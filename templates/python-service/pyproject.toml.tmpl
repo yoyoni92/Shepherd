@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "__NAME__"
+version = "0.1.0"
+description = "Shepherd __NAME__ service"
+authors = ["Shepherd Team <team@shepherd.local>"]
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115"
+uvicorn = { extras = ["standard"], version = "^0.30" }
+shepherd-contracts = { path = "../../libs", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+pytest-cov = "^5.0"
+httpx = "^0.27"
+respx = "^0.21"
+pytest-watcher = "^0.4"
+mypy = "^1.11"
+shepherd-testkit = { path = "../../testkit", develop = true }
+
+[build-system]
+requires = ["poetry-core>=1.9"]
+build-backend = "poetry.core.masonry.api"

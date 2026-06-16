@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "shepherd-contracts"
+version = "0.1.0"
+description = "Shared contracts (pydantic models + provider interfaces) for Shepherd services"
+authors = ["Shepherd Team <team@shepherd.local>"]
+packages = [{ include = "shepherd_contracts" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pydantic = "^2.9"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+
+[build-system]
+requires = ["poetry-core>=1.9"]
+build-backend = "poetry.core.masonry.api"
