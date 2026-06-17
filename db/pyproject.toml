@@ -3,7 +3,7 @@ name = "shepherd-db"
 version = "0.1.0"
 description = "Shepherd fleet DB schema, migrations, and seed"
 authors = ["Shepherd Team <team@shepherd.local>"]
-package-mode = false
+packages = [{ include = "shepherd_db" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"

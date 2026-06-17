@@ -8,8 +8,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import create_engine, text
 
-sys.path.insert(0, os.path.dirname(__file__))
-from logic import next_maintenance
+from shepherd_db.logic import next_maintenance
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",

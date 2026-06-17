@@ -28,5 +28,18 @@ services:
         condition: service_healthy
     restart: "no"
 
+  fleet-api:
+    build:
+      context: .
+      dockerfile: services/fleet-api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:

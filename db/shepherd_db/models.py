@@ -127,6 +127,7 @@ maintenance_type_type = SAEnum(
     MaintenanceTypeEnum,
     name="maintenance_type_enum",
     create_type=False,
+    values_callable=lambda x: [e.value for e in x],
 )
 last_maintenance_type_type = SAEnum(
     LastMaintenanceTypeEnum,

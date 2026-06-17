@@ -1,7 +1,7 @@
 """Tests for maintenance cycle logic."""
 
 import pytest
-from logic import next_maintenance
+from shepherd_db.logic import next_maintenance
 
 # (last_type, cycle, last_km, interval_km, expected_type, expected_km)
 CASES = [

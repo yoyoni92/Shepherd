@@ -1,14 +1,10 @@
 import os
-import sys
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-# Make the db/ package importable when running alembic from the db/ directory
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from models import Base  # noqa: E402
+from shepherd_db.models import Base
 
 # Alembic Config object for access to alembic.ini values.
 config = context.config
