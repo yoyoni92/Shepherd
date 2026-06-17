@@ -41,5 +41,23 @@ services:
       db-init:
         condition: service_completed_successfully
 
+  channel-gateway:
+    build:
+      context: .
+      dockerfile: services/channel-gateway/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/ingest}
+      S3_BUCKET: ${S3_BUCKET:-shepherd-docs}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    ports:
+      - "8001:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:
