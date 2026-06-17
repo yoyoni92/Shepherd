@@ -11,11 +11,22 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shepherd}"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  db-init:
+    build: ./db
+    command: sh entrypoint.sh
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   pgdata:

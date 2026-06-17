@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "shepherd-db"
+version = "0.1.0"
+description = "Shepherd fleet DB schema, migrations, and seed"
+authors = ["Shepherd Team <team@shepherd.local>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+sqlalchemy = "^2.0"
+alembic = "^1.13"
+psycopg = {extras = ["binary"], version = "^3.1"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+testcontainers = {extras = ["postgres"], version = "^4.8"}
+
+[build-system]
+requires = ["poetry-core>=1.9"]
+build-backend = "poetry.core.masonry.api"
