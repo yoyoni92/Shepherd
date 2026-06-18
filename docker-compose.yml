@@ -97,5 +97,25 @@ services:
       retries: 5
       start_period: 15s
 
+  rag:
+    build:
+      context: .
+      dockerfile: services/rag/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://rag_readonly:rag_readonly@postgres:5432/${POSTGRES_DB:-shepherd}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+    ports:
+      - "8004:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   pgdata:

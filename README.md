@@ -11,7 +11,7 @@ Design & build plans: [`../plans/`](../plans/README.md) (design) and
 libs/             shared contracts (pydantic models + provider interfaces)
 db/               Postgres schema, migrations, seed           [T1-T5 done]
 services/         fleet-api [done], channel-gateway [done], doc-extractor [done],
-                  image-analyser, rag, langgraph-agent,
+                  image-analyser [done], rag [done], langgraph-agent,
                   guardrails, webui                            [planned]
 n8n/              workflow JSON + Code-node units              [planned]
 infra/            docker-compose, env                          [planned]
@@ -33,3 +33,8 @@ n8n forward, identity binding, outbound send, WhatsApp seam (33 tests, 93% cover
 `services/doc-extractor` complete: Bedrock + Gemini vision extractors, provider factory,
 reconcile-by-plate -> Fleet API, eval harness (10 fixtures, prompt V1), FastAPI wrapper
 (38 tests, 94% coverage).
+
+`services/rag` complete: vehicle-profile builder, multilingual embeddings
+(paraphrase-multilingual-MiniLM-L12-v2), Chroma vector index, hard ownership filter,
+LangChain/Claude Sonnet generator, POST /query endpoint, prompt log V1-V5
+(29 tests, 91% coverage).
