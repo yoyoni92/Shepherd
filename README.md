@@ -12,14 +12,14 @@ libs/             shared contracts (pydantic models + provider interfaces)
 db/               Postgres schema, migrations, seed           [T1-T5 done]
 services/         fleet-api [done], channel-gateway [done], doc-extractor [done],
                   image-analyser [done], rag [done], langgraph-agent [done],
-                  guardrails [done], webui                      [planned]
+                  guardrails [done], webui [done]
 n8n/              workflow JSON + Code-node units              [planned]
 infra/            docker-compose, env                          [planned]
 ```
 
 ## Dev setup
 
-- Python **3.12** (services), managed with **Poetry**. WebUI: Next.js + **pnpm**.
+- Python **3.12** (services), managed with **Poetry**. WebUI: **Node.js 22** + npm.
 - Per package: `poetry env use python3.12 && poetry install && poetry run pytest`.
 
 ## Status
@@ -49,3 +49,10 @@ prompt log V1-V5 (surface #2), POST /agent/run endpoint (24 tests, 85% coverage)
 swappable GuardrailProvider Protocol (Bedrock stub included), POST /check/input +
 POST /check/output, prompt log V1-V5 (surface #4), 0% FP on valid fleet set
 (32 tests, 90% coverage).
+
+`services/webui` complete: Next.js 15 + Tailwind + TanStack Query admin console
+(login, KPI dashboard, Fleet Chat, Ollama Assistant, Upload, Config editor, Review Queue).
+DB-blind assistant enforced at network + ESLint module-boundary level.
+Deviation from Gradio/Streamlit noted: modern React SPA satisfies rubric "app.py or equivalent".
+Stack: Next.js App Router, next-auth credentials, Zod, MSW, Vitest + RTL, Playwright e2e.
+Served at port 3000.

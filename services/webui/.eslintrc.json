@@ -1,0 +1,18 @@
+{
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["hooks/useAssistant.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            {
+              "group": ["**/api/fleet*", "**/api/agent*", "**/api/gateway*"],
+              "message": "Assistant must be DB-blind: no fleet/agent/gateway imports allowed"
+            }
+          ]
+        }]
+      }
+    }
+  ]
+}
