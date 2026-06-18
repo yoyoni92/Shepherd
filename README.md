@@ -10,7 +10,7 @@ Design & build plans: [`../plans/`](../plans/README.md) (design) and
 ```
 libs/             shared contracts (pydantic models + provider interfaces)
 db/               Postgres schema, migrations, seed           [T1-T5 done]
-services/         fleet-api [done], channel-gateway [done], doc-extractor,
+services/         fleet-api [done], channel-gateway [done], doc-extractor [done],
                   image-analyser, rag, langgraph-agent,
                   guardrails, webui                            [planned]
 n8n/              workflow JSON + Code-node units              [planned]
@@ -29,3 +29,7 @@ Phase 1 (foundation) complete: `libs/` contracts, `db/` schema/migrations, and
 
 `services/channel-gateway` complete: Telegram + webapp inbound, S3 media upload,
 n8n forward, identity binding, outbound send, WhatsApp seam (33 tests, 93% coverage).
+
+`services/doc-extractor` complete: Bedrock + Gemini vision extractors, provider factory,
+reconcile-by-plate -> Fleet API, eval harness (10 fixtures, prompt V1), FastAPI wrapper
+(38 tests, 94% coverage).

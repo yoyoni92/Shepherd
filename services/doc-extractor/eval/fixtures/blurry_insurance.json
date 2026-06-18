@@ -1,0 +1,17 @@
+{
+  "scenario": "blurry_insurance",
+  "doc_type": "insurance_cert",
+  "expected_pass": true,
+  "llm_response": {
+    "fields": {
+      "insurer": "Harel Insurance",
+      "policy_number": null,
+      "plate_number": "12-345-67",
+      "coverage_type": null,
+      "valid_from": null,
+      "valid_to": "2025-01-01"
+    },
+    "confidence": 0.61,
+    "raw": "Harel Insurance | Plate: 12-345-67 | ...unreadable... | Valid to: 01/01/2025"
+  }
+}

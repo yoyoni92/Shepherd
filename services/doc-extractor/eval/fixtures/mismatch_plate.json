@@ -1,0 +1,17 @@
+{
+  "scenario": "mismatch_plate",
+  "doc_type": "insurance_cert",
+  "expected_pass": true,
+  "llm_response": {
+    "fields": {
+      "insurer": "Clal Insurance",
+      "policy_number": "CLK-99001",
+      "plate_number": "XX-999-ZZ",
+      "coverage_type": "third-party",
+      "valid_from": "2023-07-01",
+      "valid_to": "2024-07-01"
+    },
+    "confidence": 0.82,
+    "raw": "Clal | Policy CLK-99001 | Plate XX-999-ZZ | Third Party | 01/07/2023 - 01/07/2024"
+  }
+}

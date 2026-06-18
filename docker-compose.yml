@@ -40,6 +40,12 @@ services:
     depends_on:
       db-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   channel-gateway:
     build:
@@ -58,6 +64,38 @@ services:
     depends_on:
       db-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  doc-extractor:
+    build:
+      context: .
+      dockerfile: services/doc-extractor/Dockerfile
+    environment:
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
+      BEDROCK_REGION: ${BEDROCK_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-shepherd-docs}
+      FLEET_API_URL: http://fleet-api:8000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+      EXTRACTOR_PROVIDER: ${EXTRACTOR_PROVIDER:-bedrock}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8002:8002"
+    depends_on:
+      fleet-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   pgdata:
