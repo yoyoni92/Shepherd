@@ -12,7 +12,7 @@ libs/             shared contracts (pydantic models + provider interfaces)
 db/               Postgres schema, migrations, seed           [T1-T5 done]
 services/         fleet-api [done], channel-gateway [done], doc-extractor [done],
                   image-analyser [done], rag [done], langgraph-agent [done],
-                  guardrails, webui                            [planned]
+                  guardrails [done], webui                      [planned]
 n8n/              workflow JSON + Code-node units              [planned]
 infra/            docker-compose, env                          [planned]
 ```
@@ -43,3 +43,9 @@ LangChain/Claude Sonnet generator, POST /query endpoint, prompt log V1-V5
 synthesiser), Fleet API + RAG tool wrappers with caller-context forwarding, 403 surfaces
 as refusal, injectable planner/synthesiser for deterministic tests, tool-description
 prompt log V1-V5 (surface #2), POST /agent/run endpoint (24 tests, 85% coverage).
+
+`services/guardrails` complete: deterministic auth + language pre-checks
+(channel_identities + langdetect), Guardrails AI topic + grounding rails behind a
+swappable GuardrailProvider Protocol (Bedrock stub included), POST /check/input +
+POST /check/output, prompt log V1-V5 (surface #4), 0% FP on valid fleet set
+(32 tests, 90% coverage).

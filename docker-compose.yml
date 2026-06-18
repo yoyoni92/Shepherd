@@ -140,5 +140,26 @@ services:
       retries: 5
       start_period: 15s
 
+  guardrails:
+    build:
+      context: .
+      dockerfile: services/guardrails/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://shepherd:shepherd@postgres:5432/shepherd}
+      GUARDRAILS_API_KEY: ${GUARDRAILS_API_KEY:-}
+      GUARDRAILS_LLM: ${GUARDRAILS_LLM:-openai/gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   pgdata:
