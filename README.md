@@ -11,7 +11,7 @@ Design & build plans: [`../plans/`](../plans/README.md) (design) and
 libs/             shared contracts (pydantic models + provider interfaces)
 db/               Postgres schema, migrations, seed           [T1-T5 done]
 services/         fleet-api [done], channel-gateway [done], doc-extractor [done],
-                  image-analyser [done], rag [done], langgraph-agent,
+                  image-analyser [done], rag [done], langgraph-agent [done],
                   guardrails, webui                            [planned]
 n8n/              workflow JSON + Code-node units              [planned]
 infra/            docker-compose, env                          [planned]
@@ -38,3 +38,8 @@ reconcile-by-plate -> Fleet API, eval harness (10 fixtures, prompt V1), FastAPI 
 (paraphrase-multilingual-MiniLM-L12-v2), Chroma vector index, hard ownership filter,
 LangChain/Claude Sonnet generator, POST /query endpoint, prompt log V1-V5
 (29 tests, 91% coverage).
+
+`services/langgraph-agent` complete: LangGraph StateGraph (planner -> tool-exec ->
+synthesiser), Fleet API + RAG tool wrappers with caller-context forwarding, 403 surfaces
+as refusal, injectable planner/synthesiser for deterministic tests, tool-description
+prompt log V1-V5 (surface #2), POST /agent/run endpoint (24 tests, 85% coverage).
