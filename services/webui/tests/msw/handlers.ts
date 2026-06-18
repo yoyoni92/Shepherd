@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 const FLEET = process.env.NEXT_PUBLIC_FLEET_API_URL ?? 'http://localhost:8000'
 const AGENT = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:8003'
 const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8001'
-const ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:11434'
+const ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:8006'
 
 export const handlers = [
   http.get(`${FLEET}/kpis`, () =>

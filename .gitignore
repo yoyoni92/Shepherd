@@ -14,10 +14,14 @@ build/
 node_modules/
 .next/
 coverage/
+next-env.d.ts
+test-results/
 
 # Env / secrets
 .env
 *.env
+.env.local
+*.env.local
 !.env.example
 
 # Models / data artifacts

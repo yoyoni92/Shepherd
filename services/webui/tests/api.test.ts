@@ -8,7 +8,7 @@ import { uploadDocument } from '@/lib/api/gateway'
 const FLEET = process.env.NEXT_PUBLIC_FLEET_API_URL ?? 'http://localhost:8000'
 const AGENT = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:8003'
 const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8001'
-const ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:11434'
+const ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:8006'
 
 describe('API client error paths', () => {
   it('fetchKpis throws on non-ok response', async () => {
