@@ -4,8 +4,8 @@ FROM python:3.12-slim
 RUN pip install --no-cache-dir poetry==2.4.0
 WORKDIR /app
 
+COPY db /db
 COPY services/guardrails /app/svc
-COPY db /app/db
 
 WORKDIR /app/svc
 RUN poetry config virtualenvs.create false \
