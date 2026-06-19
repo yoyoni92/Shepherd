@@ -1,53 +1,101 @@
 'use client'
+import { useEffect, useState } from 'react'
 import { useConfig } from '@/hooks/useConfig'
-import { useState } from 'react'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+
+interface Field {
+  key: string
+  label: string
+  desc: string
+  unit: string
+  step: number
+}
+
+const FIELDS: Field[] = [
+  { key: 'docs_expiry_warning_days', label: 'התראת תוקף מסמכים', desc: 'מספר ימים מראש להתראה על מסמך פג', unit: 'ימים', step: 5 },
+  { key: 'condition_min_alert', label: 'סף מצב רכב מינימלי', desc: 'מתחת לציון זה הרכב מסומן לתחזוקה', unit: 'נק׳', step: 5 },
+  { key: 'ticket_unpaid_days', label: 'חלון דוחות לא משולמים', desc: 'ימים עד שדוח מסומן כחורג', unit: 'ימים', step: 1 },
+  { key: 'maintenance_interval_km', label: 'מרווח טיפול (ק״מ)', desc: 'מרחק בין טיפולים תקופתיים', unit: 'ק״מ', step: 1000 },
+  { key: 'maintenance_interval_days', label: 'מרווח טיפול (זמן)', desc: 'ימים מקסימלי בין טיפולים', unit: 'ימים', step: 30 },
+  { key: 'low_confidence_threshold', label: 'סף ביטחון לחילוץ', desc: 'מתחת לאחוז זה פריט עובר לתור בדיקה', unit: '%', step: 5 },
+]
+
+const DEFAULTS: Record<string, number> = {
+  docs_expiry_warning_days: 30,
+  condition_min_alert: 60,
+  ticket_unpaid_days: 14,
+  maintenance_interval_km: 15000,
+  maintenance_interval_days: 180,
+  low_confidence_threshold: 70,
+}
+
+function seed(config: Record<string, unknown> | undefined): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const f of FIELDS) out[f.key] = Number(config?.[f.key] ?? DEFAULTS[f.key])
+  return out
+}
 
 export default function ConfigPage() {
   const { config, loading, save, saving } = useConfig()
-  const [edits, setEdits] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<Record<string, number>>(() => seed(undefined))
 
-  if (loading) return <p className="text-muted text-sm">Loading...</p>
+  useEffect(() => {
+    if (config) setValues(seed(config))
+  }, [config])
+
+  if (loading) return <p className="text-faint text-sm">טוען…</p>
+
+  const bump = (key: string, delta: number) =>
+    setValues((v) => ({ ...v, [key]: Math.max(0, v[key] + delta) }))
+
+  const saveAll = () => {
+    for (const f of FIELDS) save({ key: f.key, value: values[f.key] })
+  }
 
   return (
-    <div>
-      <h2 className="text-[15px] font-bold mb-4">Config</h2>
-      <div className="bg-panel border border-line rounded-xl p-4">
-        <h3 className="text-[11px] uppercase tracking-wider text-slate-400 mb-3">
-          System configuration
-        </h3>
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr className="text-muted text-[10px] uppercase tracking-wider">
-              <th className="text-left py-2 px-2">Key</th>
-              <th className="text-left py-2 px-2">Value</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(config ?? {}).map(([key, val]) => (
-              <tr key={key} className="border-t border-line">
-                <td className="py-2 px-2 font-mono text-slate-300">{key}</td>
-                <td className="py-2 px-2">
-                  <input
-                    className="bg-panel2 border border-line rounded px-2 py-1 text-slate-200 font-mono text-xs w-40 outline-none focus:border-blue-500"
-                    defaultValue={String(val)}
-                    onChange={e => setEdits(d => ({ ...d, [key]: e.target.value }))}
-                  />
-                </td>
-                <td className="py-2 px-2">
-                  <button
-                    disabled={saving}
-                    onClick={() => save({ key, value: edits[key] ?? val })}
-                    className="bg-emerald-950 text-emerald-300 border border-emerald-800 rounded px-3 py-1 font-bold text-[11px] hover:brightness-110 disabled:opacity-50"
-                  >
-                    Save
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="animate-fade-up" style={{ maxWidth: 760 }}>
+      <Card style={{ padding: '8px 22px 16px' }}>
+        {FIELDS.map((f) => (
+          <div key={f.key} className="flex items-center gap-5 border-b border-divider" style={{ padding: '18px 0' }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14.5px] font-bold mb-[3px]">{f.label}</div>
+              <div className="text-[12px] text-faint">{f.desc}</div>
+              <div className="text-[11px] font-mono mt-1 ltr" style={{ color: '#334155' }}>
+                {f.key}
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                aria-label={`הפחת ${f.label}`}
+                onClick={() => bump(f.key, -f.step)}
+                className="w-8 h-8 rounded-lg bg-panel2 border border-control text-muted text-lg cursor-pointer flex items-center justify-center hover:text-ink"
+              >
+                −
+              </button>
+              <div className="text-center bg-bg border border-control rounded-lg" style={{ minWidth: 92, padding: '8px 6px' }}>
+                <span className="text-[16px] font-extrabold text-accent">{values[f.key].toLocaleString()}</span>
+                <span className="text-[11px] text-faint mr-1">{f.unit}</span>
+              </div>
+              <button
+                aria-label={`הגדל ${f.label}`}
+                onClick={() => bump(f.key, f.step)}
+                className="w-8 h-8 rounded-lg bg-panel2 border border-control text-muted text-lg cursor-pointer flex items-center justify-center hover:text-ink"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        ))}
+        <div className="flex justify-start gap-2.5 pt-[18px]">
+          <Button onClick={saveAll} disabled={saving}>
+            שמירת הגדרות
+          </Button>
+          <Button variant="secondary" onClick={() => setValues(seed(config))}>
+            איפוס
+          </Button>
+        </div>
+      </Card>
     </div>
   )
 }

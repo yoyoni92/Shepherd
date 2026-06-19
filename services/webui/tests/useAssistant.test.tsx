@@ -28,5 +28,5 @@ it('T4 - returns assistant response content', async () => {
   const { result } = renderHook(() => useAssistant())
   await act(async () => { await result.current.send('How often should fleet tires be rotated?') })
   await waitFor(() => expect(result.current.messages).toHaveLength(2))
-  expect(result.current.messages[1].content).toMatch(/8,000|rotate/i)
+  expect(result.current.messages[1].content).toContain('שמן')
 })

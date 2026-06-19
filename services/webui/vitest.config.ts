@@ -9,10 +9,13 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     exclude: ['e2e/**', 'node_modules/**'],
+    // Client base points at the mocked Fleet host (the Next proxy is bypassed in unit tests).
+    env: { NEXT_PUBLIC_FLEET_BASE: 'http://localhost:8000' },
     coverage: {
       provider: 'v8',
       include: ['lib/**', 'hooks/**'],
-      exclude: ['lib/auth.ts'],  // ponytail: NextAuth config, not business logic - mocked in all tests
+      // ponytail: NextAuth config, cn() styling helper, and no-backend sample data — not business logic
+      exclude: ['lib/auth.ts', 'lib/utils.ts', 'lib/preview.ts'],
       thresholds: { lines: 85, functions: 85, branches: 85, statements: 85 },
     },
   },

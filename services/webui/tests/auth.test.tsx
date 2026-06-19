@@ -27,23 +27,23 @@ describe('T1 - Admin login', () => {
   it('redirects to /dashboard on valid credentials', async () => {
     vi.mocked(signIn).mockResolvedValue({ ok: true, error: null, status: 200, url: '/dashboard' } as never)
     render(<LoginPage />)
-    await userEvent.type(screen.getByLabelText(/password/i), 'correct-pass')
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await userEvent.type(screen.getByLabelText('סיסמה'), 'correct-pass')
+    await userEvent.click(screen.getByRole('button', { name: 'כניסה למערכת' }))
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard'))
   })
 
   it('shows error message on invalid credentials', async () => {
     vi.mocked(signIn).mockResolvedValue({ ok: false, error: 'CredentialsSignin', status: 401, url: null } as never)
     render(<LoginPage />)
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
-    await waitFor(() => expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: 'כניסה למערכת' }))
+    await waitFor(() => expect(screen.getByText('פרטי התחברות שגויים')).toBeInTheDocument())
   })
 
   it('calls signIn with credentials provider', async () => {
     vi.mocked(signIn).mockResolvedValue({ ok: true } as never)
     render(<LoginPage />)
-    await userEvent.type(screen.getByLabelText(/password/i), 'secret')
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await userEvent.type(screen.getByLabelText('סיסמה'), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: 'כניסה למערכת' }))
     expect(signIn).toHaveBeenCalledWith('credentials', expect.objectContaining({ password: 'secret', redirect: false }))
   })
 })

@@ -1,0 +1,6 @@
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
+# Playwright
+/test-results/
+/playwright-report/

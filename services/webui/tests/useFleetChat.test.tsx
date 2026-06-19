@@ -11,7 +11,8 @@ describe('T3 - useFleetChat', () => {
     await waitFor(() => expect(result.current.messages).toHaveLength(2))
     expect(result.current.messages[0]).toMatchObject({ role: 'user', content: 'What is the status of vehicle 12-345-67?' })
     expect(result.current.messages[1]).toMatchObject({ role: 'assistant' })
-    expect(result.current.messages[1].citations).toContain('vehicles · plate 12-345-67')
+    // Agent returns tools_used (no citation list yet — gap D1)
+    expect(result.current.messages[1].tool_calls).toContain('fleet_api')
   })
 
   it('clears loading after response arrives', async () => {

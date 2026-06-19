@@ -1,57 +1,118 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
+import {
+  LayoutDashboard,
+  Truck,
+  User,
+  CheckSquare,
+  CalendarCheck,
+  Settings,
+  MessageSquare,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react'
+import { useVehicles } from '@/hooks/useVehicles'
+import { useDrivers } from '@/hooks/useDrivers'
+import { useMissions } from '@/hooks/useMissions'
+import { isOpen } from '@/lib/domain'
 
-const NAV = [
-  { href: '/dashboard', icon: '▦', label: 'Dashboard' },
-  { href: '/chat', icon: '◆', label: 'Fleet Chat' },
-  { href: '/assistant', icon: '✦', label: 'Assistant' },
-  { href: '/upload', icon: '⬆', label: 'Upload' },
-  { href: '/config', icon: '⚙', label: 'Config' },
-  { href: '/review', icon: '⚑', label: 'Review Queue' },
+type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'missions' }
+
+const NAV: NavItem[] = [
+  { href: '/dashboard', label: 'לוח בקרה', Icon: LayoutDashboard },
+  { href: '/vehicles', label: 'רכבים', Icon: Truck, badge: 'vehicles' },
+  { href: '/drivers', label: 'נהגים', Icon: User, badge: 'drivers' },
+  { href: '/missions', label: 'משימות', Icon: CheckSquare, badge: 'missions' },
+  { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
+  { href: '/config', label: 'הגדרות', Icon: Settings },
+  { href: '/chat', label: 'צ׳אט ועוזר', Icon: MessageSquare },
 ]
 
-export function Sidebar() {
+export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname()
-  const { data: session } = useSession()
-  const initials = session?.user?.name?.[0]?.toUpperCase() ?? 'A'
+  const { vehicles } = useVehicles()
+  const { drivers } = useDrivers()
+  const { missions } = useMissions()
+  const counts: Record<string, number> = {
+    vehicles: vehicles.length,
+    drivers: drivers.length,
+    missions: missions.filter(isOpen).length,
+  }
 
   return (
-    <aside className="bg-panel2 border-r border-line flex flex-col p-4" style={{ width: 212 }}>
-      <div className="flex items-center gap-2.5 mb-5">
-        <img src="/logo.png" alt="Shepherd" className="w-8 h-8" style={{ mixBlendMode: 'lighten' }} />
-        <span className="font-extrabold text-sm tracking-tight">Shepherd</span>
+    <aside
+      className="bg-raised border-l border-line flex flex-col sticky top-0 h-screen shrink-0 transition-[width] duration-200 ease-out"
+      style={{ width: collapsed ? 74 : 244, minWidth: collapsed ? 74 : 244, padding: '16px 14px' }}
+    >
+      <div className="flex items-center gap-[11px] px-1.5 mb-3.5" style={{ height: 56 }}>
+        <div
+          className="flex items-center justify-center shrink-0"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 9,
+            background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)',
+          }}
+        >
+          <Truck size={19} color="#fff" />
+        </div>
+        {!collapsed && (
+          <div className="text-[15px] font-extrabold whitespace-nowrap">ניהול צי רכב</div>
+        )}
       </div>
-      <nav className="flex flex-col gap-1 flex-1">
-        {NAV.map(({ href, icon, label }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-semibold transition-colors ${
-              pathname?.startsWith(href)
-                ? 'bg-blue-950 text-blue-200 border border-blue-900'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-            }`}
-          >
-            <span className="w-4 text-center opacity-90 text-sm">{icon}</span>
-            {label}
-          </Link>
-        ))}
+
+      <nav className="flex flex-col gap-1">
+        {NAV.map(({ href, label, Icon, badge }) => {
+          const active = pathname === href || pathname?.startsWith(href + '/')
+          const count = badge ? counts[badge] : undefined
+          return (
+            <Link
+              key={href}
+              href={href}
+              title={label}
+              className="flex items-center gap-3 w-full rounded-[10px] text-sm font-semibold cursor-pointer"
+              style={{
+                padding: '11px 12px',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                background: active ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'transparent',
+                color: active ? '#fff' : '#94a3b8',
+                boxShadow: active ? '0 6px 16px rgba(59,130,246,.32)' : 'none',
+              }}
+            >
+              <span className="flex items-center justify-center" style={{ minWidth: 20 }}>
+                <Icon size={19} />
+              </span>
+              {!collapsed && <span className="flex-1 text-right whitespace-nowrap">{label}</span>}
+              {!collapsed && count != null && (
+                <span
+                  className="text-[11px] font-bold rounded-full text-center"
+                  style={{
+                    padding: '1px 8px',
+                    minWidth: 20,
+                    background: active ? 'rgba(255,255,255,.15)' : '#1a2030',
+                    color: active ? '#fff' : '#94a3b8',
+                  }}
+                >
+                  {count}
+                </span>
+              )}
+            </Link>
+          )
+        })}
       </nav>
-      <div className="border-t border-line pt-3 mt-2 flex items-center gap-2">
-        <div className="w-7 h-7 rounded-full bg-indigo-950 border border-purple-800 text-violet-300 flex items-center justify-center font-bold text-xs">
-          {initials}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold truncate">{session?.user?.name ?? 'Admin'}</div>
-          <div className="text-[10px] text-muted">Administrator</div>
-        </div>
+
+      <div className="mt-auto pt-3.5 border-t border-line">
         <button
           onClick={() => signOut({ callbackUrl: '/' })}
-          className="text-muted hover:text-rose-400 text-xs bg-transparent border-none cursor-pointer"
+          className="w-full flex items-center gap-[11px] bg-transparent border-0 text-faint rounded-[9px] cursor-pointer text-sm font-semibold hover:text-ink"
+          style={{ padding: '10px 12px', justifyContent: collapsed ? 'center' : 'flex-start' }}
         >
-          Logout
+          <span className="flex justify-center" style={{ minWidth: 20 }}>
+            <LogOut size={18} />
+          </span>
+          {!collapsed && <span className="whitespace-nowrap">יציאה</span>}
         </button>
       </div>
     </aside>

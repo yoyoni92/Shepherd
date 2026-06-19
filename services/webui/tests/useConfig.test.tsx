@@ -7,7 +7,7 @@ describe('T6 - useConfig', () => {
   it('fetches config from Fleet API', async () => {
     const { result } = renderHook(() => useConfig(), { wrapper: QueryClientWrapper })
     await waitFor(() => expect(result.current.config).toBeDefined())
-    expect(result.current.config?.license_expiring_days).toBe(30)
+    expect(result.current.config?.docs_expiry_warning_days).toBe(30)
   })
 
   it('sets saveError when value fails Zod validation', async () => {
