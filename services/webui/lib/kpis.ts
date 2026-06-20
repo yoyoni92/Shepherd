@@ -1,51 +1,52 @@
-import type { VehicleRead, DriverRead, EventRead, ReportRead } from './api/schemas'
-import { daysTo } from './domain'
+import type { KpiDailyRead } from './api/schemas'
 
-export interface Kpis {
-  vehicles: number
-  activeDrivers: number
-  docsExpiring30d: number
-  openEvents: number
-  unpaidTickets: number
-  maintenanceDue: number
+// VP-grade dashboard tiles, precomputed nightly into kpi_daily and read O(1).
+// Each tile maps to one column; trends come free from comparing the latest two rows.
+export const KPI_TILE_KEYS = [
+  'fleetKm7d',
+  'avgKmPerDriver',
+  'maintCadence',
+  'maintDue',
+  'docsExpiring',
+  'topCustomer',
+] as const
+
+export type KpiTileKey = (typeof KPI_TILE_KEYS)[number]
+export type TrendDir = 'up' | 'down' | 'flat'
+
+export interface KpiTile {
+  key: KpiTileKey
+  value: number | null
+  delta: number | null
+  trend: TrendDir | null
 }
 
-export interface KpiConfig {
-  docs_expiry_warning_days: number
+const COLUMN: Record<KpiTileKey, (r: KpiDailyRead) => number | null> = {
+  fleetKm7d: (r) => r.total_km_7d,
+  avgKmPerDriver: (r) => r.avg_km_per_driver_7d,
+  maintCadence: (r) => r.avg_days_between_maintenance,
+  maintDue: (r) => r.maintenance_due_count,
+  docsExpiring: (r) => r.docs_expiring_count,
+  topCustomer: (r) => r.top_customer_km,
 }
+
+const round1 = (n: number) => Math.round(n * 10) / 10
 
 /**
- * Fleet API exposes no `/kpis` endpoint — the six dashboard numbers are derived from the
- * real `/vehicles`, `/drivers`, `/events` and `/reports` lists plus config thresholds.
- * Pure & deterministic given `today`. (See API_ALIGNMENT.md.)
+ * Map the latest kpi_daily rows (newest first) to the six dashboard tiles.
+ * Trend per tile = today vs yesterday; a single row yields no trend.
  */
-export function deriveKpis(
-  vehicles: readonly VehicleRead[],
-  drivers: readonly DriverRead[],
-  events: readonly EventRead[],
-  reports: readonly ReportRead[],
-  config: KpiConfig,
-  today: Date = new Date(),
-): Kpis {
-  const warn = config.docs_expiry_warning_days
-  const expiring = (d: string | null | undefined) => d != null && daysTo(d, today) < warn
-
-  let docsExpiring30d = 0
-  let maintenanceDue = 0
-  for (const v of vehicles) {
-    if (expiring(v.insurance_valid_to)) docsExpiring30d++
-    if (expiring(v.license_valid_to)) docsExpiring30d++
-    if (v.current_km != null && v.next_maintenance_km != null && v.current_km >= v.next_maintenance_km) {
-      maintenanceDue++
+export function deriveKpiTiles(rows: readonly KpiDailyRead[]): KpiTile[] {
+  const [today, prev] = rows
+  return KPI_TILE_KEYS.map((key) => {
+    const get = COLUMN[key]
+    const value = today ? get(today) : null
+    let delta: number | null = null
+    let trend: TrendDir | null = null
+    if (today && prev) {
+      delta = round1((get(today) ?? 0) - (get(prev) ?? 0))
+      trend = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
     }
-  }
-
-  return {
-    vehicles: vehicles.length,
-    activeDrivers: drivers.filter((d) => d.status === 'active').length,
-    docsExpiring30d,
-    openEvents: events.filter((e) => e.status === 'open').length,
-    unpaidTickets: reports.filter((r) => r.status === 'unpaid').length,
-    maintenanceDue,
-  }
+    return { key, value, delta, trend }
+  })
 }

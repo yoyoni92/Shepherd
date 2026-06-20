@@ -10,24 +10,22 @@ interface Field {
   desc: string
   unit: string
   step: number
+  max?: number
 }
 
+// Real seeded system_config numeric keys (services/fleet-api, db seed).
 const FIELDS: Field[] = [
-  { key: 'docs_expiry_warning_days', label: 'התראת תוקף מסמכים', desc: 'מספר ימים מראש להתראה על מסמך פג', unit: 'ימים', step: 5 },
-  { key: 'condition_min_alert', label: 'סף מצב רכב מינימלי', desc: 'מתחת לציון זה הרכב מסומן לתחזוקה', unit: 'נק׳', step: 5 },
-  { key: 'ticket_unpaid_days', label: 'חלון דוחות לא משולמים', desc: 'ימים עד שדוח מסומן כחורג', unit: 'ימים', step: 1 },
-  { key: 'maintenance_interval_km', label: 'מרווח טיפול (ק״מ)', desc: 'מרחק בין טיפולים תקופתיים', unit: 'ק״מ', step: 1000 },
-  { key: 'maintenance_interval_days', label: 'מרווח טיפול (זמן)', desc: 'ימים מקסימלי בין טיפולים', unit: 'ימים', step: 30 },
-  { key: 'low_confidence_threshold', label: 'סף ביטחון לחילוץ', desc: 'מתחת לאחוז זה פריט עובר לתור בדיקה', unit: '%', step: 5 },
+  { key: 'license_expiring_days', label: 'התראת תוקף רישוי', desc: 'ימים מראש להתראה על רישוי רכב פג', unit: 'ימים', step: 1 },
+  { key: 'insurance_expiring_days', label: 'התראת תוקף ביטוח', desc: 'ימים מראש להתראה על ביטוח פג', unit: 'ימים', step: 1 },
+  { key: 'maintenance_km_buffer', label: 'מרווח התראת טיפול', desc: 'ק״מ לפני הטיפול הבא שבו מופקת התראה', unit: 'ק״מ', step: 100 },
+  { key: 'image_confidence_min', label: 'סף ביטחון לזיהוי מסמך', desc: 'מתחת לערך זה (0–1) מסמך עובר לבדיקה', unit: '', step: 0.05, max: 1 },
 ]
 
 const DEFAULTS: Record<string, number> = {
-  docs_expiry_warning_days: 30,
-  condition_min_alert: 60,
-  ticket_unpaid_days: 14,
-  maintenance_interval_km: 15000,
-  maintenance_interval_days: 180,
-  low_confidence_threshold: 70,
+  license_expiring_days: 30,
+  insurance_expiring_days: 30,
+  maintenance_km_buffer: 1000,
+  image_confidence_min: 0.7,
 }
 
 function seed(config: Record<string, unknown> | undefined): Record<string, number> {
@@ -47,7 +45,13 @@ export default function ConfigPage() {
   if (loading) return <p className="text-faint text-sm">טוען…</p>
 
   const bump = (key: string, delta: number) =>
-    setValues((v) => ({ ...v, [key]: Math.max(0, v[key] + delta) }))
+    setValues((v) => {
+      const f = FIELDS.find((x) => x.key === key)
+      // round to 2dp so 0.05 steps don't drift (image_confidence_min is a 0–1 float)
+      let next = Math.max(0, Math.round((v[key] + delta) * 100) / 100)
+      if (f?.max != null) next = Math.min(f.max, next)
+      return { ...v, [key]: next }
+    })
 
   const saveAll = () => {
     for (const f of FIELDS) save({ key: f.key, value: values[f.key] })

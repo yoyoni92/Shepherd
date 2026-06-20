@@ -1,16 +1,6 @@
-// PREVIEW-ONLY domain — no backend yet (API_ALIGNMENT.md gaps B1 missions, B2 attendance).
-// These types + sample data let the Missions and Attendance sections render the design while the
+// PREVIEW-ONLY domain — no backend yet (API_ALIGNMENT.md gap B2 attendance).
+// These types + sample data let the Attendance section render the design while the
 // backing endpoints are built. UI surfaces a "no API" banner so this is never mistaken for live data.
-
-export interface Mission {
-  id: number
-  title: string
-  priority: 'high' | 'medium' | 'low'
-  vehicle: string
-  driver: string
-  due: string
-  status: 'pending' | 'in_progress' | 'done'
-}
 
 export interface AttendanceDay {
   day: number
@@ -34,15 +24,6 @@ export interface AttendanceMonth {
   employees: Employee[]
   records: Record<string, AttendanceDay[]>
 }
-
-export const SAMPLE_MISSIONS: Mission[] = [
-  { id: 1, title: 'איסוף משלוח דחוף — נמל אשדוד', priority: 'high', vehicle: '45-990-12', driver: 'נעם ברק', due: 'היום · 14:00', status: 'in_progress' },
-  { id: 2, title: 'הסעת צוות הנהלה — מטה תל אביב', priority: 'high', vehicle: '23-110-88', driver: 'מאיה גל', due: 'היום · 16:30', status: 'pending' },
-  { id: 3, title: 'טיפול 15,000 ק״מ — מוסך מרכזי', priority: 'medium', vehicle: '88-201-55', driver: 'יוסי מזרחי', due: 'מחר · 09:00', status: 'pending' },
-  { id: 4, title: 'חידוש ביטוח חובה — רכב 77-004-31', priority: 'medium', vehicle: '77-004-31', driver: 'לא משויך', due: '21/06', status: 'pending' },
-  { id: 5, title: 'בדיקת רישוי שנתי (טסט)', priority: 'low', vehicle: '56-321-09', driver: 'איתי שמש', due: '24/06', status: 'pending' },
-  { id: 6, title: 'החזרת רכב שכור לחברת ההשכרה', priority: 'low', vehicle: '12-345-67', driver: 'דנה לוי', due: '28/06', status: 'done' },
-]
 
 const EMPLOYEES: Employee[] = [
   { id: 1, name: 'דנה לוי', role: 'נהגת', dept: 'תפעול' },

@@ -1,24 +1,16 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { fetchVehicles, fetchDrivers, fetchEvents, fetchReports, fetchConfig } from '@/lib/api/fleet'
-import { deriveKpis } from '@/lib/kpis'
+import { fetchKpiDaily } from '@/lib/api/fleet'
+import { deriveKpiTiles } from '@/lib/kpis'
 
-// No `/kpis` endpoint: fetch the real lists in parallel and derive the six numbers.
+// Reads the latest 2 kpi_daily snapshots (precomputed nightly) → six tiles + trend arrows.
 export function useKpis() {
   return useQuery({
-    queryKey: ['kpis'],
+    queryKey: ['kpi-daily'],
     queryFn: async () => {
-      const [vehicles, drivers, events, reports, config] = await Promise.all([
-        fetchVehicles(),
-        fetchDrivers(),
-        fetchEvents(),
-        fetchReports(),
-        fetchConfig(),
-      ])
-      return deriveKpis(vehicles, drivers, events, reports, {
-        docs_expiry_warning_days: Number(config.docs_expiry_warning_days ?? 30),
-      })
+      const rows = await fetchKpiDaily(2)
+      return { tiles: deriveKpiTiles(rows), latest: rows[0] ?? null }
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   })
 }

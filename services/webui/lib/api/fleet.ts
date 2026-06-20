@@ -5,7 +5,8 @@ import {
   ConfigReadSchema,
   EventReadSchema,
   ReportReadSchema,
-  ReviewItemSchema,
+  KpiDailyReadSchema,
+  CustomerReadSchema,
   type VehicleRead,
   type VehicleCreate,
   type DriverRead,
@@ -53,9 +54,15 @@ export const createDriver = (d: DriverCreate): Promise<DriverRead> =>
   send('POST', '/drivers', d, DriverReadSchema)
 export const deleteDriver = (driverId: string) => send('DELETE', `/drivers/${driverId}`, undefined)
 
-// Events / reports (read-only; back KPIs + alerts)
+// Events / reports (read-only; back alerts)
 export const fetchEvents = () => get('/events', z.array(EventReadSchema))
 export const fetchReports = () => get('/reports', z.array(ReportReadSchema))
+
+// Customers (read-only; resolves the KPI top-customer name)
+export const fetchCustomers = () => get('/customers', z.array(CustomerReadSchema))
+
+// KPI daily rollup: latest snapshots, newest first (dashboard tiles + trends)
+export const fetchKpiDaily = (limit = 2) => get(`/kpi/daily?limit=${limit}`, z.array(KpiDailyReadSchema))
 
 // Config: API returns a list of {config_key, config_value, description}; expose as a record.
 export async function fetchConfig(): Promise<Record<string, unknown>> {
@@ -64,10 +71,5 @@ export async function fetchConfig(): Promise<Record<string, unknown>> {
 }
 export const updateConfig = (key: string, value: unknown) =>
   send('PUT', `/config/${key}`, { config_value: value })
-
-// Review queue: no real endpoint yet (gap B3); kept mocked behind the proxy.
-export const fetchReviewQueue = () => get('/review-queue', z.array(ReviewItemSchema))
-export const resolveReviewItem = (id: string, action: 'accept' | 'reject', payload?: unknown) =>
-  send('PUT', `/review-queue/${id}/${action}`, payload ?? {})
 
 export type { VehicleRead, DriverRead, EventRead, ReportRead }

@@ -2,7 +2,8 @@
 // ponytail: no fleet/agent/gateway imports - ESLint enforces this at hooks/useAssistant.ts
 import { useState, useCallback } from 'react'
 
-const ASSISTANT_URL = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:8006'
+// Browser → same-origin proxy (app/api/proxy/assistant); tests point straight at the assistant host.
+const ASSISTANT_URL = process.env.NEXT_PUBLIC_ASSISTANT_BASE ?? '/api/proxy/assistant'
 
 export interface AssistantMessage {
   role: 'user' | 'assistant'

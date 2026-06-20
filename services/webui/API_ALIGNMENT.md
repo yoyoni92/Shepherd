@@ -3,7 +3,7 @@
 Tracks how the admin console (this service) maps onto the **real** backend services, and the
 gaps where the UI needs data/endpoints that do not exist yet. Update this file as gaps close.
 
-Legend: ✅ wired to real API · ⚠️ wired but with field gaps · ❌ no backend (mocked/placeholder)
+Legend: ✅ wired to real API · ⚠️ wired but with field gaps · ❌ no backend (mocked/placeholder) · 🗑 removed
 
 ## Auth model (applies to every Fleet API call)
 
@@ -25,22 +25,26 @@ way (see gap A2).
 | UI section | Real endpoint(s) | Status | Notes |
 |---|---|---|---|
 | Login | NextAuth credentials (webui-local) | ✅ | Not a backend call. |
-| Dashboard · KPIs | derived from `/vehicles` `/drivers` `/events` `/reports` `/config` | ✅ | No `/kpis` endpoint exists; computed client-side (`lib/kpis.ts` `deriveKpis`). |
+| Dashboard · KPIs | `GET /kpi/daily?limit=2` (+ `/customers` for the top-customer name) | ✅ | Six VP-grade tiles from the nightly `kpi_daily` rollup; trends derived from the latest 2 rows (`lib/kpis.ts` `deriveKpiTiles`). |
 | Dashboard · Alerts | `GET /events?status=open` | ✅ | Mapped from real events (`lib/alerts.ts` `alertsFromEvents`). |
-| Dashboard · Urgent list | `GET /events` (open, by severity) | ⚠️ | Shown as "אירועים דחופים". No `missions` concept (gap B1). |
-| Vehicles | `GET/POST /vehicles`, `DELETE /vehicles/{vehicle_id}` | ⚠️ | Field gaps C1. Delete by **UUID**. |
-| Drivers | `GET/POST /drivers`, `DELETE /drivers/{driver_id}` | ⚠️ | Field gaps C2. |
-| Missions | — | ❌ | No missions table/endpoint (gap B1). Page shows placeholder. |
-| Attendance | — | ❌ | No employees/attendance domain at all (gap B2). Page shows placeholder. |
-| Config | `GET /config`, `PUT /config/{key}` | ✅ | API returns a **list** of `{config_key,config_value,description}`; client maps to/from a record. PUT body is `{config_value}`. |
-| Chat · Fleet Q&A | `POST /agent/run` | ⚠️ | Body `{query, caller_context}`; returns `{answer, tools_used, reasoning_steps}`. No citation list (gap D1) — `tools_used` shown instead. |
-| Chat · Assistant | `POST /chat` (ollama-assistant) | ✅ | Body `{message}` → `{content}`. Matches. |
-| Upload (hidden route) | `POST /webapp/ingest` (gateway) | ⚠️ | Multipart `phone`(req)/`text`/`file`; returns `{ok:true}` only — no sync classification result (gap D2). |
-| Review queue (hidden route) | `GET /events` (candidate) | ❌ | No dedicated review-queue endpoint (gap B3). |
+| Dashboard · Recent activity | `GET /events` (severity, then recency) | ✅ | `lib/events.ts` `sortEvents`; replaced the demo missions list. |
+| Vehicles | `GET/POST /vehicles`, `DELETE /vehicles/{vehicle_id}` | ✅ | Gap C1 closed: real DB fields only; driver name via `driver_id`→drivers join. Delete by **UUID**. |
+| Drivers | `GET/POST /drivers`, `DELETE /drivers/{driver_id}` | ⚠️ | Gap C2: assigned vehicle via reverse-join (done); licence expiry waits on `drivers.license_valid_to` (Phase 3). |
+| Events | `GET /events` | ✅ | Replaces Missions. Full list, severity+recency order, type/severity/status/vehicle filters. |
+| Attendance | — | ❌ | No employees/attendance domain yet (gap B2 → Phase 3). Page shows placeholder. |
+| Config | `GET /config`, `PUT /config/{key}` | ✅ | Real numeric keys only: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`, `image_confidence_min`. PUT body `{config_value}`. |
+| Chat · Fleet Q&A | `POST /agent/run` (via `/api/proxy/agent`) | ⚠️ | Returns `{answer, tools_used, reasoning_steps}`. No citation list yet (gap D1 → Phase 2). |
+| Chat · Assistant | `POST /chat` (via `/api/proxy/assistant`) | ✅ | Body `{message}` → `{content}`. DB-blind. |
+| Upload (hidden route) | `POST /webapp/ingest` (via `/api/proxy/gateway`) | ⚠️ | Returns `{ok:true}`; async pipeline, outcomes surface in Events (gap D2). |
+| Review queue | — | 🗑 | Removed; open events in `/events` cover the attention list (gap B3 resolved by decision). |
 
 ## Field-level gaps
 
-### C1 — Vehicle (UI card vs `VehicleRead`)
+### C1 — Vehicle (UI card vs `VehicleRead`) — RESOLVED
+The card now shows only real DB fields (plate, vendor+model, current_km, insurance/licence expiry,
+last/next maintenance) and resolves the assigned driver name via `driver_id`→drivers. The invented
+`year`/`fuel`/`status`/`condition` fields were dropped. Original gap detail kept below for history.
+
 Real fields: `vehicle_id, licensing_plate, nickname, vendor, model, current_km, insurance_valid_to,
 license_valid_to, driver_id, customer_id, next_maintenance_km, next_maintenance_type,
 last_maintenance_type, last_maintenance_km, last_maintenance_date, maintenance_type, allowed_driver`.
@@ -58,7 +62,10 @@ last_maintenance_type, last_maintenance_km, last_maintenance_date, maintenance_t
 | fuel | — | ❌ not stored |
 | condition (0–100) | — | ❌ not stored; could derive from km vs next_maintenance_km |
 
-### C2 — Driver (UI card vs `DriverRead`)
+### C2 — Driver (UI card vs `DriverRead`) — PARTIAL
+Assigned vehicle now resolved via reverse-join (`vehicle.driver_id`→plate). Licence expiry still has no
+source on the driver; renders `—` until `drivers.license_valid_to` lands in Phase 3.
+
 Real fields: `driver_id, full_name, phone_number, license_number, status(active|inactive)`.
 
 | UI field | Source | Gap |
@@ -73,14 +80,17 @@ Real fields: `driver_id, full_name, phone_number, license_number, status(active|
 ## Missing endpoints (backend work, owner: fleet-api)
 
 - **A1** Proxy auth — DONE in webui (`app/api/fleet`). Needs `INTERNAL_SERVICE_TOKEN` + `FLEET_API_URL` set.
-- **A2** Proxy / CORS for `agent`, `rag`, `assistant`, `gateway` so the browser can reach them in prod.
-- **B1** `missions` domain (title, priority, driver, vehicle, due, status) — or formal decision to render the Missions section from `events`.
-- **B2** Attendance domain (employees + per-day clock-in/out records, monthly aggregation, PATCH day, CSV/PDF export endpoint). Entirely absent.
-- **B3** Review-queue endpoint (low-confidence docs, plate mismatch, output-rail blocks) — or a documented `GET /events` filter contract.
-- **C3** Vehicle: add `status`, `year`, `fuel`, `condition` (or a derivation rule), and embed assigned driver name.
-- **C4** Driver: expose assigned vehicle + licence expiry (or document the join the UI must do).
-- **D1** Citations on `POST /agent/run` (RAG returns `citations` on `/query`; agent drops them).
-- **D2** Synchronous classification/extraction result from `POST /webapp/ingest` for the upload screen, or a status-polling contract.
+- **A2** DONE — generic same-origin proxy `app/api/proxy/[svc]/[...path]` for `agent`/`rag`/`gateway`/`assistant`
+  (server-only `AGENT_URL`/`RAG_URL`/`GATEWAY_URL`/`ASSISTANT_URL`).
+- **B1** RESOLVED by decision — Missions removed; the Events section renders the real `events` domain.
+- **B2** Attendance domain (reuse drivers as employees + `attendance_records` table + endpoints) — Phase 3.
+- **B3** RESOLVED by decision — Review queue removed; open `events` cover the attention list.
+- **C1** DONE — vehicle card shows real DB fields; assigned driver name via `driver_id`→drivers join.
+- **C2** Partial — assigned vehicle via reverse-join DONE; driver licence expiry needs `drivers.license_valid_to` (Phase 3).
+- **D1** Citations on `POST /agent/run` (RAG returns `citations`; agent drops them) — Phase 2.
+- **D2** Async ingest — outcomes surface in Events; no synchronous classification result by design.
+- **KPIs** DONE — `kpi_daily` nightly rollup (`refresh_kpi_daily()` on pg_cron) + `GET /kpi/daily`;
+  webui maps the latest 2 rows to six tiles + trend arrows (`deriveKpiTiles`).
 
 ## Done in this pass
 

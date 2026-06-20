@@ -2,7 +2,11 @@
 # Services are added here as they are built (Phase 1+). Postgres is the foundation.
 services:
   postgres:
-    image: postgres:16
+    build:
+      context: ./db
+      dockerfile: postgres.Dockerfile
+    # pg_cron must be preloaded and pointed at the app DB for the kpi_daily schedule.
+    command: postgres -c shared_preload_libraries=pg_cron -c cron.database_name=${POSTGRES_DB:-shepherd}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-shepherd}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shepherd}

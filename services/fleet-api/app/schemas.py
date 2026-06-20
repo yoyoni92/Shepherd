@@ -207,3 +207,18 @@ class ConfigRead(BaseModel):
 
 class ConfigUpdate(BaseModel):
     config_value: object
+
+
+# --- KPI daily rollup ---
+
+class KpiDailyRead(BaseModel):
+    snapshot_date: date
+    total_km_7d: int | None = None
+    avg_km_per_driver_7d: Decimal | None = None
+    avg_days_between_maintenance: Decimal | None = None
+    maintenance_due_count: int | None = None
+    docs_expiring_count: int | None = None
+    top_customer_id: UUID | None = None
+    top_customer_km: int | None = None
+    top_customer_vehicle_count: int | None = None
+    computed_ts: datetime

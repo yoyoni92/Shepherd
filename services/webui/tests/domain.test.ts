@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  initials,
-  avatarColor,
-  daysTo,
-  fmtDate,
-  sortItems,
-  sortByPriority,
-  isOpen,
-} from '@/lib/domain'
-import type { Mission } from '@/lib/preview'
+import { initials, avatarColor, daysTo, fmtDate, sortItems } from '@/lib/domain'
 
 const TODAY = new Date('2026-06-19T00:00:00')
 
@@ -60,20 +51,5 @@ describe('sortItems', () => {
   })
   it('sorts numbers', () => {
     expect(sortItems([{ v: 3 }, { v: 1 }, { v: 2 }], (r) => r.v, 'asc').map((r) => r.v)).toEqual([1, 2, 3])
-  })
-})
-
-describe('sortByPriority / isOpen', () => {
-  const missions: Mission[] = [
-    { id: 1, title: 'a', priority: 'low', vehicle: '', driver: '', due: '', status: 'pending' },
-    { id: 2, title: 'b', priority: 'high', vehicle: '', driver: '', due: '', status: 'done' },
-    { id: 3, title: 'c', priority: 'medium', vehicle: '', driver: '', due: '', status: 'pending' },
-  ]
-  it('orders high -> medium -> low immutably', () => {
-    expect(sortByPriority(missions).map((m) => m.priority)).toEqual(['high', 'medium', 'low'])
-    expect(missions[0].priority).toBe('low')
-  })
-  it('isOpen excludes done', () => {
-    expect(missions.filter(isOpen)).toHaveLength(2)
   })
 })

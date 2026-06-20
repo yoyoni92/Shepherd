@@ -2,7 +2,8 @@
 //   fields phone(required), display_name?, text?, file?
 //   reply  { ok: true }
 // The ingest pipeline is async — no synchronous classification result (gap D2).
-const BASE = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8001'
+// Browser → same-origin proxy (app/api/proxy/gateway); tests point straight at the gateway host.
+const BASE = process.env.NEXT_PUBLIC_GATEWAY_BASE ?? '/api/proxy/gateway'
 
 export async function uploadDocument(file: File, phone: string): Promise<{ ok: boolean }> {
   const form = new FormData()

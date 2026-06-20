@@ -21,6 +21,7 @@ class Action(str, Enum):
     WRITE_EVENTS = "write_events"
     READ_CONFIG = "read_config"
     EDIT_CONFIG = "edit_config"
+    READ_KPI = "read_kpi"
 
 
 # {action: {role: ownership_required}}
@@ -40,6 +41,7 @@ _MATRIX: dict[Action, dict[Role, bool | None]] = {
     Action.WRITE_EVENTS:     {Role.admin: False, Role.driver: None,  Role.customer: None},
     Action.READ_CONFIG:      {Role.admin: False, Role.driver: False,  Role.customer: False},
     Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None},
+    Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None},
 }
 
 

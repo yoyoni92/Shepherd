@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   Truck,
   User,
-  CheckSquare,
+  TriangleAlert,
   CalendarCheck,
   Settings,
   MessageSquare,
@@ -15,16 +15,16 @@ import {
 } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
-import { useMissions } from '@/hooks/useMissions'
-import { isOpen } from '@/lib/domain'
+import { useEvents } from '@/hooks/useEvents'
+import { openCount } from '@/lib/events'
 
-type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'missions' }
+type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'events' }
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'לוח בקרה', Icon: LayoutDashboard },
   { href: '/vehicles', label: 'רכבים', Icon: Truck, badge: 'vehicles' },
   { href: '/drivers', label: 'נהגים', Icon: User, badge: 'drivers' },
-  { href: '/missions', label: 'משימות', Icon: CheckSquare, badge: 'missions' },
+  { href: '/events', label: 'אירועים', Icon: TriangleAlert, badge: 'events' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
   { href: '/config', label: 'הגדרות', Icon: Settings },
   { href: '/chat', label: 'צ׳אט ועוזר', Icon: MessageSquare },
@@ -34,11 +34,11 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname()
   const { vehicles } = useVehicles()
   const { drivers } = useDrivers()
-  const { missions } = useMissions()
+  const { events } = useEvents()
   const counts: Record<string, number> = {
     vehicles: vehicles.length,
     drivers: drivers.length,
-    missions: missions.filter(isOpen).length,
+    events: openCount(events),
   }
 
   return (

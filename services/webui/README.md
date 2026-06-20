@@ -35,15 +35,15 @@ The shell (`components/Shell.tsx` = sidebar + topbar) wraps the seven design sec
 | Route | Description |
 |-------|-------------|
 | `/` | Login (credentials, Hebrew RTL) |
-| `/dashboard` | 6 KPI tiles + derived alerts (`lib/alerts.ts`) + urgent missions |
+| `/dashboard` | 6 VP-grade KPI tiles (`kpi_daily` + trends) + alerts + recent events |
 | `/vehicles` | Sortable card grid; add/remove vehicles (optimistic) |
 | `/drivers` | Sortable card grid; add/remove drivers (optimistic) |
-| `/missions` | Priority-ordered task list (`lib/domain.ts` `sortByPriority`) |
+| `/events` | Real `events` list — severity+recency order, type/severity/status/vehicle filters |
 | `/attendance` | Monthly clock-in/out report, edit modal, CSV/PDF export (`lib/attendance.ts`) |
 | `/config` | `system_config` stepper editor (admin-gated, Zod-validated) |
 | `/chat` | Tabbed: Fleet Q&A (RAG/LangGraph) + DB-blind Ollama assistant |
 
-Still reachable by URL (not in the sidebar): `/upload`, `/review`, `/assistant`.
+Still reachable by URL (not in the sidebar): `/upload`, `/assistant`.
 
 Pure logic lives in `lib/` (`kpis`, `domain`, `attendance`, `alerts`) and is unit-tested to
 100% lines (gate >= 85% on `lib/` + `hooks/`).
@@ -57,12 +57,17 @@ The UI is wired to the **real** services (`fleet-api`, `langgraph-agent`, `ollam
 - **Auth proxy:** every Fleet API call goes through `app/api/fleet/[...path]/route.ts`, which injects
   `X-Internal-Token` + `X-Caller-Context: {role:admin}` server-side (the token never reaches the
   browser). Browser base URL is `/api/fleet`.
-- **No `/kpis`:** the six dashboard numbers are derived from real `/vehicles` `/drivers` `/events`
-  `/reports` (`lib/kpis.ts` `deriveKpis`). Dashboard alerts come from real open `/events`.
-- **Adapters:** `lib/adapters.ts` maps `VehicleRead`/`DriverRead` → card view models; fields the
-  backend doesn't expose (vehicle condition/year/fuel, driver licence-expiry/assigned-vehicle) render `—`.
-- **Config** is a list of `{config_key, config_value}` on the wire; the client maps it to a record.
-- **Missions & Attendance have no backend yet** (gaps B1/B2) — those sections run on clearly-labelled
+- **Generic service proxy:** `agent`/`rag`/`gateway`/`assistant` are reached via the same-origin
+  `app/api/proxy/[svc]/[...path]` (server-only `AGENT_URL`/`RAG_URL`/`GATEWAY_URL`/`ASSISTANT_URL`);
+  no service hostname reaches the browser.
+- **KPIs:** `GET /kpi/daily?limit=2` reads the nightly `kpi_daily` rollup; `lib/kpis.ts`
+  `deriveKpiTiles` maps the latest 2 rows to six tiles + trend arrows. Alerts/recent come from `/events`.
+- **Adapters:** `lib/adapters.ts` maps `VehicleRead`/`DriverRead` → card view models grounded to real
+  DB fields; the driver↔vehicle link is filled by a join in the pages.
+- **Config** is a list of `{config_key, config_value}` on the wire; the client maps it to a record
+  (real numeric keys: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`,
+  `image_confidence_min`).
+- **Attendance has no backend yet** (gap B2 → Phase 3) — that section runs on clearly-labelled
   sample data (`lib/preview.ts`) behind a "no API" banner until the endpoints exist.
 
 ## DB-blind assistant

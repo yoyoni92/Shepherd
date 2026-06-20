@@ -3,12 +3,21 @@ import { it, expect } from 'vitest'
 import { useKpis } from '@/hooks/useKpis'
 import { QueryClientWrapper } from './helpers'
 
-// No /kpis endpoint: derived from the real vehicles/drivers/events/reports handlers.
-it('T2b - useKpis derives kpis from the real lists', async () => {
+// Reads the latest 2 kpi_daily snapshots and maps them to six tiles + trends.
+it('useKpis maps kpi_daily rows to six tiles with trends', async () => {
   const { result } = renderHook(() => useKpis(), { wrapper: QueryClientWrapper })
   await waitFor(() => expect(result.current.data).toBeDefined())
-  expect(result.current.data?.vehicles).toBe(3)
-  expect(result.current.data?.activeDrivers).toBe(1) // d1 active, d2 inactive
-  expect(result.current.data?.openEvents).toBe(2) // e1, e2 open; e3 resolved
-  expect(result.current.data?.unpaidTickets).toBe(1) // r1 unpaid; r2 paid
+
+  const tiles = result.current.data!.tiles
+  expect(tiles).toHaveLength(6)
+
+  const km = tiles.find((t) => t.key === 'fleetKm7d')
+  expect(km?.value).toBe(1200)
+  expect(km?.trend).toBe('up') // 1200 today vs 1000 yesterday
+
+  const due = tiles.find((t) => t.key === 'maintDue')
+  expect(due?.value).toBe(2)
+  expect(due?.trend).toBe('down') // 2 vs 4
+
+  expect(result.current.data!.latest?.top_customer_id).toBe('c1')
 })

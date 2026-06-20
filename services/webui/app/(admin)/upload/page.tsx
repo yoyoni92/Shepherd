@@ -75,7 +75,7 @@ export default function UploadPage() {
             ))}
           </ul>
           <p className="text-[11px] text-dim mt-3">
-            הקליטה אסינכרונית — תוצאת הסיווג/חילוץ אינה מוחזרת מיידית (ראה API_ALIGNMENT.md · D2).
+            הקליטה אסינכרונית — תוצאת הסיווג/חילוץ אינה מוחזרת מיידית; היא תופיע במסך האירועים.
           </p>
         </div>
       )}

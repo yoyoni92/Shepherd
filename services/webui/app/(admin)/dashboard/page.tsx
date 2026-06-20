@@ -1,75 +1,94 @@
 'use client'
 import Link from 'next/link'
-import { Truck, User, CheckSquare, FileText, Ticket, Wrench, type LucideIcon } from 'lucide-react'
+import { Route, Gauge, CalendarClock, Wrench, FileText, Building2, type LucideIcon } from 'lucide-react'
 import { useKpis } from '@/hooks/useKpis'
-import { useMissions } from '@/hooks/useMissions'
+import { useCustomers } from '@/hooks/useCustomers'
 import { useEvents } from '@/hooks/useEvents'
-import { isOpen } from '@/lib/domain'
+import { sortEvents } from '@/lib/events'
+import { fmtDate } from '@/lib/domain'
 import { alertsFromEvents } from '@/lib/alerts'
-import type { Kpis } from '@/lib/kpis'
+import { KPI_TILE_KEYS, type KpiTile, type KpiTileKey } from '@/lib/kpis'
 import { Card } from '@/components/ui/card'
-import { PRIORITY_META, MISSION_STATUS_META, ALERT_COLOR } from '@/components/meta'
+import { EVENT_TYPE_LABEL, SEVERITY_META, ALERT_COLOR } from '@/components/meta'
 
-type Trend = 'up' | 'down' | 'flat'
-
-const TREND_STYLE: Record<Trend, React.CSSProperties> = {
-  up: { color: '#34d399', background: 'rgba(52,211,153,.1)' },
-  down: { color: '#f87171', background: 'rgba(248,113,113,.1)' },
-  flat: { color: '#94a3b8', background: '#10131f' },
-}
-
-interface Tile {
-  key: keyof Kpis
+interface TileMeta {
   label: string
   Icon: LucideIcon
   color: string
   bg: string
-  trend: string
-  trendType: Trend
+  goodWhenUp: boolean
+  fmt: (v: number) => string
 }
 
-const TILES: Tile[] = [
-  { key: 'vehicles', label: 'סך רכבים בצי', Icon: Truck, color: '#60a5fa', bg: 'rgba(59,130,246,.12)', trend: '+2', trendType: 'up' },
-  { key: 'activeDrivers', label: 'נהגים פעילים', Icon: User, color: '#34d399', bg: 'rgba(52,211,153,.12)', trend: 'יציב', trendType: 'flat' },
-  { key: 'openEvents', label: 'משימות פתוחות', Icon: CheckSquare, color: '#a78bfa', bg: 'rgba(167,139,250,.12)', trend: '+3', trendType: 'up' },
-  { key: 'docsExpiring30d', label: 'מסמכים פגי תוקף', Icon: FileText, color: '#fbbf24', bg: 'rgba(251,191,36,.12)', trend: '30 יום', trendType: 'down' },
-  { key: 'unpaidTickets', label: 'דוחות לא שולמו', Icon: Ticket, color: '#f472b6', bg: 'rgba(244,114,182,.12)', trend: '₪1.2K', trendType: 'down' },
-  { key: 'maintenanceDue', label: 'טיפולים נדרשים', Icon: Wrench, color: '#fb923c', bg: 'rgba(251,146,60,.12)', trend: 'דחוף', trendType: 'down' },
-]
+const KM = (v: number) => `${Math.round(v).toLocaleString()} ק״מ`
+const INT = (v: number) => String(Math.round(v))
+const DAYS = (v: number) => `${Math.round(v)} ימים`
+
+const TILE_META: Record<KpiTileKey, TileMeta> = {
+  fleetKm7d: { label: 'ק״מ השבוע', Icon: Route, color: '#60a5fa', bg: 'rgba(59,130,246,.12)', goodWhenUp: true, fmt: KM },
+  avgKmPerDriver: { label: 'ממוצע ק״מ לנהג', Icon: Gauge, color: '#34d399', bg: 'rgba(52,211,153,.12)', goodWhenUp: true, fmt: KM },
+  maintCadence: { label: 'ימים בין טיפולים', Icon: CalendarClock, color: '#a78bfa', bg: 'rgba(167,139,250,.12)', goodWhenUp: true, fmt: DAYS },
+  maintDue: { label: 'טיפולים נדרשים', Icon: Wrench, color: '#fb923c', bg: 'rgba(251,146,60,.12)', goodWhenUp: false, fmt: INT },
+  docsExpiring: { label: 'מסמכים פגי תוקף', Icon: FileText, color: '#fbbf24', bg: 'rgba(251,191,36,.12)', goodWhenUp: false, fmt: INT },
+  topCustomer: { label: 'לקוח מוביל בק״מ', Icon: Building2, color: '#f472b6', bg: 'rgba(244,114,182,.12)', goodWhenUp: true, fmt: KM },
+}
+
+function trendBadge(tile: KpiTile, goodWhenUp: boolean): { text: string; style: React.CSSProperties } {
+  if (tile.trend == null) return { text: '—', style: { color: '#94a3b8', background: '#10131f' } }
+  if (tile.trend === 'flat') return { text: 'יציב', style: { color: '#94a3b8', background: '#10131f' } }
+  const good = (tile.trend === 'up') === goodWhenUp
+  const color = good ? '#34d399' : '#f87171'
+  const arrow = tile.trend === 'up' ? '▲' : '▼'
+  return { text: `${arrow} ${Math.abs(tile.delta ?? 0).toLocaleString()}`, style: { color, background: `${color}1a` } }
+}
 
 export default function DashboardPage() {
-  const { data: kpis } = useKpis()
-  const { missions } = useMissions()
+  const { data } = useKpis()
+  const { customerById } = useCustomers()
   const { events } = useEvents()
 
+  const tiles = data?.tiles ?? KPI_TILE_KEYS.map((key) => ({ key, value: null, delta: null, trend: null }))
+  const latest = data?.latest ?? null
+
   const alerts = alertsFromEvents(events)
-  const topMissions = missions.filter(isOpen).slice(0, 4)
+  const recent = sortEvents(events).slice(0, 5)
 
   return (
     <div className="animate-fade-up">
       <div className="grid gap-3.5 mb-[22px]" style={{ gridTemplateColumns: 'repeat(6,1fr)' }}>
-        {TILES.map(({ key, label, Icon, color, bg, trend, trendType }) => (
-          <Card key={key} className="rounded-[13px]" style={{ padding: '16px 16px 15px' }}>
-            <div className="flex items-center justify-between mb-3">
-              <div
-                className="flex items-center justify-center"
-                style={{ width: 34, height: 34, borderRadius: 9, background: bg, color }}
-              >
-                <Icon size={17} />
+        {tiles.map((tile) => {
+          const meta = TILE_META[tile.key]
+          const badge = trendBadge(tile, meta.goodWhenUp)
+          const isTopCustomer = tile.key === 'topCustomer'
+          const vcount = latest?.top_customer_vehicle_count ?? null
+          const customerName = latest?.top_customer_id ? (customerById[latest.top_customer_id] ?? '—') : '—'
+          const sub =
+            isTopCustomer && tile.value != null
+              ? `${customerName}${vcount != null ? ` · ${vcount} רכבים` : ''}`
+              : meta.label
+          const flag = isTopCustomer && vcount != null && vcount <= 2
+          return (
+            <Card key={tile.key} className="rounded-[13px]" style={{ padding: '16px 16px 15px' }}>
+              <div className="flex items-center justify-between mb-3">
+                <div
+                  className="flex items-center justify-center"
+                  style={{ width: 34, height: 34, borderRadius: 9, background: meta.bg, color: meta.color }}
+                >
+                  <meta.Icon size={17} />
+                </div>
+                <span className="text-[11px] font-bold rounded-md" style={{ padding: '2px 7px', ...badge.style }}>
+                  {badge.text}
+                </span>
               </div>
-              <span
-                className="text-[11px] font-bold rounded-md"
-                style={{ padding: '2px 7px', ...TREND_STYLE[trendType] }}
-              >
-                {trend}
-              </span>
-            </div>
-            <div className="text-[30px] font-extrabold leading-none" style={{ letterSpacing: '-1px' }}>
-              {kpis ? kpis[key] : '–'}
-            </div>
-            <div className="text-[12.5px] text-muted mt-[5px]">{label}</div>
-          </Card>
-        ))}
+              <div className="text-[30px] font-extrabold leading-none" style={{ letterSpacing: '-1px' }}>
+                {tile.value != null ? meta.fmt(tile.value) : '–'}
+              </div>
+              <div className="text-[12.5px] mt-[5px] truncate" style={{ color: flag ? '#fbbf24' : '#94a3b8' }}>
+                {sub}
+              </div>
+            </Card>
+          )
+        })}
       </div>
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.3fr 1fr' }}>
@@ -111,42 +130,36 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        {/* Urgent missions */}
+        {/* Recent activity */}
         <Card style={{ padding: '18px 20px' }}>
           <div className="flex items-center justify-between mb-4">
-            <div className="text-[15px] font-bold">
-              משימות דחופות <span className="text-[10px] text-dim font-normal">דמו · ללא API</span>
-            </div>
-            <Link href="/missions" className="text-[12px] text-accent font-semibold">
+            <div className="text-[15px] font-bold">פעילות אחרונה</div>
+            <Link href="/events" className="text-[12px] text-accent font-semibold">
               הצג הכל ←
             </Link>
           </div>
           <div className="flex flex-col gap-[11px]">
-            {topMissions.length === 0 && <div className="text-[13px] text-faint">אין משימות פתוחות</div>}
-            {topMissions.map((m) => (
-              <div key={m.id} className="flex items-center gap-3">
-                <span
-                  className="rounded"
-                  style={{ minWidth: 4, width: 4, height: 34, background: PRIORITY_META[m.priority].color }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-semibold truncate">{m.title}</div>
-                  <div className="text-[11.5px] text-faint">
-                    {m.driver} · {m.due}
+            {recent.length === 0 && <div className="text-[13px] text-faint">אין אירועים</div>}
+            {recent.map((e) => {
+              const sev = SEVERITY_META[e.severity] ?? SEVERITY_META.info
+              return (
+                <div key={e.event_id} className="flex items-center gap-3">
+                  <span className="rounded" style={{ minWidth: 4, width: 4, height: 34, background: sev.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13.5px] font-semibold truncate">{e.message}</div>
+                    <div className="text-[11.5px] text-faint">
+                      {EVENT_TYPE_LABEL[e.event_type] ?? e.event_type} · <span className="ltr">{fmtDate(e.triggered_ts)}</span>
+                    </div>
                   </div>
+                  <span
+                    className="text-[11.5px] font-bold rounded-md whitespace-nowrap"
+                    style={{ color: sev.color, background: sev.bg, padding: '5px 11px' }}
+                  >
+                    {sev.label}
+                  </span>
                 </div>
-                <span
-                  className="text-[11.5px] font-bold rounded-md whitespace-nowrap"
-                  style={{
-                    color: MISSION_STATUS_META[m.status].color,
-                    background: MISSION_STATUS_META[m.status].bg,
-                    padding: '5px 11px',
-                  }}
-                >
-                  {MISSION_STATUS_META[m.status].label}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
       </div>

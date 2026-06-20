@@ -2,27 +2,28 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useDrivers } from '@/hooks/useDrivers'
 import { sortItems } from '@/lib/domain'
 import type { UiVehicle, VehicleCreate } from '@/lib/api/schemas'
 import { Button } from '@/components/ui/button'
 import { SortChips, nextDir, type SortState } from '@/components/SortChips'
 import { VehicleCard } from '@/components/VehicleCard'
 
-type VKey = 'plate' | 'title' | 'year' | 'condition' | 'insurance'
+type VKey = 'plate' | 'title' | 'insurance' | 'license' | 'km'
 
 const FIELDS: { key: VKey; label: string }[] = [
   { key: 'plate', label: 'לוחית' },
   { key: 'title', label: 'דגם' },
-  { key: 'year', label: 'שנה' },
-  { key: 'condition', label: 'מצב' },
   { key: 'insurance', label: 'ביטוח' },
+  { key: 'license', label: 'רישוי' },
+  { key: 'km', label: 'ק״מ' },
 ]
 
 const accessor = (v: UiVehicle, key: VKey): string | number => {
   if (key === 'title') return `${v.make} ${v.model}`
-  if (key === 'year') return v.year ?? 0
-  if (key === 'condition') return v.condition ?? 0
   if (key === 'insurance') return v.insurance ?? ''
+  if (key === 'license') return v.licenseValidTo ?? ''
+  if (key === 'km') return v.currentKm ?? 0
   return v.plate
 }
 
@@ -34,6 +35,8 @@ const NEW_VEHICLE: VehicleCreate = {
 
 export default function VehiclesPage() {
   const { vehicles, add, remove } = useVehicles()
+  const { drivers } = useDrivers()
+  const driverById = Object.fromEntries(drivers.map((d) => [d.id, d.name]))
   const [sort, setSort] = useState<SortState<VKey>>({ key: 'plate', dir: 'asc' })
   const sorted = sortItems(vehicles, (v) => accessor(v, sort.key), sort.dir)
 
@@ -49,7 +52,12 @@ export default function VehiclesPage() {
 
       <div className="grid gap-[15px]" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(330px,1fr))' }}>
         {sorted.map((v) => (
-          <VehicleCard key={v.id} v={v} onRemove={() => remove(v.id)} />
+          <VehicleCard
+            key={v.id}
+            v={v}
+            driverName={v.driverId ? driverById[v.driverId] : undefined}
+            onRemove={() => remove(v.id)}
+          />
         ))}
       </div>
     </div>

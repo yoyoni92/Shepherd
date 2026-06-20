@@ -28,10 +28,21 @@ const REPORTS = [
   { report_id: 'r2', vehicle_id: 'v1', ticket_type: 'traffic', status: 'paid', amount: 250 },
 ]
 
+const CUSTOMERS = [
+  { customer_id: 'c1', full_name: 'אלקטרה מערכות', phone_number: null, email: null, status: 'active' },
+  { customer_id: 'c2', full_name: 'מובילי הצפון', phone_number: null, email: null, status: 'active' },
+]
+
+const KPI_DAILY = [
+  { snapshot_date: '2026-06-19', total_km_7d: 1200, avg_km_per_driver_7d: 300, avg_days_between_maintenance: 45, maintenance_due_count: 2, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 800, top_customer_vehicle_count: 2, computed_ts: '2026-06-19T03:00:00Z' },
+  { snapshot_date: '2026-06-18', total_km_7d: 1000, avg_km_per_driver_7d: 250, avg_days_between_maintenance: 45, maintenance_due_count: 4, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 700, top_customer_vehicle_count: 2, computed_ts: '2026-06-18T03:00:00Z' },
+]
+
 const CONFIG = [
-  { config_key: 'docs_expiry_warning_days', config_value: 30, description: 'days ahead to warn' },
-  { config_key: 'condition_min_alert', config_value: 60, description: 'maintenance threshold' },
-  { config_key: 'low_confidence_threshold', config_value: 70, description: 'review queue threshold' },
+  { config_key: 'license_expiring_days', config_value: 30, description: 'days ahead to warn on רישוי' },
+  { config_key: 'insurance_expiring_days', config_value: 30, description: 'days ahead to warn on insurance' },
+  { config_key: 'maintenance_km_buffer', config_value: 1000, description: 'km before next service to alert' },
+  { config_key: 'image_confidence_min', config_value: 0.7, description: 'min classifier confidence' },
 ]
 
 export const handlers = [
@@ -55,21 +66,16 @@ export const handlers = [
   http.get(`${FLEET}/events`, () => HttpResponse.json(EVENTS)),
   http.get(`${FLEET}/reports`, () => HttpResponse.json(REPORTS)),
 
+  // Customers + KPI daily rollup
+  http.get(`${FLEET}/customers`, () => HttpResponse.json(CUSTOMERS)),
+  http.get(`${FLEET}/kpi/daily`, () => HttpResponse.json(KPI_DAILY)),
+
   // Config (list shape)
   http.get(`${FLEET}/config`, () => HttpResponse.json(CONFIG)),
   http.put(`${FLEET}/config/:key`, async ({ params, request }) => {
     const body = (await request.json()) as { config_value: unknown }
     return HttpResponse.json({ config_key: params.key, config_value: body.config_value, description: null })
   }),
-
-  // Review queue (gap B3 — still mocked)
-  http.get(`${FLEET}/review-queue`, () =>
-    HttpResponse.json([
-      { id: '1', file_name: 'scan_blur.jpg', reason: 'low_confidence', confidence: 0.48, message: 'Classifier unsure.', doc_type: 'uncertain' },
-      { id: '2', file_name: 'doc_99x.pdf', reason: 'plate_mismatch', message: 'Plate not in fleet.' },
-    ]),
-  ),
-  http.put(`${FLEET}/review-queue/:id/:action`, () => HttpResponse.json({ ok: true })),
 
   // Agent (real contract)
   http.post(`${AGENT}/agent/run`, () =>

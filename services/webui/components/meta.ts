@@ -1,5 +1,4 @@
 // Presentational colour/label maps for the design's tinted pills.
-import type { Mission } from '@/lib/preview'
 import type { EmployeeStatus } from '@/lib/attendance'
 import type { AlertSeverity } from '@/lib/alerts'
 
@@ -9,16 +8,26 @@ export interface Meta {
   label: string
 }
 
-export const PRIORITY_META: Record<Mission['priority'], Meta> = {
-  high: { color: '#f87171', bg: 'rgba(248,113,113,.13)', label: 'גבוהה' },
-  medium: { color: '#fbbf24', bg: 'rgba(251,191,36,.13)', label: 'בינונית' },
-  low: { color: '#60a5fa', bg: 'rgba(96,165,250,.13)', label: 'נמוכה' },
+// Real `events` domain (services/fleet-api): types, severity, status.
+export const EVENT_TYPE_LABEL: Record<string, string> = {
+  maintenance_due: 'טיפול נדרש',
+  license_expiring: 'רישוי פג',
+  insurance_expiring: 'ביטוח פג',
+  ticket_received: 'דוח התקבל',
+  accident_logged: 'תאונה',
 }
 
-export const MISSION_STATUS_META: Record<Mission['status'], Meta> = {
-  in_progress: { color: '#60a5fa', bg: 'rgba(96,165,250,.13)', label: 'בביצוע' },
-  pending: { color: '#fbbf24', bg: 'rgba(251,191,36,.13)', label: 'ממתין' },
-  done: { color: '#34d399', bg: 'rgba(52,211,153,.13)', label: 'הושלם' },
+export const SEVERITY_META: Record<string, Meta> = {
+  critical: { color: '#f87171', bg: 'rgba(248,113,113,.13)', label: 'קריטי' },
+  warning: { color: '#fbbf24', bg: 'rgba(251,191,36,.13)', label: 'אזהרה' },
+  info: { color: '#60a5fa', bg: 'rgba(96,165,250,.13)', label: 'מידע' },
+}
+
+export const EVENT_STATUS_META: Record<string, Meta> = {
+  open: { color: '#f87171', bg: 'rgba(248,113,113,.13)', label: 'פתוח' },
+  acknowledged: { color: '#fbbf24', bg: 'rgba(251,191,36,.13)', label: 'בטיפול' },
+  resolved: { color: '#34d399', bg: 'rgba(52,211,153,.13)', label: 'נפתר' },
+  dismissed: { color: '#64748b', bg: 'rgba(100,116,139,.13)', label: 'נדחה' },
 }
 
 export const ATT_STATUS_META: Record<EmployeeStatus, Meta> = {
@@ -32,9 +41,4 @@ export const ALERT_COLOR: Record<AlertSeverity, string> = {
   orange: '#fb923c',
   warning: '#fbbf24',
   pink: '#f472b6',
-}
-
-/** Vehicle condition bar/text colour by score. */
-export function conditionColor(score: number): string {
-  return score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171'
 }

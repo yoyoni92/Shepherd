@@ -1,5 +1,3 @@
-import type { Mission } from './preview'
-
 export const UNASSIGNED = 'לא משויך'
 
 /** Two-letter initials from a Hebrew/Latin name; em-dash for empty/unassigned. */
@@ -54,16 +52,3 @@ export function sortItems<T>(
     return (x < y ? -1 : x > y ? 1 : 0) * mul
   })
 }
-
-export const PRIORITY_ORDER: Record<Mission['priority'], number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-}
-
-/** Missions ordered high -> low priority (immutable). */
-export function sortByPriority(missions: readonly Mission[]): Mission[] {
-  return [...missions].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
-}
-
-export const isOpen = (m: Mission) => m.status !== 'done'

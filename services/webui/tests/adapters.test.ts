@@ -3,32 +3,34 @@ import { toUiVehicle, toUiDriver } from '@/lib/adapters'
 import type { VehicleRead, DriverRead } from '@/lib/api/schemas'
 
 describe('toUiVehicle', () => {
-  it('maps real fields and nulls the gap fields', () => {
+  it('maps the real DB fields', () => {
     const v: VehicleRead = {
       vehicle_id: 'v1', licensing_plate: '12-345-67', vendor: 'Toyota', model: 'Corolla',
-      insurance_valid_to: '2026-09-02', last_maintenance_date: '2026-04-12',
+      current_km: 84000, insurance_valid_to: '2026-09-02', license_valid_to: '2026-07-01',
+      driver_id: 'd9', last_maintenance_date: '2026-04-12',
+      next_maintenance_km: 90000, next_maintenance_type: 'service',
     }
-    const ui = toUiVehicle(v)
-    expect(ui).toMatchObject({
+    expect(toUiVehicle(v)).toEqual({
       id: 'v1', plate: '12-345-67', make: 'Toyota', model: 'Corolla',
-      insurance: '2026-09-02', lastService: '2026-04-12', status: 'active',
+      driverId: 'd9', currentKm: 84000, insurance: '2026-09-02', licenseValidTo: '2026-07-01',
+      lastService: '2026-04-12', nextMaintenanceKm: 90000, nextMaintenanceType: 'service',
     })
-    expect(ui.year).toBeNull()
-    expect(ui.fuel).toBeNull()
-    expect(ui.condition).toBeNull()
-    expect(ui.driver).toBeNull()
   })
 
-  it('falls back to nickname then dash for make', () => {
+  it('falls back to nickname then dash for make and nulls absent fields', () => {
     expect(toUiVehicle({ vehicle_id: 'v', licensing_plate: 'p', nickname: 'Van' }).make).toBe('Van')
-    expect(toUiVehicle({ vehicle_id: 'v', licensing_plate: 'p' }).make).toBe('—')
+    const bare = toUiVehicle({ vehicle_id: 'v', licensing_plate: 'p' })
+    expect(bare.make).toBe('—')
+    expect(bare.driverId).toBeNull()
+    expect(bare.currentKm).toBeNull()
+    expect(bare.licenseValidTo).toBeNull()
   })
 })
 
 describe('toUiDriver', () => {
   it('maps fields and translates status to on/off', () => {
     const d: DriverRead = { driver_id: 'd1', full_name: 'דנה לוי', phone_number: '050', license_number: 'IL-1', status: 'active' }
-    expect(toUiDriver(d)).toMatchObject({ id: 'd1', name: 'דנה לוי', phone: '050', license: 'IL-1', status: 'on' })
+    expect(toUiDriver(d)).toMatchObject({ id: 'd1', name: 'דנה לוי', phone: '050', license: 'IL-1', status: 'on', licExpiry: null })
     expect(toUiDriver({ ...d, status: 'inactive' }).status).toBe('off')
   })
 

@@ -66,6 +66,28 @@ export const EventReadSchema = z.object({
   triggered_ts: z.string(),
 })
 
+// Numeric fields may arrive as a JSON number or a Decimal-as-string (Pydantic serializes
+// Decimal as a string); coerce to number, but keep null.
+const numish = z.coerce.number().nullable()
+
+export const KpiDailyReadSchema = z.object({
+  snapshot_date: z.string(),
+  total_km_7d: numish,
+  avg_km_per_driver_7d: numish,
+  avg_days_between_maintenance: numish,
+  maintenance_due_count: numish,
+  docs_expiring_count: numish,
+  top_customer_id: z.string().nullish(),
+  top_customer_km: numish,
+  top_customer_vehicle_count: numish,
+  computed_ts: z.string(),
+})
+
+export const CustomerReadSchema = z.object({
+  customer_id: z.string(),
+  full_name: z.string(),
+})
+
 export const ReportReadSchema = z.object({
   report_id: z.string(),
   vehicle_id: z.string(),
@@ -74,17 +96,6 @@ export const ReportReadSchema = z.object({
   amount: z.number().nullish(),
 })
 
-// Review queue has no real endpoint yet (gap B3) — kept mocked.
-export const ReviewItemSchema = z.object({
-  id: z.string(),
-  file_name: z.string(),
-  reason: z.enum(['low_confidence', 'plate_mismatch', 'output_blocked']),
-  doc_type: z.string().optional(),
-  confidence: z.number().optional(),
-  message: z.string(),
-})
-
-export type ReviewItem = z.infer<typeof ReviewItemSchema>
 export type VehicleRead = z.infer<typeof VehicleReadSchema>
 export type VehicleCreate = z.infer<typeof VehicleCreateSchema>
 export type DriverRead = z.infer<typeof DriverReadSchema>
@@ -92,6 +103,8 @@ export type DriverCreate = z.infer<typeof DriverCreateSchema>
 export type ConfigRead = z.infer<typeof ConfigReadSchema>
 export type EventRead = z.infer<typeof EventReadSchema>
 export type ReportRead = z.infer<typeof ReportReadSchema>
+export type KpiDailyRead = z.infer<typeof KpiDailyReadSchema>
+export type CustomerRead = z.infer<typeof CustomerReadSchema>
 
 // ───────────────────────── UI view models ─────────────────────────
 // Component-facing shapes. Fields the backend does not provide are nullable
@@ -100,15 +113,15 @@ export type ReportRead = z.infer<typeof ReportReadSchema>
 export interface UiVehicle {
   id: string
   plate: string
-  make: string
+  make: string // vendor
   model: string
-  year: number | null // gap C1
-  fuel: string | null // gap C1
-  driver: string | null // gap C1 (only driver_id available)
-  status: 'active' | 'inactive' // gap C1 (assumed active)
-  lastService: string | null
-  insurance: string | null
-  condition: number | null // gap C1
+  driverId: string | null // assigned driver, resolved to a name via the drivers list
+  currentKm: number | null
+  insurance: string | null // insurance_valid_to
+  licenseValidTo: string | null // annual רישוי (not a driver's licence)
+  lastService: string | null // last_maintenance_date
+  nextMaintenanceKm: number | null
+  nextMaintenanceType: string | null
 }
 
 export interface UiDriver {
@@ -116,7 +129,6 @@ export interface UiDriver {
   name: string
   phone: string
   license: string
-  licExpiry: string | null // gap C2
-  vehicle: string | null // gap C2
+  licExpiry: string | null // drivers.license_valid_to (added in Phase 3; null until then)
   status: 'on' | 'off'
 }

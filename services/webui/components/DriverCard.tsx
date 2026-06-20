@@ -8,7 +8,15 @@ import { Button } from '@/components/ui/button'
 
 const DASH = '—'
 
-export function DriverCard({ d, onRemove }: { d: UiDriver; onRemove: () => void }) {
+export function DriverCard({
+  d,
+  vehiclePlate,
+  onRemove,
+}: {
+  d: UiDriver
+  vehiclePlate?: string
+  onRemove: () => void
+}) {
   const on = d.status === 'on'
   const licWarn = d.licExpiry != null && daysTo(d.licExpiry) < 30
   const statusColor = on ? '#34d399' : '#64748b'
@@ -51,7 +59,7 @@ export function DriverCard({ d, onRemove }: { d: UiDriver; onRemove: () => void 
           <div className="text-[11px] text-faint mb-0.5">רכב משויך</div>
           <div className="flex items-center gap-2">
             <Truck size={15} color="#60a5fa" />
-            <span className="text-[13px] font-semibold ltr">{d.vehicle ?? DASH}</span>
+            <span className="text-[13px] font-semibold ltr">{vehiclePlate ?? DASH}</span>
           </div>
         </div>
       </div>

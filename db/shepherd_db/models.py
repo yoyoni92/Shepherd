@@ -494,6 +494,32 @@ class SystemConfig(Base):
     updated_by = mapped_column(Text, nullable=True)
 
 
+class KpiDaily(Base):
+    """Nightly KPI snapshot (one row per day). Populated by refresh_kpi_daily()
+    on a pg_cron schedule; the dashboard reads the latest rows and derives trends."""
+
+    __tablename__ = "kpi_daily"
+
+    snapshot_date = mapped_column(Date, primary_key=True)
+    total_km_7d = mapped_column(Integer, nullable=True)
+    avg_km_per_driver_7d = mapped_column(Numeric, nullable=True)
+    avg_days_between_maintenance = mapped_column(Numeric, nullable=True)
+    maintenance_due_count = mapped_column(Integer, nullable=True)
+    docs_expiring_count = mapped_column(Integer, nullable=True)
+    top_customer_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("customers.customer_id"),
+        nullable=True,
+    )
+    top_customer_km = mapped_column(Integer, nullable=True)
+    top_customer_vehicle_count = mapped_column(Integer, nullable=True)
+    computed_ts = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 class ChannelIdentity(Base):
     __tablename__ = "channel_identities"
 

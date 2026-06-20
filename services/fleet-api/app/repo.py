@@ -11,6 +11,7 @@ from shepherd_db.models import (
     AccidentAttachment,
     Event,
     KmUpdate,
+    KpiDaily,
     Report,
     SystemConfig,
     Vehicle,
@@ -321,6 +322,15 @@ def get_all_config(session: Session) -> list[SystemConfig]:
 
 def get_config_key(session: Session, key: str) -> SystemConfig | None:
     return session.get(SystemConfig, key)
+
+
+# ---------------------------------------------------------------------------
+# KPI daily rollup (read-only; populated by refresh_kpi_daily())
+# ---------------------------------------------------------------------------
+
+def list_kpi_daily(session: Session, limit: int = 2) -> list[KpiDaily]:
+    stmt = select(KpiDaily).order_by(KpiDaily.snapshot_date.desc()).limit(limit)
+    return list(session.execute(stmt).scalars())
 
 
 def set_config(session: Session, key: str, value: object) -> SystemConfig:
