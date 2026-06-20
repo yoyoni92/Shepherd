@@ -1,7 +1,6 @@
 'use client'
 import { X } from 'lucide-react'
-import type { AttendanceDay, AttendanceMonth, Employee } from '@/lib/preview'
-import { aggregate, hoursFor } from '@/lib/attendance'
+import { aggregate, hoursFor, type AttendanceDay, type AttendanceMonth, type Employee } from '@/lib/attendance'
 import { Avatar } from '@/components/Avatar'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -17,19 +16,20 @@ interface Props {
   month: AttendanceMonth
   employee: Employee
   monthLabel: string
-  onPatch: (employeeId: number, day: number, patch: Partial<AttendanceDay>) => void
+  onPatch: (employeeId: string, day: number, patch: Partial<AttendanceDay>) => void
   onClose: () => void
 }
 
 export function AttendanceEditModal({ month, employee, monthLabel, onPatch, onClose }: Props) {
-  const days = month.records[String(employee.id)] ?? []
+  const avatarId = Number(employee.id) || employee.name.length
+  const days = month.records[employee.id] ?? []
   const a = aggregate(days)
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <div className="flex items-center gap-[13px] border-b border-line" style={{ padding: '18px 22px' }}>
-          <Avatar id={employee.id} name={employee.name} size={42} radius={11} font={15} />
+          <Avatar id={avatarId} name={employee.name} size={42} radius={11} font={15} />
           <div className="flex-1 min-w-0">
             <DialogTitle className="text-[16px] font-extrabold">{employee.name}</DialogTitle>
             <div className="text-[12px] text-faint">

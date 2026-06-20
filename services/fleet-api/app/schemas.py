@@ -47,6 +47,7 @@ class DriverCreate(BaseModel):
     full_name: str
     phone_number: str
     license_number: str | None = None
+    license_valid_to: date | None = None
 
 
 class DriverRead(BaseModel):
@@ -54,6 +55,7 @@ class DriverRead(BaseModel):
     full_name: str
     phone_number: str
     license_number: str | None = None
+    license_valid_to: date | None = None
     status: str
 
 
@@ -207,6 +209,22 @@ class ConfigRead(BaseModel):
 
 class ConfigUpdate(BaseModel):
     config_value: object
+
+
+# --- Attendance ---
+
+class AttendanceRecordRead(BaseModel):
+    driver_id: UUID
+    work_date: date
+    clock_in: str | None = None
+    clock_out: str | None = None
+    status: str
+
+
+class AttendancePatch(BaseModel):
+    clock_in: str | None = None
+    clock_out: str | None = None
+    status: str  # present | late | leave | absent
 
 
 # --- KPI daily rollup ---

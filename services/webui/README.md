@@ -67,8 +67,9 @@ The UI is wired to the **real** services (`fleet-api`, `langgraph-agent`, `ollam
 - **Config** is a list of `{config_key, config_value}` on the wire; the client maps it to a record
   (real numeric keys: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`,
   `image_confidence_min`).
-- **Attendance has no backend yet** (gap B2 → Phase 3) — that section runs on clearly-labelled
-  sample data (`lib/preview.ts`) behind a "no API" banner until the endpoints exist.
+- **Attendance** (gap B2 closed): drivers double as employees; `GET /attendance/{month}` +
+  `PATCH /attendance/{driver_id}/{date}`. The webui builds the weekday skeleton (`lib/attendance.ts`)
+  and overlays stored records; edits PATCH with optimistic update + Zod time validation.
 
 ## DB-blind assistant
 

@@ -114,6 +114,13 @@ class ChannelStatusEnum(str, enum.Enum):
     revoked = "revoked"
 
 
+class AttendanceStatusEnum(str, enum.Enum):
+    present = "present"
+    late = "late"
+    leave = "leave"
+    absent = "absent"
+
+
 # ---------------------------------------------------------------------------
 # SQLAlchemy Enum type helpers (named types matching PG enum names)
 # ---------------------------------------------------------------------------
@@ -194,6 +201,11 @@ channel_status_type = SAEnum(
     name="channel_status_enum",
     create_type=False,
 )
+attendance_status_type = SAEnum(
+    AttendanceStatusEnum,
+    name="attendance_status_enum",
+    create_type=False,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +233,7 @@ class Driver(Base):
     full_name = mapped_column(Text, nullable=False)
     phone_number = mapped_column(Text, unique=True, nullable=False)
     license_number = mapped_column(Text, nullable=True)
+    license_valid_to = mapped_column(Date, nullable=True)
     status = mapped_column(
         driver_status_type,
         nullable=False,
@@ -518,6 +531,35 @@ class KpiDaily(Base):
         nullable=False,
         server_default=text("now()"),
     )
+
+
+class AttendanceRecord(Base):
+    """Per-driver daily clock-in/out (drivers double as employees). One row per
+    (driver, work_date); the webui generates the weekday skeleton and overlays these."""
+
+    __tablename__ = "attendance_records"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    driver_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("drivers.driver_id"),
+        nullable=False,
+    )
+    work_date = mapped_column(Date, nullable=False)
+    # ponytail: "HH:MM" strings — matches the webui's Zod time validation; no tz/parse friction
+    clock_in = mapped_column(Text, nullable=True)
+    clock_out = mapped_column(Text, nullable=True)
+    status = mapped_column(
+        attendance_status_type,
+        nullable=False,
+        server_default="present",
+    )
+
+    __table_args__ = (UniqueConstraint("driver_id", "work_date"),)
 
 
 class ChannelIdentity(Base):

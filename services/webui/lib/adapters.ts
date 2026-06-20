@@ -17,14 +17,14 @@ export function toUiVehicle(v: VehicleRead): UiVehicle {
   }
 }
 
-/** DriverRead -> card view model. `licExpiry` has no source until Phase 3 (renders —). */
+/** DriverRead -> card view model. licExpiry maps from license_valid_to (— when null). */
 export function toUiDriver(d: DriverRead): UiDriver {
   return {
     id: d.driver_id,
     name: d.full_name,
     phone: d.phone_number,
     license: d.license_number ?? '—',
-    licExpiry: null,
+    licExpiry: d.license_valid_to ?? null,
     status: d.status === 'active' ? 'on' : 'off',
   }
 }

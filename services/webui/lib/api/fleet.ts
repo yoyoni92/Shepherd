@@ -7,6 +7,7 @@ import {
   ReportReadSchema,
   KpiDailyReadSchema,
   CustomerReadSchema,
+  AttendanceRecordReadSchema,
   type VehicleRead,
   type VehicleCreate,
   type DriverRead,
@@ -63,6 +64,15 @@ export const fetchCustomers = () => get('/customers', z.array(CustomerReadSchema
 
 // KPI daily rollup: latest snapshots, newest first (dashboard tiles + trends)
 export const fetchKpiDaily = (limit = 2) => get(`/kpi/daily?limit=${limit}`, z.array(KpiDailyReadSchema))
+
+// Attendance: month is YYYY-MM; upsert one (driver, date=YYYY-MM-DD) day.
+export const fetchAttendanceMonth = (month: string) =>
+  get(`/attendance/${month}`, z.array(AttendanceRecordReadSchema))
+export const patchAttendanceDay = (
+  driverId: string,
+  day: string,
+  body: { clock_in?: string | null; clock_out?: string | null; status: string },
+) => send('PATCH', `/attendance/${driverId}/${day}`, body, AttendanceRecordReadSchema)
 
 // Config: API returns a list of {config_key, config_value, description}; expose as a record.
 export async function fetchConfig(): Promise<Record<string, unknown>> {

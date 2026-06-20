@@ -9,6 +9,7 @@ from shepherd_db.logic import next_maintenance
 from shepherd_db.models import (
     Accident,
     AccidentAttachment,
+    AttendanceRecord,
     Event,
     KmUpdate,
     KpiDaily,
@@ -322,6 +323,38 @@ def get_all_config(session: Session) -> list[SystemConfig]:
 
 def get_config_key(session: Session, key: str) -> SystemConfig | None:
     return session.get(SystemConfig, key)
+
+
+# ---------------------------------------------------------------------------
+# Attendance (drivers as employees)
+# ---------------------------------------------------------------------------
+
+def list_attendance_month(session: Session, year: int, month: int) -> list[AttendanceRecord]:
+    from calendar import monthrange
+    from datetime import date
+
+    start = date(year, month, 1)
+    end = date(year, month, monthrange(year, month)[1])
+    stmt = select(AttendanceRecord).where(AttendanceRecord.work_date.between(start, end))
+    return list(session.execute(stmt).scalars())
+
+
+def upsert_attendance(session: Session, driver_id: UUID, work_date, data: dict) -> AttendanceRecord:
+    rec = session.execute(
+        select(AttendanceRecord).where(
+            AttendanceRecord.driver_id == driver_id,
+            AttendanceRecord.work_date == work_date,
+        )
+    ).scalar_one_or_none()
+    if rec is None:
+        rec = AttendanceRecord(driver_id=driver_id, work_date=work_date, **data)
+        session.add(rec)
+    else:
+        for key, value in data.items():
+            setattr(rec, key, value)
+    session.commit()
+    session.refresh(rec)
+    return rec
 
 
 # ---------------------------------------------------------------------------

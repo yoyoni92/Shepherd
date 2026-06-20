@@ -13,8 +13,8 @@ const VEHICLES = [
 ]
 
 const DRIVERS = [
-  { driver_id: 'd1', full_name: 'דנה לוי', phone_number: '050-123-4567', license_number: 'IL-4485219', status: 'active' },
-  { driver_id: 'd2', full_name: 'יוסי מזרחי', phone_number: '052-998-1120', license_number: 'IL-3320981', status: 'inactive' },
+  { driver_id: 'd1', full_name: 'דנה לוי', phone_number: '050-123-4567', license_number: 'IL-4485219', license_valid_to: '2027-03-01', status: 'active' },
+  { driver_id: 'd2', full_name: 'יוסי מזרחי', phone_number: '052-998-1120', license_number: 'IL-3320981', license_valid_to: null, status: 'inactive' },
 ]
 
 const EVENTS = [
@@ -69,6 +69,17 @@ export const handlers = [
   // Customers + KPI daily rollup
   http.get(`${FLEET}/customers`, () => HttpResponse.json(CUSTOMERS)),
   http.get(`${FLEET}/kpi/daily`, () => HttpResponse.json(KPI_DAILY)),
+
+  // Attendance: month read returns one stored record for d1; PATCH echoes the upsert
+  http.get(`${FLEET}/attendance/:month`, ({ params }) =>
+    HttpResponse.json([
+      { driver_id: 'd1', work_date: `${params.month}-02`, clock_in: '08:05', clock_out: '17:00', status: 'late' },
+    ]),
+  ),
+  http.patch(`${FLEET}/attendance/:driverId/:day`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ driver_id: params.driverId, work_date: params.day, ...body })
+  }),
 
   // Config (list shape)
   http.get(`${FLEET}/config`, () => HttpResponse.json(CONFIG)),

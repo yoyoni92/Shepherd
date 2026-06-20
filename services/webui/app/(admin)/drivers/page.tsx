@@ -9,16 +9,18 @@ import { Button } from '@/components/ui/button'
 import { SortChips, nextDir, type SortState } from '@/components/SortChips'
 import { DriverCard } from '@/components/DriverCard'
 
-type DKey = 'name' | 'vehicle' | 'status'
+type DKey = 'name' | 'licExpiry' | 'vehicle' | 'status'
 
 const FIELDS: { key: DKey; label: string }[] = [
   { key: 'name', label: 'שם' },
+  { key: 'licExpiry', label: 'תוקף רישיון' },
   { key: 'vehicle', label: 'רכב' },
   { key: 'status', label: 'סטטוס' },
 ]
 
 const accessor = (d: UiDriver, key: DKey, vehicleByDriver: Record<string, string>): string => {
   if (key === 'vehicle') return vehicleByDriver[d.id] ?? ''
+  if (key === 'licExpiry') return d.licExpiry ?? ''
   return d[key]
 }
 

@@ -1,35 +1,41 @@
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { useAttendance } from '@/hooks/useAttendance'
+import { QueryClientWrapper } from './helpers'
 
-// Attendance has no backend (gap B2) — preview state held + validated in-memory.
-describe('useAttendance (preview)', () => {
-  it('builds a sample month with employees and records', () => {
-    const { result } = renderHook(() => useAttendance('2026-06'))
-    expect(result.current.available).toBe(false)
-    expect(result.current.month.employees).toHaveLength(7)
-    expect(result.current.month.label).toBe('יוני 2026')
+// Employees are drivers; the month skeleton overlays records fetched from the Fleet API.
+describe('useAttendance', () => {
+  it('builds the month from drivers and overlays a stored record', async () => {
+    const { result } = renderHook(() => useAttendance('2026-06'), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.month.employees).toHaveLength(2))
+    await waitFor(() => {
+      const d = result.current.month.records['d1'].find((x) => x.day === 2)
+      expect(d?.in).toBe('08:05')
+      expect(d?.status).toBe('late')
+    })
   })
 
-  it('applies a valid time edit to local state', () => {
-    const { result } = renderHook(() => useAttendance('2026-06'))
-    const firstDay = result.current.month.records['1'][0].day
-    act(() => result.current.patchDay({ employeeId: 1, day: firstDay, patch: { in: '08:15' } }))
+  it('accepts a valid time edit', async () => {
+    const { result } = renderHook(() => useAttendance('2026-06'), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.month.employees).toHaveLength(2))
+    const firstDay = result.current.month.records['d1'][0].day
+    act(() => result.current.patchDay({ employeeId: 'd1', day: firstDay, patch: { in: '08:15' } }))
     expect(result.current.patchError).toBeNull()
-    expect(result.current.month.records['1'][0].in).toBe('08:15')
   })
 
-  it('rejects an out-before-in edit', () => {
-    const { result } = renderHook(() => useAttendance('2026-06'))
-    const firstDay = result.current.month.records['1'][0].day
-    act(() => result.current.patchDay({ employeeId: 1, day: firstDay, patch: { out: '01:00' } }))
+  it('rejects a malformed time string', async () => {
+    const { result } = renderHook(() => useAttendance('2026-06'), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.month.employees).toHaveLength(2))
+    const firstDay = result.current.month.records['d1'][0].day
+    act(() => result.current.patchDay({ employeeId: 'd1', day: firstDay, patch: { in: '99:99' } }))
     expect(result.current.patchError).toBeTruthy()
   })
 
-  it('rejects a malformed time string', () => {
-    const { result } = renderHook(() => useAttendance('2026-06'))
-    const firstDay = result.current.month.records['1'][0].day
-    act(() => result.current.patchDay({ employeeId: 1, day: firstDay, patch: { in: '99:99' } }))
+  it('rejects an out-before-in edit', async () => {
+    const { result } = renderHook(() => useAttendance('2026-06'), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.month.employees).toHaveLength(2))
+    const firstDay = result.current.month.records['d1'][0].day
+    act(() => result.current.patchDay({ employeeId: 'd1', day: firstDay, patch: { in: '17:00', out: '01:00' } }))
     expect(result.current.patchError).toBeTruthy()
   })
 })

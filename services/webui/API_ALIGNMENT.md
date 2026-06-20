@@ -29,9 +29,9 @@ way (see gap A2).
 | Dashboard · Alerts | `GET /events?status=open` | ✅ | Mapped from real events (`lib/alerts.ts` `alertsFromEvents`). |
 | Dashboard · Recent activity | `GET /events` (severity, then recency) | ✅ | `lib/events.ts` `sortEvents`; replaced the demo missions list. |
 | Vehicles | `GET/POST /vehicles`, `DELETE /vehicles/{vehicle_id}` | ✅ | Gap C1 closed: real DB fields only; driver name via `driver_id`→drivers join. Delete by **UUID**. |
-| Drivers | `GET/POST /drivers`, `DELETE /drivers/{driver_id}` | ⚠️ | Gap C2: assigned vehicle via reverse-join (done); licence expiry waits on `drivers.license_valid_to` (Phase 3). |
+| Drivers | `GET/POST /drivers`, `DELETE /drivers/{driver_id}` | ✅ | Assigned vehicle via reverse-join; licence expiry from `drivers.license_valid_to` (nullable). |
 | Events | `GET /events` | ✅ | Replaces Missions. Full list, severity+recency order, type/severity/status/vehicle filters. |
-| Attendance | — | ❌ | No employees/attendance domain yet (gap B2 → Phase 3). Page shows placeholder. |
+| Attendance | `GET /attendance/{month}`, `PATCH /attendance/{driver_id}/{date}` | ✅ | Drivers as employees; webui builds the weekday skeleton and overlays records (gap B2 closed). |
 | Config | `GET /config`, `PUT /config/{key}` | ✅ | Real numeric keys only: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`, `image_confidence_min`. PUT body `{config_value}`. |
 | Chat · Fleet Q&A | `POST /agent/run` (via `/api/proxy/agent`) | ✅ | Returns `{answer, tools_used, reasoning_steps, citations}`; RAG citations render as chips (gap D1 closed). |
 | Chat · Assistant | `POST /chat` (via `/api/proxy/assistant`) | ✅ | Body `{message}` → `{content}`. DB-blind. |
@@ -62,9 +62,9 @@ last_maintenance_type, last_maintenance_km, last_maintenance_date, maintenance_t
 | fuel | — | ❌ not stored |
 | condition (0–100) | — | ❌ not stored; could derive from km vs next_maintenance_km |
 
-### C2 — Driver (UI card vs `DriverRead`) — PARTIAL
-Assigned vehicle now resolved via reverse-join (`vehicle.driver_id`→plate). Licence expiry still has no
-source on the driver; renders `—` until `drivers.license_valid_to` lands in Phase 3.
+### C2 — Driver (UI card vs `DriverRead`) — RESOLVED
+Assigned vehicle resolved via reverse-join (`vehicle.driver_id`→plate). Licence expiry now maps from the
+nullable `drivers.license_valid_to` column (renders `—` when null).
 
 Real fields: `driver_id, full_name, phone_number, license_number, status(active|inactive)`.
 
@@ -83,10 +83,11 @@ Real fields: `driver_id, full_name, phone_number, license_number, status(active|
 - **A2** DONE — generic same-origin proxy `app/api/proxy/[svc]/[...path]` for `agent`/`rag`/`gateway`/`assistant`
   (server-only `AGENT_URL`/`RAG_URL`/`GATEWAY_URL`/`ASSISTANT_URL`).
 - **B1** RESOLVED by decision — Missions removed; the Events section renders the real `events` domain.
-- **B2** Attendance domain (reuse drivers as employees + `attendance_records` table + endpoints) — Phase 3.
+- **B2** DONE — `attendance_records` table (drivers as employees) + `GET /attendance/{month}` and
+  `PATCH /attendance/{driver_id}/{date}`; webui builds the weekday skeleton and overlays records.
 - **B3** RESOLVED by decision — Review queue removed; open `events` cover the attention list.
 - **C1** DONE — vehicle card shows real DB fields; assigned driver name via `driver_id`→drivers join.
-- **C2** Partial — assigned vehicle via reverse-join DONE; driver licence expiry needs `drivers.license_valid_to` (Phase 3).
+- **C2/C4** DONE — assigned vehicle via reverse-join; driver licence expiry via nullable `drivers.license_valid_to`.
 - **D1** DONE — `POST /agent/run` returns `citations` collected from the RAG tool results;
   the webui maps them to chips in `ChatSurface`.
 - **D2** Async ingest — outcomes surface in Events; no synchronous classification result by design.

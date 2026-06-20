@@ -28,13 +28,15 @@ describe('toUiVehicle', () => {
 })
 
 describe('toUiDriver', () => {
-  it('maps fields and translates status to on/off', () => {
-    const d: DriverRead = { driver_id: 'd1', full_name: 'דנה לוי', phone_number: '050', license_number: 'IL-1', status: 'active' }
-    expect(toUiDriver(d)).toMatchObject({ id: 'd1', name: 'דנה לוי', phone: '050', license: 'IL-1', status: 'on', licExpiry: null })
+  it('maps fields, licence expiry, and translates status to on/off', () => {
+    const d: DriverRead = { driver_id: 'd1', full_name: 'דנה לוי', phone_number: '050', license_number: 'IL-1', license_valid_to: '2027-03-01', status: 'active' }
+    expect(toUiDriver(d)).toMatchObject({ id: 'd1', name: 'דנה לוי', phone: '050', license: 'IL-1', licExpiry: '2027-03-01', status: 'on' })
     expect(toUiDriver({ ...d, status: 'inactive' }).status).toBe('off')
   })
 
-  it('dashes a missing licence number', () => {
-    expect(toUiDriver({ driver_id: 'd', full_name: 'n', phone_number: 'p', status: 'active' }).license).toBe('—')
+  it('dashes a missing licence number and nulls a missing expiry', () => {
+    const ui = toUiDriver({ driver_id: 'd', full_name: 'n', phone_number: 'p', status: 'active' })
+    expect(ui.license).toBe('—')
+    expect(ui.licExpiry).toBeNull()
   })
 })

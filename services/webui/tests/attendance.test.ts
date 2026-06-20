@@ -8,8 +8,12 @@ import {
   summarize,
   isValidTimeRange,
   buildCsv,
+  monthLabel,
+  monthOptions,
+  buildMonthSkeleton,
+  type AttendanceDay,
+  type Employee,
 } from '@/lib/attendance'
-import type { AttendanceDay, Employee } from '@/lib/preview'
 
 const day = (over: Partial<AttendanceDay>): AttendanceDay => ({
   day: 1,
@@ -74,8 +78,8 @@ describe('employeeStatus', () => {
 
 describe('summarize', () => {
   const employees: Employee[] = [
-    { id: 1, name: 'A', role: 'r', dept: 'd' },
-    { id: 2, name: 'B', role: 'r', dept: 'd' },
+    { id: '1', name: 'A', role: 'r' },
+    { id: '2', name: 'B', role: 'r' },
   ]
   const records = {
     '1': [day({ in: '08:00', out: '16:00', status: 'late' })],
@@ -103,12 +107,30 @@ describe('isValidTimeRange', () => {
 
 describe('buildCsv', () => {
   it('emits a header row and one line per employee', () => {
-    const employees: Employee[] = [{ id: 1, name: 'דנה לוי', role: 'נהגת', dept: 'תפעול' }]
+    const employees: Employee[] = [{ id: '1', name: 'דנה לוי', role: 'נהג' }]
     const records = { '1': [day({ in: '08:00', out: '17:00' })] }
     const csv = buildCsv(employees, records)
     const lines = csv.split('\n')
     expect(lines[0]).toContain('עובד')
     expect(lines[1]).toContain('דנה לוי')
     expect(lines).toHaveLength(2)
+  })
+})
+
+describe('month helpers', () => {
+  it('monthLabel renders a Hebrew month + year', () => {
+    expect(monthLabel('2026-06')).toBe('יוני 2026')
+  })
+  it('monthOptions returns the last N months, newest last', () => {
+    const opts = monthOptions(3, new Date('2026-06-15T00:00:00'))
+    expect(opts.map((o) => o.key)).toEqual(['2026-04', '2026-05', '2026-06'])
+  })
+  it('buildMonthSkeleton skips weekends and seeds each employee', () => {
+    const month = buildMonthSkeleton('2026-06', [{ id: 'd1', name: 'A', role: 'נהג' }])
+    expect(month.label).toBe('יוני 2026')
+    const days = month.records['d1']
+    expect(days.length).toBeGreaterThan(0)
+    // no Friday/Saturday in the skeleton
+    expect(days.every((d) => d.weekday !== 'שישי' && d.weekday !== 'שבת')).toBe(true)
   })
 })

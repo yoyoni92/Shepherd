@@ -2,20 +2,18 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileText, Pencil } from 'lucide-react'
 import { useAttendance } from '@/hooks/useAttendance'
-import { aggregate, summarize, employeeStatus, buildCsv } from '@/lib/attendance'
-import type { AttendanceDay } from '@/lib/preview'
+import { aggregate, summarize, employeeStatus, buildCsv, monthOptions, type AttendanceDay } from '@/lib/attendance'
 import { Card } from '@/components/ui/card'
 import { Avatar } from '@/components/Avatar'
 import { ATT_STATUS_META } from '@/components/meta'
 import { AttendanceEditModal } from '@/components/AttendanceEditModal'
-import { PreviewBanner } from '@/components/PreviewBanner'
-import { PREVIEW_MONTHS as MONTHS } from '@/lib/preview'
 
 const GRID = '2fr 88px 116px 116px 86px 78px 108px 64px'
+const MONTHS = monthOptions(3)
 
 export default function AttendancePage() {
   const [idx, setIdx] = useState(MONTHS.length - 1)
-  const [editId, setEditId] = useState<number | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
   const current = MONTHS[idx]
   const { month, loading, patchDay } = useAttendance(current.key)
 
@@ -24,7 +22,7 @@ export default function AttendancePage() {
   const records = month?.records ?? {}
   const summary = summarize(employees, records)
 
-  const onPatch = (employeeId: number, day: number, patch: Partial<AttendanceDay>) =>
+  const onPatch = (employeeId: string, day: number, patch: Partial<AttendanceDay>) =>
     patchDay({ employeeId, day, patch })
 
   const exportCsv = () => {
@@ -51,7 +49,6 @@ export default function AttendancePage() {
 
   return (
     <div className="animate-fade-up">
-      <PreviewBanner>נתוני דמו — אין עדיין API לנוכחות (API_ALIGNMENT.md · B2)</PreviewBanner>
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <div className="flex items-center gap-1 bg-panel border border-control rounded-[10px]" style={{ padding: 5 }}>
           <button
@@ -129,7 +126,7 @@ export default function AttendancePage() {
               style={{ gridTemplateColumns: GRID, gap: 10, padding: '12px 18px' }}
             >
               <div className="flex items-center gap-[11px] min-w-0">
-                <Avatar id={e.id} name={e.name} size={38} radius={10} font={13} />
+                <Avatar id={Number(e.id) || e.name.length} name={e.name} size={38} radius={10} font={13} />
                 <div className="min-w-0">
                   <div className="text-[13.5px] font-bold truncate">{e.name}</div>
                   <div className="text-[11.5px] text-faint">{e.role}</div>

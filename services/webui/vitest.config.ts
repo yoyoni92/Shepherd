@@ -19,8 +19,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['lib/**', 'hooks/**'],
-      // ponytail: NextAuth config, cn() styling helper, and no-backend sample data — not business logic
-      exclude: ['lib/auth.ts', 'lib/utils.ts', 'lib/preview.ts'],
+      // ponytail: NextAuth config + cn() styling helper — not business logic
+      exclude: ['lib/auth.ts', 'lib/utils.ts'],
       thresholds: { lines: 85, functions: 85, branches: 85, statements: 85 },
     },
   },

@@ -41,6 +41,7 @@ export const DriverReadSchema = z.object({
   full_name: z.string(),
   phone_number: z.string(),
   license_number: z.string().nullish(),
+  license_valid_to: z.string().nullish(),
   status: z.string(), // 'active' | 'inactive'
 })
 
@@ -48,6 +49,7 @@ export const DriverCreateSchema = z.object({
   full_name: z.string(),
   phone_number: z.string(),
   license_number: z.string().nullish(),
+  license_valid_to: z.string().nullish(),
 })
 
 export const ConfigReadSchema = z.object({
@@ -88,6 +90,14 @@ export const CustomerReadSchema = z.object({
   full_name: z.string(),
 })
 
+export const AttendanceRecordReadSchema = z.object({
+  driver_id: z.string(),
+  work_date: z.string(), // YYYY-MM-DD
+  clock_in: z.string().nullish(),
+  clock_out: z.string().nullish(),
+  status: z.string(), // present | late | leave | absent
+})
+
 export const ReportReadSchema = z.object({
   report_id: z.string(),
   vehicle_id: z.string(),
@@ -105,6 +115,7 @@ export type EventRead = z.infer<typeof EventReadSchema>
 export type ReportRead = z.infer<typeof ReportReadSchema>
 export type KpiDailyRead = z.infer<typeof KpiDailyReadSchema>
 export type CustomerRead = z.infer<typeof CustomerReadSchema>
+export type AttendanceRecordRead = z.infer<typeof AttendanceRecordReadSchema>
 
 // ───────────────────────── UI view models ─────────────────────────
 // Component-facing shapes. Fields the backend does not provide are nullable
@@ -129,6 +140,6 @@ export interface UiDriver {
   name: string
   phone: string
   license: string
-  licExpiry: string | null // drivers.license_valid_to (added in Phase 3; null until then)
+  licExpiry: string | null // drivers.license_valid_to (nullable)
   status: 'on' | 'off'
 }

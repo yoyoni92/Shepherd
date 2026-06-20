@@ -1,4 +1,67 @@
-import type { AttendanceDay, Employee } from './preview'
+// Attendance domain types. Employees are drivers (id is the driver UUID); the webui
+// generates the weekday skeleton and overlays records fetched from the Fleet API.
+export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent'
+
+export interface AttendanceDay {
+  day: number
+  dateLabel: string
+  weekday: string
+  in: string
+  out: string
+  status: AttendanceStatus
+}
+
+export interface Employee {
+  id: string
+  name: string
+  role: string
+}
+
+export interface AttendanceMonth {
+  monthKey: string
+  label: string
+  employees: Employee[]
+  records: Record<string, AttendanceDay[]>
+}
+
+const MONTHS_HE = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
+]
+const WD = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** Hebrew label for a 'YYYY-MM' key, e.g. 'יוני 2026'. */
+export function monthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number)
+  return `${MONTHS_HE[m - 1]} ${y}`
+}
+
+/** The last `count` months (newest last) as {key:'YYYY-MM', label}. */
+export function monthOptions(count = 3, today: Date = new Date()): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = []
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
+    out.push({ key, label: monthLabel(key) })
+  }
+  return out
+}
+
+/** Weekday skeleton (Fri/Sat skipped) for each employee; days default to empty 'present'. */
+export function buildMonthSkeleton(monthKey: string, employees: readonly Employee[]): AttendanceMonth {
+  const [y, m] = monthKey.split('-').map(Number)
+  const cap = new Date(y, m, 0).getDate()
+  const skeleton: AttendanceDay[] = []
+  for (let d = 1; d <= cap; d++) {
+    const dow = new Date(`${monthKey}-${pad(d)}T00:00:00`).getDay()
+    if (dow === 5 || dow === 6) continue // Fri/Sat weekend
+    skeleton.push({ day: d, dateLabel: `${pad(d)}/${pad(m)}`, weekday: WD[dow], in: '', out: '', status: 'present' })
+  }
+  const records: Record<string, AttendanceDay[]> = {}
+  for (const e of employees) records[e.id] = skeleton.map((d) => ({ ...d }))
+  return { monthKey, label: monthLabel(monthKey), employees: [...employees], records }
+}
 
 /** 'HH:MM' -> minutes since midnight; NaN for empty/invalid. */
 export function t2m(t: string): number {
@@ -117,7 +180,6 @@ export function buildCsv(
   const head = [
     'עובד',
     'תפקיד',
-    'מחלקה',
     'ימי עבודה',
     'כניסה ממוצעת',
     'יציאה ממוצעת',
@@ -128,7 +190,7 @@ export function buildCsv(
   for (const e of employees) {
     const a = aggregate(records[e.id] ?? [])
     lines.push(
-      [e.name, e.role, e.dept, a.pres, a.avgIn, a.avgOut, a.hours, a.late]
+      [e.name, e.role, a.pres, a.avgIn, a.avgOut, a.hours, a.late]
         .map((x) => `"${x}"`)
         .join(','),
     )

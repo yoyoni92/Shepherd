@@ -1,51 +1,91 @@
 'use client'
-// Attendance has no backend yet (API_ALIGNMENT.md gap B2). Preview/sample data held in local
-// state; edits validate + recompute in-memory so the design is fully interactive offline.
-import { useEffect, useState } from 'react'
-import { isValidTimeRange } from '@/lib/attendance'
-import { buildSampleMonth, type AttendanceMonth, type AttendanceDay } from '@/lib/preview'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useDrivers } from '@/hooks/useDrivers'
+import { fetchAttendanceMonth, patchAttendanceDay } from '@/lib/api/fleet'
+import {
+  isValidTimeRange,
+  buildMonthSkeleton,
+  type AttendanceDay,
+  type AttendanceStatus,
+  type Employee,
+} from '@/lib/attendance'
+import type { AttendanceRecordRead } from '@/lib/api/schemas'
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
 type DayPatch = Partial<Pick<AttendanceDay, 'in' | 'out' | 'status'>>
 interface PatchArgs {
-  employeeId: number
+  employeeId: string
   day: number
   patch: DayPatch
 }
 
+type MutateVars = {
+  driverId: string
+  date: string
+  body: { clock_in: string | null; clock_out: string | null; status: string }
+}
+
+/** Skeleton (weekday calendar) per employee, with stored records overlaid. */
+function buildMonth(monthKey: string, employees: Employee[], records: readonly AttendanceRecordRead[]) {
+  const month = buildMonthSkeleton(monthKey, employees)
+  for (const r of records) {
+    const days = month.records[r.driver_id]
+    if (!days) continue
+    const day = days.find((d) => d.day === Number(r.work_date.slice(8, 10)))
+    if (!day) continue
+    day.in = r.clock_in ?? ''
+    day.out = r.clock_out ?? ''
+    day.status = r.status as AttendanceStatus
+  }
+  return month
+}
+
 export function useAttendance(monthKey: string) {
-  const [month, setMonth] = useState<AttendanceMonth>(() => buildSampleMonth(monthKey))
+  const qc = useQueryClient()
+  const { drivers } = useDrivers()
+  const key = ['attendance', monthKey]
+  const recordsQuery = useQuery({ queryKey: key, queryFn: () => fetchAttendanceMonth(monthKey) })
   const [patchError, setPatchError] = useState<Error | null>(null)
 
-  useEffect(() => {
-    setMonth(buildSampleMonth(monthKey))
-  }, [monthKey])
+  const employees: Employee[] = drivers.map((d) => ({ id: d.id, name: d.name, role: 'נהג' }))
+  const month = buildMonth(monthKey, employees, recordsQuery.data ?? [])
+
+  const mutation = useMutation({
+    mutationFn: ({ driverId, date, body }: MutateVars) => patchAttendanceDay(driverId, date, body),
+    onMutate: async ({ driverId, date, body }) => {
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData<AttendanceRecordRead[]>(key)
+      const next: AttendanceRecordRead = { driver_id: driverId, work_date: date, ...body }
+      qc.setQueryData<AttendanceRecordRead[]>(key, (old) => {
+        const rest = (old ?? []).filter((r) => !(r.driver_id === driverId && r.work_date === date))
+        return [...rest, next]
+      })
+      return { prev }
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(key, ctx?.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  })
 
   const patchDay = ({ employeeId, day, patch }: PatchArgs) => {
-    setMonth((m) => {
-      const eid = String(employeeId)
-      const current = m.records[eid]?.find((d) => d.day === day)
-      const merged = { ...current, ...patch } as AttendanceDay
-      // Admin-gated validation: time format + out strictly after in (when both set).
-      if (patch.in && !TIME_RE.test(patch.in)) {
-        setPatchError(new Error('זמן כניסה לא תקין'))
-        return m
-      }
-      if (patch.out && !TIME_RE.test(patch.out)) {
-        setPatchError(new Error('זמן יציאה לא תקין'))
-        return m
-      }
-      const worked = merged.status === 'present' || merged.status === 'late'
-      if (worked && merged.in && merged.out && !isValidTimeRange(merged.in, merged.out)) {
-        setPatchError(new Error('שעת יציאה חייבת להיות אחרי שעת כניסה'))
-        return m
-      }
-      setPatchError(null)
-      const days = m.records[eid]?.map((d) => (d.day === day ? merged : d)) ?? []
-      return { ...m, records: { ...m.records, [eid]: days } }
+    const current = month.records[employeeId]?.find((d) => d.day === day)
+    const merged = { ...current, ...patch } as AttendanceDay
+    // Admin-gated validation: time format + out strictly after in (when both set).
+    if (patch.in && !TIME_RE.test(patch.in)) return setPatchError(new Error('זמן כניסה לא תקין'))
+    if (patch.out && !TIME_RE.test(patch.out)) return setPatchError(new Error('זמן יציאה לא תקין'))
+    const worked = merged.status === 'present' || merged.status === 'late'
+    if (worked && merged.in && merged.out && !isValidTimeRange(merged.in, merged.out)) {
+      return setPatchError(new Error('שעת יציאה חייבת להיות אחרי שעת כניסה'))
+    }
+    setPatchError(null)
+    const date = `${monthKey}-${String(day).padStart(2, '0')}`
+    mutation.mutate({
+      driverId: employeeId,
+      date,
+      body: { clock_in: merged.in || null, clock_out: merged.out || null, status: merged.status },
     })
   }
 
-  return { month, loading: false, patchDay, patchError, available: false }
+  return { month, loading: recordsQuery.isLoading, patchDay, patchError }
 }

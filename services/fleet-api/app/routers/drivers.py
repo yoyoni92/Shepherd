@@ -16,6 +16,7 @@ def _to_read(d) -> DriverRead:
         full_name=d.full_name,
         phone_number=d.phone_number,
         license_number=d.license_number,
+        license_valid_to=d.license_valid_to,
         status=d.status.value,
     )
 
