@@ -33,6 +33,7 @@ way (see gap A2).
 | Events | `GET /events` | ✅ | Replaces Missions. Full list, severity+recency order, type/severity/status/vehicle filters. |
 | Attendance | `GET /attendance/{month}`, `PATCH /attendance/{driver_id}/{date}` | ✅ | Drivers as employees; webui builds the weekday skeleton and overlays records (gap B2 closed). |
 | Config | `GET /config`, `PUT /config/{key}` | ✅ | Real numeric keys only: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`, `image_confidence_min`. PUT body `{config_value}`. |
+| System health | `GET /health` on each service, via `app/api/health` | ✅ | Server-side aggregator pings fleet/agent/rag/gateway/assistant `/health`; `/health` page shows status dots + latency, polls 15s. |
 | Chat · Fleet Q&A | `POST /agent/run` (via `/api/proxy/agent`) | ✅ | Returns `{answer, tools_used, reasoning_steps, citations}`; RAG citations render as chips (gap D1 closed). |
 | Chat · Assistant | `POST /chat` (via `/api/proxy/assistant`) | ✅ | Body `{message}` → `{content}`. DB-blind. |
 | Upload (hidden route) | `POST /webapp/ingest` (via `/api/proxy/gateway`) | ⚠️ | Returns `{ok:true}`; async pipeline, outcomes surface in Events (gap D2). |

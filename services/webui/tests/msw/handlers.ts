@@ -88,6 +88,20 @@ export const handlers = [
     return HttpResponse.json({ config_key: params.key, config_value: body.config_value, description: null })
   }),
 
+  // System health aggregator (same-origin Next route)
+  http.get('*/api/health', () =>
+    HttpResponse.json({
+      services: [
+        { key: 'fleet', status: 'up', latencyMs: 12 },
+        { key: 'agent', status: 'up', latencyMs: 40 },
+        { key: 'rag', status: 'down', latencyMs: null },
+        { key: 'gateway', status: 'up', latencyMs: 18 },
+        { key: 'assistant', status: 'up', latencyMs: 25 },
+      ],
+      checkedAt: '2026-06-20T10:00:00Z',
+    }),
+  ),
+
   // Agent (real contract)
   http.post(`${AGENT}/agent/run`, () =>
     HttpResponse.json({

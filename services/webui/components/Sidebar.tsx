@@ -10,15 +10,18 @@ import {
   CalendarCheck,
   Settings,
   MessageSquare,
+  Activity,
   LogOut,
   type LucideIcon,
 } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
 import { useEvents } from '@/hooks/useEvents'
+import { useHealth } from '@/hooks/useHealth'
 import { openCount } from '@/lib/events'
+import { summarizeHealth, type Overall } from '@/lib/health'
 
-type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'events' }
+type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'events'; statusDot?: boolean }
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'לוח בקרה', Icon: LayoutDashboard },
@@ -27,14 +30,19 @@ const NAV: NavItem[] = [
   { href: '/events', label: 'אירועים', Icon: TriangleAlert, badge: 'events' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
   { href: '/config', label: 'הגדרות', Icon: Settings },
+  { href: '/health', label: 'מצב מערכת', Icon: Activity, statusDot: true },
   { href: '/chat', label: 'צ׳אט ועוזר', Icon: MessageSquare },
 ]
+
+const HEALTH_DOT: Record<Overall, string> = { ok: '#34d399', degraded: '#fbbf24', down: '#f87171' }
 
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname()
   const { vehicles } = useVehicles()
   const { drivers } = useDrivers()
   const { events } = useEvents()
+  const { services } = useHealth()
+  const healthColor = HEALTH_DOT[summarizeHealth(services)]
   const counts: Record<string, number> = {
     vehicles: vehicles.length,
     drivers: drivers.length,
@@ -64,7 +72,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ href, label, Icon, badge }) => {
+        {NAV.map(({ href, label, Icon, badge, statusDot }) => {
           const active = pathname === href || pathname?.startsWith(href + '/')
           const count = badge ? counts[badge] : undefined
           return (
@@ -85,6 +93,12 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                 <Icon size={19} />
               </span>
               {!collapsed && <span className="flex-1 text-right whitespace-nowrap">{label}</span>}
+              {!collapsed && statusDot && (
+                <span
+                  className="rounded-full"
+                  style={{ width: 8, height: 8, background: healthColor, boxShadow: `0 0 0 3px ${healthColor}33` }}
+                />
+              )}
               {!collapsed && count != null && (
                 <span
                   className="text-[11px] font-bold rounded-full text-center"

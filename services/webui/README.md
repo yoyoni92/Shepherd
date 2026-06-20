@@ -41,6 +41,7 @@ The shell (`components/Shell.tsx` = sidebar + topbar) wraps the seven design sec
 | `/events` | Real `events` list — severity+recency order, type/severity/status/vehicle filters |
 | `/attendance` | Monthly clock-in/out report, edit modal, CSV/PDF export (`lib/attendance.ts`) |
 | `/config` | `system_config` stepper editor (admin-gated, Zod-validated) |
+| `/health` | System status — green/red dots + latency for each 3rd-party service, polled 15s |
 | `/chat` | Tabbed: Fleet Q&A (RAG/LangGraph) + DB-blind Ollama assistant |
 
 Still reachable by URL (not in the sidebar): `/upload`, `/assistant`.
@@ -60,6 +61,9 @@ The UI is wired to the **real** services (`fleet-api`, `langgraph-agent`, `ollam
 - **Generic service proxy:** `agent`/`rag`/`gateway`/`assistant` are reached via the same-origin
   `app/api/proxy/[svc]/[...path]` (server-only `AGENT_URL`/`RAG_URL`/`GATEWAY_URL`/`ASSISTANT_URL`);
   no service hostname reaches the browser.
+- **System health:** `app/api/health` pings every service's `/health` server-side (3s timeout) and
+  returns per-service up/down + latency; the `/health` page renders status dots and the sidebar shows a
+  live overall dot.
 - **KPIs:** `GET /kpi/daily?limit=2` reads the nightly `kpi_daily` rollup; `lib/kpis.ts`
   `deriveKpiTiles` maps the latest 2 rows to six tiles + trend arrows. Alerts/recent come from `/events`.
 - **Adapters:** `lib/adapters.ts` maps `VehicleRead`/`DriverRead` → card view models grounded to real
