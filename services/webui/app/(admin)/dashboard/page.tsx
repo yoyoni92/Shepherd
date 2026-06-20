@@ -9,6 +9,7 @@ import { fmtDate } from '@/lib/domain'
 import { alertsFromEvents } from '@/lib/alerts'
 import { KPI_TILE_KEYS, type KpiTile, type KpiTileKey } from '@/lib/kpis'
 import { Card } from '@/components/ui/card'
+import { HealthSummary } from '@/components/HealthSummary'
 import { EVENT_TYPE_LABEL, SEVERITY_META, ALERT_COLOR } from '@/components/meta'
 
 interface TileMeta {
@@ -90,6 +91,8 @@ export default function DashboardPage() {
           )
         })}
       </div>
+
+      <HealthSummary />
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.3fr 1fr' }}>
         {/* Alerts */}
