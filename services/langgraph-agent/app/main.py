@@ -74,6 +74,7 @@ class RunResponse(BaseModel):
     answer: str
     tools_used: list[str]
     reasoning_steps: list[str]
+    citations: list[str] = []
 
 
 @app.post("/agent/run", response_model=RunResponse)
@@ -86,12 +87,14 @@ def run_agent(req: RunRequest) -> RunResponse:
         "answer": "",
         "tools_used": [],
         "reasoning_steps": [],
+        "citations": [],
     }
     final = _get_graph().invoke(initial)
     return RunResponse(
         answer=final["answer"],
         tools_used=final["tools_used"],
         reasoning_steps=final["reasoning_steps"],
+        citations=final.get("citations", []),
     )
 
 

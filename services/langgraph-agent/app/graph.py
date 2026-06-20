@@ -12,6 +12,19 @@ class AgentState(TypedDict):
     answer: str
     tools_used: list[str]
     reasoning_steps: list[str]
+    citations: list[str]        # collected from rag tool results by the synthesiser
+
+
+def _collect_citations(tool_results: list[dict]) -> list[str]:
+    """Pull RAG citations out of the tool results (deduped, order-preserving)."""
+    cites: list[str] = []
+    for r in tool_results:
+        if r.get("tool") != "rag":
+            continue
+        for c in (r.get("result") or {}).get("citations") or []:
+            if c not in cites:
+                cites.append(c)
+    return cites
 
 
 def build_graph(
@@ -71,12 +84,14 @@ def build_graph(
                 "answer": msg,
                 "tools_used": [],
                 "reasoning_steps": state["reasoning_steps"] + ["clarify: no tool needed"],
+                "citations": [],
             }
         out = synthesiser_fn(state["query"], state["tool_results"])
         return {
             "answer": out["answer"],
             "tools_used": out.get("tools_used", state["tools_used"]),
             "reasoning_steps": state["reasoning_steps"] + out.get("reasoning_steps", []),
+            "citations": _collect_citations(state["tool_results"]),
         }
 
     def _route(state: AgentState) -> str:

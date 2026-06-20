@@ -33,7 +33,7 @@ way (see gap A2).
 | Events | `GET /events` | ✅ | Replaces Missions. Full list, severity+recency order, type/severity/status/vehicle filters. |
 | Attendance | — | ❌ | No employees/attendance domain yet (gap B2 → Phase 3). Page shows placeholder. |
 | Config | `GET /config`, `PUT /config/{key}` | ✅ | Real numeric keys only: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`, `image_confidence_min`. PUT body `{config_value}`. |
-| Chat · Fleet Q&A | `POST /agent/run` (via `/api/proxy/agent`) | ⚠️ | Returns `{answer, tools_used, reasoning_steps}`. No citation list yet (gap D1 → Phase 2). |
+| Chat · Fleet Q&A | `POST /agent/run` (via `/api/proxy/agent`) | ✅ | Returns `{answer, tools_used, reasoning_steps, citations}`; RAG citations render as chips (gap D1 closed). |
 | Chat · Assistant | `POST /chat` (via `/api/proxy/assistant`) | ✅ | Body `{message}` → `{content}`. DB-blind. |
 | Upload (hidden route) | `POST /webapp/ingest` (via `/api/proxy/gateway`) | ⚠️ | Returns `{ok:true}`; async pipeline, outcomes surface in Events (gap D2). |
 | Review queue | — | 🗑 | Removed; open events in `/events` cover the attention list (gap B3 resolved by decision). |
@@ -87,7 +87,8 @@ Real fields: `driver_id, full_name, phone_number, license_number, status(active|
 - **B3** RESOLVED by decision — Review queue removed; open `events` cover the attention list.
 - **C1** DONE — vehicle card shows real DB fields; assigned driver name via `driver_id`→drivers join.
 - **C2** Partial — assigned vehicle via reverse-join DONE; driver licence expiry needs `drivers.license_valid_to` (Phase 3).
-- **D1** Citations on `POST /agent/run` (RAG returns `citations`; agent drops them) — Phase 2.
+- **D1** DONE — `POST /agent/run` returns `citations` collected from the RAG tool results;
+  the webui maps them to chips in `ChatSurface`.
 - **D2** Async ingest — outcomes surface in Events; no synchronous classification result by design.
 - **KPIs** DONE — `kpi_daily` nightly rollup (`refresh_kpi_daily()` on pg_cron) + `GET /kpi/daily`;
   webui maps the latest 2 rows to six tiles + trend arrows (`deriveKpiTiles`).

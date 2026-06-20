@@ -83,6 +83,7 @@ export const handlers = [
       answer: 'רכב 12-345-67: הביטוח בתוקף עד 02/09/2026.',
       tools_used: ['fleet_api', 'rag'],
       reasoning_steps: [],
+      citations: ['vehicle-profile-12-345-67'],
     }),
   ),
   // Gateway (real contract)

@@ -34,4 +34,5 @@ def initial_state(query: str, caller_context: dict | None = None) -> dict:
         "answer": "",
         "tools_used": [],
         "reasoning_steps": [],
+        "citations": [],
     }

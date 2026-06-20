@@ -80,6 +80,30 @@ def test_ownership_enforced_via_fleet_api_403():
     assert "not permitted" in resp.json()["answer"].lower()
 
 
+@respx.mock
+def test_rag_citations_flow_through_to_response():
+    """RAG returns citations on /query; the agent must surface them (gap D1)."""
+    planner = make_scripted_planner({
+        "policy": [{"tool": "rag", "question": "what is the tyre policy?"}],
+    })
+    with _inject_graph(planner):
+        respx.post("http://rag:8000/query").mock(
+            return_value=httpx.Response(200, json={
+                "answer": "Rotate every 10000km.",
+                "citations": ["vehicle-profile-12-345-67", "maintenance-guide"],
+            })
+        )
+        with TestClient(app) as client:
+            resp = client.post("/agent/run", json={
+                "query": "tyre policy?",
+                "caller_context": ADMIN_CTX,
+            })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "citations" in body
+    assert body["citations"] == ["vehicle-profile-12-345-67", "maintenance-guide"]
+
+
 def test_health_endpoint():
     with TestClient(app) as client:
         resp = client.get("/health")
