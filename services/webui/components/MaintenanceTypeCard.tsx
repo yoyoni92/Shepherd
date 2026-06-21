@@ -44,7 +44,7 @@ export function MaintenanceTypeCard({
             <span key={i} className="inline-flex items-center gap-1">
               <span
                 className="text-[12px] font-semibold rounded-md"
-                style={{ background: '#0b1a2e', border: '1px solid #1e3a5f', color: '#7dd3fc', padding: '3px 9px' }}
+                style={{ background: 'var(--chip)', border: '1px solid var(--control)', color: 'var(--accent)', padding: '3px 9px' }}
               >
                 {s}
               </span>

@@ -35,8 +35,8 @@ const TILE_META: Record<KpiTileKey, TileMeta> = {
 }
 
 function trendBadge(tile: KpiTile, goodWhenUp: boolean): { text: string; style: React.CSSProperties } {
-  if (tile.trend == null) return { text: '—', style: { color: '#94a3b8', background: '#10131f' } }
-  if (tile.trend === 'flat') return { text: 'יציב', style: { color: '#94a3b8', background: '#10131f' } }
+  if (tile.trend == null) return { text: '—', style: { color: 'var(--muted)', background: 'var(--panel2)' } }
+  if (tile.trend === 'flat') return { text: 'יציב', style: { color: 'var(--muted)', background: 'var(--panel2)' } }
   const good = (tile.trend === 'up') === goodWhenUp
   const color = good ? '#34d399' : '#f87171'
   const arrow = tile.trend === 'up' ? '▲' : '▼'
@@ -142,7 +142,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="flex flex-col gap-[11px]">
-            {recent.length === 0 && <div className="text-[13px] text-faint">אין אירועים</div>}
+            {recent.length === 0 && <div className="text-[13px] text-faint">אין משימות</div>}
             {recent.map((e) => {
               const sev = SEVERITY_META[e.severity] ?? SEVERITY_META.info
               return (

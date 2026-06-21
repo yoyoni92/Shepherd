@@ -79,13 +79,13 @@ export function VehicleCard({
         <Field label="טיפול אחרון" value={v.lastService ? fmtDate(v.lastService) : DASH} ltr />
         <div>
           <div className="text-[11px] text-faint mb-0.5">תוקף ביטוח</div>
-          <div className="text-[13px] font-semibold ltr" style={{ color: insWarn ? '#fbbf24' : '#e2e8f0' }}>
+          <div className="text-[13px] font-semibold ltr" style={{ color: insWarn ? '#fbbf24' : 'var(--ink)' }}>
             {v.insurance ? fmtDate(v.insurance) : DASH}
           </div>
         </div>
         <div>
           <div className="text-[11px] text-faint mb-0.5">תוקף רישוי</div>
-          <div className="text-[13px] font-semibold ltr" style={{ color: licWarn ? '#fbbf24' : '#e2e8f0' }}>
+          <div className="text-[13px] font-semibold ltr" style={{ color: licWarn ? '#fbbf24' : 'var(--ink)' }}>
             {v.licenseValidTo ? fmtDate(v.licenseValidTo) : DASH}
           </div>
         </div>

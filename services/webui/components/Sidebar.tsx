@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { href: '/vehicles', label: 'רכבים', Icon: Truck, badge: 'vehicles' },
   { href: '/drivers', label: 'נהגים', Icon: User, badge: 'drivers' },
   { href: '/customers', label: 'לקוחות', Icon: Building2, badge: 'customers' },
-  { href: '/events', label: 'אירועים', Icon: TriangleAlert, badge: 'events' },
+  { href: '/events', label: 'משימות', Icon: TriangleAlert, badge: 'events' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
   { href: '/maintenance-types', label: 'סוגי טיפול', Icon: Wrench },
   { href: '/config', label: 'הגדרות', Icon: Settings },
@@ -109,8 +109,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                   style={{
                     padding: '1px 8px',
                     minWidth: 20,
-                    background: active ? 'rgba(255,255,255,.15)' : '#1a2030',
-                    color: active ? '#fff' : '#94a3b8',
+                    background: active ? 'rgba(255,255,255,.15)' : 'var(--line)',
+                    color: active ? '#fff' : 'var(--muted)',
                   }}
                 >
                   {count}

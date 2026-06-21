@@ -73,11 +73,11 @@ export default function EventsPage() {
           options={vehicleIds.map((id) => ({ value: id, label: id }))}
         />
         <div className="flex-1" />
-        <span className="text-[13px] text-faint font-semibold">{filtered.length} אירועים</span>
+        <span className="text-[13px] text-faint font-semibold">{filtered.length} משימות</span>
       </div>
 
       <div className="flex flex-col gap-[11px]">
-        {filtered.length === 0 && <div className="text-[13px] text-faint">אין אירועים תואמים</div>}
+        {filtered.length === 0 && <div className="text-[13px] text-faint">אין משימות תואמות</div>}
         {filtered.map((e) => (
           <EventRow key={e.event_id} e={e} />
         ))}

@@ -6,22 +6,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Surfaces
-        bg: '#0b0d14',
-        panel: '#0f1218',
-        panel2: '#10131f',
-        raised: '#0c0f17',
+        // Surfaces (theme-driven via CSS vars; see globals.css)
+        bg: 'var(--bg)',
+        panel: 'var(--panel)',
+        panel2: 'var(--panel2)',
+        raised: 'var(--raised)',
         // Borders
-        line: '#1a2030', // panel border
-        control: '#1e2638', // control border
-        divider: '#14181f',
+        line: 'var(--line)',
+        control: 'var(--control)',
+        divider: 'var(--divider)',
         // Text
-        ink: '#e2e8f0',
-        muted: '#94a3b8',
-        faint: '#64748b',
-        dim: '#475569',
+        ink: 'var(--ink)',
+        muted: 'var(--muted)',
+        faint: 'var(--faint)',
+        dim: 'var(--dim)',
         // Accents
-        accent: '#60a5fa',
+        accent: 'var(--accent)',
         success: '#34d399',
         warning: '#fbbf24',
         danger: '#f87171',

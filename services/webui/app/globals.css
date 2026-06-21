@@ -2,15 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens. Dark is the default; `html.light` overrides the surfaces/text.
+   Accent + status colors that read on both themes stay fixed in tailwind.config. */
+:root {
+  --bg: #0b0d14;
+  --panel: #0f1218;
+  --panel2: #10131f;
+  --raised: #0c0f17;
+  --line: #1a2030;
+  --control: #1e2638;
+  --divider: #14181f;
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --faint: #64748b;
+  --dim: #475569;
+  --accent: #60a5fa;
+  --chip: #0b1a2e;
+  --scrollbar: #1e2638;
+}
+
+html.light {
+  --bg: #eef2f7;
+  --panel: #ffffff;
+  --panel2: #f5f8fc;
+  --raised: #ffffff;
+  --line: #e2e8f0;
+  --control: #cbd5e1;
+  --divider: #eef2f6;
+  --ink: #0f172a;
+  --muted: #475569;
+  --faint: #64748b;
+  --dim: #94a3b8;
+  --accent: #2563eb;
+  --chip: #eff6ff;
+  --scrollbar: #cbd5e1;
+}
+
 html,
 body {
-  background: #0b0d14;
-  color: #e2e8f0;
+  background: var(--bg);
+  color: var(--ink);
   font-family: var(--font-assistant), system-ui, sans-serif;
 }
 
 *::placeholder {
-  color: #475569;
+  color: var(--dim);
 }
 
 ::-webkit-scrollbar {
@@ -18,7 +54,7 @@ body {
   height: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e2638;
+  background: var(--scrollbar);
   border-radius: 9px;
 }
 ::-webkit-scrollbar-track {

@@ -25,7 +25,7 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center p-6"
       style={{
         background:
-          'radial-gradient(1100px 600px at 50% -10%,rgba(59,130,246,.10),transparent 60%),#0b0d14',
+          'radial-gradient(1100px 600px at 50% -10%,rgba(59,130,246,.10),transparent 60%),var(--bg)',
       }}
     >
       <div className="w-full" style={{ maxWidth: 420 }}>

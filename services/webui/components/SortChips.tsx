@@ -24,9 +24,9 @@ export function SortChips<K extends string>({ fields, sort, onSort }: SortChipsP
             className="inline-flex items-center gap-1 rounded-lg text-[12.5px] font-semibold cursor-pointer"
             style={{
               padding: '7px 12px',
-              background: active ? 'rgba(59,130,246,.14)' : '#10131f',
-              color: active ? '#60a5fa' : '#94a3b8',
-              border: `1px solid ${active ? '#2b4d7a' : '#1e2638'}`,
+              background: active ? 'rgba(59,130,246,.14)' : 'var(--panel2)',
+              color: active ? 'var(--accent)' : 'var(--muted)',
+              border: `1px solid ${active ? '#2b4d7a' : 'var(--control)'}`,
             }}
           >
             {f.label}

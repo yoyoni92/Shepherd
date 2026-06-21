@@ -42,9 +42,9 @@ export function ChatSurface({ messages, loading, onSend, placeholder }: ChatSurf
                   maxWidth: '78%',
                   padding: '13px 16px',
                   borderRadius: user ? '14px 14px 14px 4px' : '14px 14px 4px 14px',
-                  background: user ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : '#10131f',
-                  border: user ? 'none' : '1px solid #1e2638',
-                  color: user ? '#fff' : '#e2e8f0',
+                  background: user ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'var(--panel2)',
+                  border: user ? 'none' : '1px solid var(--control)',
+                  color: user ? '#fff' : 'var(--ink)',
                 }}
               >
                 <div className="text-[13.5px] whitespace-pre-wrap" style={{ lineHeight: 1.6 }}>
@@ -56,7 +56,7 @@ export function ChatSurface({ messages, loading, onSend, placeholder }: ChatSurf
                       <span
                         key={c}
                         className="inline-flex items-center gap-[5px] text-[10.5px] font-semibold rounded-md ltr"
-                        style={{ background: '#0b1a2e', border: '1px solid #1e3a5f', color: '#7dd3fc', padding: '3px 8px' }}
+                        style={{ background: 'var(--chip)', border: '1px solid var(--control)', color: 'var(--accent)', padding: '3px 8px' }}
                       >
                         <FileText size={11} />
                         {c}

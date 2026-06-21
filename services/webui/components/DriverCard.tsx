@@ -53,7 +53,7 @@ export function DriverCard({
         </div>
         <div>
           <div className="text-[11px] text-faint mb-0.5">תוקף רישיון</div>
-          <div className="text-[13px] font-semibold ltr" style={{ color: licWarn ? '#fbbf24' : '#e2e8f0' }}>
+          <div className="text-[13px] font-semibold ltr" style={{ color: licWarn ? '#fbbf24' : 'var(--ink)' }}>
             {d.licExpiry ? fmtDate(d.licExpiry) : DASH}
           </div>
         </div>
