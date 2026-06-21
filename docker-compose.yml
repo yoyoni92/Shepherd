@@ -170,6 +170,10 @@ services:
       context: ./services/webui
       dockerfile: Dockerfile
     environment:
+      # Docker auto-sets HOSTNAME to the container id; Next's standalone server would bind to it
+      # and refuse localhost (breaking the healthcheck). Pin it to all interfaces.
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fleetops.io}
@@ -204,7 +208,8 @@ services:
     ports:
       - "11434:11434"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      # the ollama image ships no curl/wget — use the bundled CLI (hits the local server)
+      test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
