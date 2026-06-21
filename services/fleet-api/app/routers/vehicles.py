@@ -25,11 +25,12 @@ def _to_read(v) -> VehicleRead:
         driver_id=v.driver_id,
         customer_id=v.customer_id,
         next_maintenance_km=v.next_maintenance_km,
-        next_maintenance_type=v.next_maintenance_type.value if v.next_maintenance_type else None,
-        last_maintenance_type=v.last_maintenance_type.value if v.last_maintenance_type else None,
+        next_maintenance_type=v.next_maintenance_type,
+        last_maintenance_type=v.last_maintenance_type,
         last_maintenance_km=v.last_maintenance_km,
         last_maintenance_date=v.last_maintenance_date,
-        maintenance_type=v.maintenance_type.value if v.maintenance_type else None,
+        maintenance_type_id=v.maintenance_type_id,
+        maintenance_type_name=v.maintenance_type.name if v.maintenance_type else None,
         allowed_driver=v.allowed_driver.value if v.allowed_driver else None,
     )
 

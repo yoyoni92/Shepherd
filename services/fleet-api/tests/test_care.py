@@ -5,10 +5,16 @@ from tests.conftest import admin_headers, driver_headers
 
 
 def _make_vehicle(client) -> str:
+    # admin-defined cycle: small -> big, 10000 km interval
+    mt = client.post(
+        "/maintenance-types",
+        json={"name": f"cycle-{uuid.uuid4().hex[:6]}", "interval_km": 10000, "steps": ["small", "big"]},
+        headers=admin_headers(),
+    ).json()
     plate = f"CARE-{uuid.uuid4().hex[:6]}"
     r = client.post(
         "/vehicles",
-        json={"licensing_plate": plate, "maintenance_type": "1_small_then_1_big"},
+        json={"licensing_plate": plate, "maintenance_type_id": mt["id"]},
         headers=admin_headers(),
     )
     return r.json()["vehicle_id"]

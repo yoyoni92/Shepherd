@@ -27,7 +27,7 @@ def _vehicle_doc(session: Session, v: Vehicle) -> tuple[str, dict]:
         insurance_valid_to=v.insurance_valid_to,
         license_valid_to=v.license_valid_to,
         last_maintenance_date=v.last_maintenance_date,
-        last_maintenance_type=v.last_maintenance_type.value if v.last_maintenance_type else None,
+        last_maintenance_type=v.last_maintenance_type,
         next_maintenance_km=v.next_maintenance_km,
         current_km=v.current_km,
         open_tickets=open_tickets,

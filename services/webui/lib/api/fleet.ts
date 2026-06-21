@@ -8,7 +8,9 @@ import {
   KpiDailyReadSchema,
   CustomerReadSchema,
   AttendanceRecordReadSchema,
+  MaintenanceTypeReadSchema,
   type VehicleRead,
+  type MaintenanceTypeCreate,
   type VehicleCreate,
   type DriverRead,
   type DriverCreate,
@@ -73,6 +75,27 @@ export const updateCustomer = (customerId: string, patch: Partial<CustomerRead>)
   send('PATCH', `/customers/${customerId}`, patch, CustomerReadSchema)
 // Deleting a customer unlinks them from any vehicles server-side (cascade), then removes them.
 export const deleteCustomer = (customerId: string) => send('DELETE', `/customers/${customerId}`, undefined)
+
+// Maintenance types (admin catalog)
+export const fetchMaintenanceTypes = () => get('/maintenance-types', z.array(MaintenanceTypeReadSchema))
+export const createMaintenanceType = (m: MaintenanceTypeCreate) =>
+  send('POST', '/maintenance-types', m, MaintenanceTypeReadSchema)
+export const updateMaintenanceType = (id: string, patch: Partial<MaintenanceTypeCreate>) =>
+  send('PATCH', `/maintenance-types/${id}`, patch, MaintenanceTypeReadSchema)
+// Surfaces the server's Hebrew detail (e.g. "N רכבים משתמשים בסוג זה") on a blocked (409) delete.
+export async function deleteMaintenanceType(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/maintenance-types/${id}`, { method: 'DELETE' })
+  if (!res.ok) {
+    let detail = `Fleet API DELETE /maintenance-types/${id}: ${res.status}`
+    try {
+      const body = await res.json()
+      if (body?.detail) detail = body.detail
+    } catch {
+      /* no JSON body */
+    }
+    throw new Error(detail)
+  }
+}
 
 // KPI daily rollup: latest snapshots, newest first (dashboard tiles + trends)
 export const fetchKpiDaily = (limit = 2) => get(`/kpi/daily?limit=${limit}`, z.array(KpiDailyReadSchema))

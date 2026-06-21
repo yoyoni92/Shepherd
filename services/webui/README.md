@@ -39,6 +39,7 @@ The shell (`components/Shell.tsx` = sidebar + topbar) wraps the seven design sec
 | `/vehicles` | Sortable card grid; add/edit/remove with a validated form; vehicle type + assignments |
 | `/drivers` | Sortable card grid; add/edit/remove with a validated form |
 | `/customers` | Customer cards; add/edit/remove (delete unlinks vehicles server-side) |
+| `/maintenance-types` | סוגי טיפול catalog; add/edit/remove cycles (name, interval, ordered steps); delete blocked if in use |
 | `/events` | Real `events` list — severity+recency order, type/severity/status/vehicle filters |
 | `/attendance` | Monthly clock-in/out report, edit modal, CSV/PDF export (`lib/attendance.ts`) |
 | `/config` | `system_config` stepper editor (admin-gated, Zod-validated) |

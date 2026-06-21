@@ -20,7 +20,8 @@ export const VehicleReadSchema = z.object({
   last_maintenance_type: z.string().nullish(),
   last_maintenance_km: z.number().nullish(),
   last_maintenance_date: z.string().nullish(),
-  maintenance_type: z.string().nullish(),
+  maintenance_type_id: z.string().nullish(),
+  maintenance_type_name: z.string().nullish(),
   allowed_driver: z.string().nullish(),
 })
 
@@ -34,9 +35,24 @@ export const VehicleCreateSchema = z.object({
   allowed_driver: z.string().nullish(),
   driver_id: z.string().nullish(),
   customer_id: z.string().nullish(),
-  maintenance_type: z.string().nullish(),
+  maintenance_type_id: z.string().nullish(),
   insurance_valid_to: z.string().nullish(),
   license_valid_to: z.string().nullish(),
+})
+
+export const MaintenanceTypeReadSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullish(),
+  interval_km: z.number(),
+  steps: z.array(z.string()),
+})
+
+export const MaintenanceTypeCreateSchema = z.object({
+  name: z.string(),
+  description: z.string().nullish(),
+  interval_km: z.number(),
+  steps: z.array(z.string()),
 })
 
 export const DriverReadSchema = z.object({
@@ -128,6 +144,8 @@ export type ReportRead = z.infer<typeof ReportReadSchema>
 export type KpiDailyRead = z.infer<typeof KpiDailyReadSchema>
 export type CustomerRead = z.infer<typeof CustomerReadSchema>
 export type CustomerCreate = z.infer<typeof CustomerCreateSchema>
+export type MaintenanceTypeRead = z.infer<typeof MaintenanceTypeReadSchema>
+export type MaintenanceTypeCreate = z.infer<typeof MaintenanceTypeCreateSchema>
 export type AttendanceRecordRead = z.infer<typeof AttendanceRecordReadSchema>
 
 // ───────────────────────── UI view models ─────────────────────────
@@ -148,7 +166,16 @@ export interface UiVehicle {
   lastService: string | null // last_maintenance_date
   nextMaintenanceKm: number | null
   nextMaintenanceType: string | null
-  maintenanceType: string | null // service cycle (1_small_then_1_big | 2_small_then_1_big)
+  maintenanceTypeId: string | null // FK into the maintenance_types catalog
+  maintenanceTypeName: string | null // resolved name for display
+}
+
+export interface UiMaintenanceType {
+  id: string
+  name: string
+  description: string | null
+  intervalKm: number
+  steps: string[]
 }
 
 export interface UiDriver {

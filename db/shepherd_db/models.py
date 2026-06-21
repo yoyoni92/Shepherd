@@ -28,18 +28,6 @@ class AllowedDriverEnum(str, enum.Enum):
     specific_driver_only = "specific_driver_only"
 
 
-class MaintenanceTypeEnum(str, enum.Enum):
-    one_small_then_one_big = "1_small_then_1_big"
-    two_small_then_one_big = "2_small_then_1_big"
-
-
-class LastMaintenanceTypeEnum(str, enum.Enum):
-    small = "small"      # used by 1_small_then_1_big
-    small_1 = "small_1"  # first small in 2_small_then_1_big
-    small_2 = "small_2"  # second small in 2_small_then_1_big
-    big = "big"
-
-
 class DriverStatusEnum(str, enum.Enum):
     active = "active"
     inactive = "inactive"
@@ -136,17 +124,6 @@ class VehicleTypeEnum(str, enum.Enum):
 allowed_driver_type = SAEnum(
     AllowedDriverEnum,
     name="allowed_driver_enum",
-    create_type=False,
-)
-maintenance_type_type = SAEnum(
-    MaintenanceTypeEnum,
-    name="maintenance_type_enum",
-    create_type=False,
-    values_callable=lambda x: [e.value for e in x],
-)
-last_maintenance_type_type = SAEnum(
-    LastMaintenanceTypeEnum,
-    name="last_maintenance_type_enum",
     create_type=False,
 )
 driver_status_type = SAEnum(
@@ -272,6 +249,28 @@ class Customer(Base):
     )
 
 
+class MaintenanceType(Base):
+    """Admin-defined maintenance cycle: an ordered list of service step labels plus a
+    fixed km interval. Vehicles reference one; next_maintenance() advances through `steps`."""
+
+    __tablename__ = "maintenance_types"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name = mapped_column(Text, unique=True, nullable=False)
+    description = mapped_column(Text, nullable=True)
+    interval_km = mapped_column(Integer, nullable=False)
+    steps = mapped_column(JSONB, nullable=False)  # ordered list of unique step labels
+    created_ts = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 class Vehicle(Base):
     __tablename__ = "vehicles"
 
@@ -292,17 +291,22 @@ class Vehicle(Base):
     vendor = mapped_column(Text, nullable=True)
     model = mapped_column(Text, nullable=True)
     last_maintenance_date = mapped_column(Date, nullable=True)
-    last_maintenance_type = mapped_column(last_maintenance_type_type, nullable=True)
+    # free-text step label within the assigned maintenance type's cycle
+    last_maintenance_type = mapped_column(Text, nullable=True)
     last_maintenance_km = mapped_column(Integer, nullable=True)
     next_maintenance_km = mapped_column(Integer, nullable=True)
-    next_maintenance_type = mapped_column(last_maintenance_type_type, nullable=True)
+    next_maintenance_type = mapped_column(Text, nullable=True)
     current_km = mapped_column(Integer, nullable=True)
     driver_id = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("drivers.driver_id"),
         nullable=True,
     )
-    maintenance_type = mapped_column(maintenance_type_type, nullable=True)
+    maintenance_type_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("maintenance_types.id"),
+        nullable=True,
+    )
     customer_id = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("customers.customer_id"),
@@ -311,6 +315,7 @@ class Vehicle(Base):
 
     driver = relationship("Driver", foreign_keys=[driver_id])
     customer = relationship("Customer", foreign_keys=[customer_id])
+    maintenance_type = relationship("MaintenanceType", foreign_keys=[maintenance_type_id])
 
 
 class Accident(Base):
@@ -410,7 +415,7 @@ class VehicleCare(Base):
         nullable=False,
     )
     service_date = mapped_column(Date, nullable=False)
-    maintenance_type = mapped_column(last_maintenance_type_type, nullable=False)
+    maintenance_type = mapped_column(Text, nullable=False)  # step label performed
     km_at_service = mapped_column(Integer, nullable=False)
     description = mapped_column(Text, nullable=True)
     cost = mapped_column(Numeric(10, 2), nullable=True)

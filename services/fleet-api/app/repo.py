@@ -2,7 +2,7 @@
 import json
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from shepherd_db.logic import next_maintenance
@@ -13,6 +13,7 @@ from shepherd_db.models import (
     Event,
     KmUpdate,
     KpiDaily,
+    MaintenanceType,
     Report,
     SystemConfig,
     Vehicle,
@@ -236,11 +237,11 @@ def create_care(session: Session, data: dict) -> VehicleCare:
     session.flush()
 
     vehicle = session.get(Vehicle, care.vehicle_id)
-    mt = vehicle.maintenance_type
-    cycle = (mt.value if hasattr(mt, "value") else mt) if mt else "1_small_then_1_big"
-    ct = care.maintenance_type
-    care_type_str = ct.value if hasattr(ct, "value") else ct
-    nm = next_maintenance(care_type_str, cycle, last_km=care.km_at_service)
+    # Cycle is data-driven: read the assigned maintenance type's steps + interval.
+    mtype = vehicle.maintenance_type
+    steps = mtype.steps if mtype else [care.maintenance_type]
+    interval_km = mtype.interval_km if mtype else 10_000
+    nm = next_maintenance(care.maintenance_type, steps, last_km=care.km_at_service, interval_km=interval_km)
 
     vehicle.last_maintenance_date = care.service_date
     vehicle.last_maintenance_type = care.maintenance_type
@@ -360,6 +361,52 @@ def get_all_config(session: Session) -> list[SystemConfig]:
 
 def get_config_key(session: Session, key: str) -> SystemConfig | None:
     return session.get(SystemConfig, key)
+
+
+# ---------------------------------------------------------------------------
+# Maintenance types (admin-managed catalog)
+# ---------------------------------------------------------------------------
+
+def list_maintenance_types(session: Session) -> list[MaintenanceType]:
+    return list(session.execute(select(MaintenanceType).order_by(MaintenanceType.name)).scalars())
+
+
+def get_maintenance_type(session: Session, type_id: UUID) -> MaintenanceType | None:
+    return session.get(MaintenanceType, type_id)
+
+
+def create_maintenance_type(session: Session, data: dict) -> MaintenanceType:
+    mtype = MaintenanceType(**data)
+    session.add(mtype)
+    session.commit()
+    session.refresh(mtype)
+    return mtype
+
+
+def update_maintenance_type(session: Session, type_id: UUID, data: dict) -> MaintenanceType | None:
+    mtype = session.get(MaintenanceType, type_id)
+    if mtype is None:
+        return None
+    for key, value in data.items():
+        setattr(mtype, key, value)
+    session.commit()
+    session.refresh(mtype)
+    return mtype
+
+
+def count_vehicles_for_maintenance_type(session: Session, type_id: UUID) -> int:
+    return session.scalar(
+        select(func.count()).select_from(Vehicle).where(Vehicle.maintenance_type_id == type_id)
+    ) or 0
+
+
+def delete_maintenance_type(session: Session, type_id: UUID) -> bool:
+    mtype = session.get(MaintenanceType, type_id)
+    if mtype is None:
+        return False
+    session.delete(mtype)
+    session.commit()
+    return True
 
 
 # ---------------------------------------------------------------------------

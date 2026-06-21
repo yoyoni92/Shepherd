@@ -1,4 +1,13 @@
-import type { VehicleRead, DriverRead, CustomerRead, UiVehicle, UiDriver, UiCustomer } from './api/schemas'
+import type {
+  VehicleRead,
+  DriverRead,
+  CustomerRead,
+  MaintenanceTypeRead,
+  UiVehicle,
+  UiDriver,
+  UiCustomer,
+  UiMaintenanceType,
+} from './api/schemas'
 
 /** VehicleRead -> card view model. `driverId` is resolved to a name in the vehicles page. */
 export function toUiVehicle(v: VehicleRead): UiVehicle {
@@ -16,7 +25,19 @@ export function toUiVehicle(v: VehicleRead): UiVehicle {
     lastService: v.last_maintenance_date ?? null,
     nextMaintenanceKm: v.next_maintenance_km ?? null,
     nextMaintenanceType: v.next_maintenance_type ?? null,
-    maintenanceType: v.maintenance_type ?? null,
+    maintenanceTypeId: v.maintenance_type_id ?? null,
+    maintenanceTypeName: v.maintenance_type_name ?? null,
+  }
+}
+
+/** MaintenanceTypeRead -> card/form view model. */
+export function toUiMaintenanceType(m: MaintenanceTypeRead): UiMaintenanceType {
+  return {
+    id: m.id,
+    name: m.name,
+    description: m.description ?? null,
+    intervalKm: m.interval_km,
+    steps: m.steps,
   }
 }
 

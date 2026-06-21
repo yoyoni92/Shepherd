@@ -37,10 +37,10 @@ def test_enum_column_rejects_invalid_value(conn):
     with pytest.raises((IntegrityError, DataError)):
         conn.execute(
             text(
-                "INSERT INTO vehicles (licensing_plate, maintenance_type)"
-                " VALUES (:plate, :mt)"
+                "INSERT INTO vehicles (licensing_plate, vehicle_type)"
+                " VALUES (:plate, :vt)"
             ),
-            {"plate": "ENUM-TEST-001", "mt": "nope"},
+            {"plate": "ENUM-TEST-001", "vt": "nope"},
         )
 
 

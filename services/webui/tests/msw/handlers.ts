@@ -28,6 +28,11 @@ const REPORTS = [
   { report_id: 'r2', vehicle_id: 'v1', ticket_type: 'traffic', status: 'paid', amount: 250 },
 ]
 
+const MAINTENANCE_TYPES = [
+  { id: 'mt1', name: 'קטן ואז גדול', description: null, interval_km: 10000, steps: ['קטן', 'גדול'] },
+  { id: 'mt2', name: 'שניים קטנים ואז גדול', description: null, interval_km: 10000, steps: ['קטן א׳', 'קטן ב׳', 'גדול'] },
+]
+
 const CUSTOMERS = [
   { customer_id: 'c1', full_name: 'אלקטרה מערכות', phone_number: null, email: null, status: 'active' },
   { customer_id: 'c2', full_name: 'מובילי הצפון', phone_number: null, email: null, status: 'active' },
@@ -85,6 +90,19 @@ export const handlers = [
     return HttpResponse.json({ customer_id: params.id, full_name: 'n', status: 'active', ...body })
   }),
   http.delete(`${FLEET}/customers/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  // Maintenance types (admin catalog)
+  http.get(`${FLEET}/maintenance-types`, () => HttpResponse.json(MAINTENANCE_TYPES)),
+  http.post(`${FLEET}/maintenance-types`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ id: 'mt99', ...body }, { status: 201 })
+  }),
+  http.patch(`${FLEET}/maintenance-types/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ id: params.id, name: 'n', interval_km: 10000, steps: ['x'], ...body })
+  }),
+  http.delete(`${FLEET}/maintenance-types/:id`, () => new HttpResponse(null, { status: 204 })),
+
   http.get(`${FLEET}/kpi/daily`, () => HttpResponse.json(KPI_DAILY)),
 
   // Attendance: month read returns one stored record for d1; PATCH echoes the upsert

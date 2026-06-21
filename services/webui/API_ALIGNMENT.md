@@ -31,6 +31,7 @@ way (see gap A2).
 | Vehicles | `GET/POST/PATCH /vehicles`, `DELETE /vehicles/{vehicle_id}` | ✅ | Full CRUD; `vehicle_type` enum (אופנוע/רכב פרטי/מסחרית/אוטובוס/משאית); driver name via `driver_id`→join. Add/edit form with strict IL guards (plate 7–8 digits). |
 | Drivers | `GET/POST/PATCH /drivers`, `DELETE /drivers/{driver_id}` | ✅ | Full CRUD; add/edit form (phone 05X, licence 7–9 digits); assigned vehicle via reverse-join. |
 | Customers | `GET/POST/PATCH /customers`, `DELETE /customers/{id}` | ✅ | Full CRUD section; delete unlinks vehicles (server cascade) then removes. Fields name/phone/email/status. |
+| Maintenance types | `GET/POST/PATCH /maintenance-types`, `DELETE /{id}` | ✅ | Admin catalog (סוגי טיפול): name, interval_km, ordered unique step labels. `next_maintenance()` is data-driven. Vehicle references one via `maintenance_type_id`; delete blocked (409) if in use. |
 | Events | `GET /events` | ✅ | Replaces Missions. Full list, severity+recency order, type/severity/status/vehicle filters. |
 | Attendance | `GET /attendance/{month}`, `PATCH /attendance/{driver_id}/{date}` | ✅ | Drivers as employees; webui builds the weekday skeleton and overlays records (gap B2 closed). |
 | Config | `GET /config`, `PUT /config/{key}` | ✅ | Real numeric keys only: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`, `image_confidence_min`. PUT body `{config_value}`. |

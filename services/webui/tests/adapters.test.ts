@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { toUiVehicle, toUiDriver, toUiCustomer } from '@/lib/adapters'
-import type { VehicleRead, DriverRead, CustomerRead } from '@/lib/api/schemas'
+import { toUiVehicle, toUiDriver, toUiCustomer, toUiMaintenanceType } from '@/lib/adapters'
+import type { VehicleRead, DriverRead, CustomerRead, MaintenanceTypeRead } from '@/lib/api/schemas'
 
 describe('toUiVehicle', () => {
   it('maps the real DB fields', () => {
@@ -8,12 +8,14 @@ describe('toUiVehicle', () => {
       vehicle_id: 'v1', licensing_plate: '12-345-67', vehicle_type: 'truck', vendor: 'Toyota', model: 'Corolla',
       current_km: 84000, insurance_valid_to: '2026-09-02', license_valid_to: '2026-07-01',
       driver_id: 'd9', customer_id: 'c2', last_maintenance_date: '2026-04-12',
-      next_maintenance_km: 90000, next_maintenance_type: 'service', maintenance_type: '1_small_then_1_big',
+      next_maintenance_km: 90000, next_maintenance_type: 'גדול',
+      maintenance_type_id: 'mt1', maintenance_type_name: 'קטן ואז גדול',
     }
     expect(toUiVehicle(v)).toEqual({
       id: 'v1', plate: '12-345-67', vehicleType: 'truck', make: 'Toyota', model: 'Corolla',
       driverId: 'd9', customerId: 'c2', currentKm: 84000, insurance: '2026-09-02', licenseValidTo: '2026-07-01',
-      lastService: '2026-04-12', nextMaintenanceKm: 90000, nextMaintenanceType: 'service', maintenanceType: '1_small_then_1_big',
+      lastService: '2026-04-12', nextMaintenanceKm: 90000, nextMaintenanceType: 'גדול',
+      maintenanceTypeId: 'mt1', maintenanceTypeName: 'קטן ואז גדול',
     })
   })
 
@@ -47,5 +49,13 @@ describe('toUiCustomer', () => {
     expect(toUiCustomer(c)).toEqual({ id: 'c1', name: 'אלקטרה', phone: '03-1', email: 'a@b.co', status: 'active' })
     expect(toUiCustomer({ customer_id: 'c', full_name: 'n', status: 'inactive' }).status).toBe('inactive')
     expect(toUiCustomer({ customer_id: 'c', full_name: 'n' }).phone).toBeNull()
+  })
+})
+
+describe('toUiMaintenanceType', () => {
+  it('maps the catalog fields', () => {
+    const m: MaintenanceTypeRead = { id: 'mt1', name: 'קטן ואז גדול', description: 'x', interval_km: 10000, steps: ['קטן', 'גדול'] }
+    expect(toUiMaintenanceType(m)).toEqual({ id: 'mt1', name: 'קטן ואז גדול', description: 'x', intervalKm: 10000, steps: ['קטן', 'גדול'] })
+    expect(toUiMaintenanceType({ id: 'm', name: 'n', interval_km: 5000, steps: ['א'] }).description).toBeNull()
   })
 })

@@ -1,7 +1,21 @@
 """Fleet API - sole Postgres writer and agent tool layer for Shepherd."""
 from fastapi import FastAPI
 
-from app.routers import accidents, attendance, care, config, customers, documents, drivers, events, km, kpi, reports, vehicles
+from app.routers import (
+    accidents,
+    attendance,
+    care,
+    config,
+    customers,
+    documents,
+    drivers,
+    events,
+    km,
+    kpi,
+    maintenance_types,
+    reports,
+    vehicles,
+)
 
 app = FastAPI(
     title="Shepherd Fleet API",
@@ -29,6 +43,7 @@ app.include_router(events.router)
 app.include_router(config.router)
 app.include_router(kpi.router)
 app.include_router(attendance.router)
+app.include_router(maintenance_types.router)
 
 
 @app.get("/health", tags=["health"], summary="Health check", description="Returns 200 when the service is up.")

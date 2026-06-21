@@ -48,7 +48,20 @@ EVENT_TYPES = [
 EVENT_SEVERITIES = ["info", "warning", "critical"]
 EVENT_SOURCES = ["km_updates", "scheduler", "accidents", "reports"]
 TICKET_TYPES = ["traffic", "parking"]
-MAINTENANCE_CYCLES = ["1_small_then_1_big", "2_small_then_1_big"]
+MAINTENANCE_TYPES = [
+    {
+        "name": "קטן ואז גדול",
+        "description": "טיפול קטן ולאחריו טיפול גדול, לסירוגין",
+        "interval_km": 10000,
+        "steps": ["קטן", "גדול"],
+    },
+    {
+        "name": "שניים קטנים ואז גדול",
+        "description": "שני טיפולים קטנים ולאחריהם טיפול גדול",
+        "interval_km": 10000,
+        "steps": ["קטן א׳", "קטן ב׳", "גדול"],
+    },
+]
 VENDORS = ["Toyota", "Ford", "Hyundai", "Kia", "Volkswagen"]
 MODELS = ["Corolla", "Transit", "Tucson", "Sportage", "Caddy"]
 
@@ -87,16 +100,32 @@ def _seed_customers(conn):
         )
 
 
+def _seed_maintenance_types(conn):
+    for idx, mt in enumerate(MAINTENANCE_TYPES):
+        conn.execute(
+            text("""
+                INSERT INTO maintenance_types (id, name, description, interval_km, steps)
+                VALUES (:id, :name, :desc, :interval, :steps)
+                ON CONFLICT (id) DO NOTHING
+            """),
+            {
+                "id": stable_uuid("maintenance_type", idx),
+                "name": mt["name"],
+                "desc": mt["description"],
+                "interval": mt["interval_km"],
+                "steps": json.dumps(mt["steps"]),
+            },
+        )
+
+
 def _seed_vehicles(conn):
     for i in range(1, 26):
-        cycle = MAINTENANCE_CYCLES[i % 2]
+        idx = i % 2
+        mt = MAINTENANCE_TYPES[idx]
+        steps = mt["steps"]
         last_km = 10000 * i
-        # Use cycle-appropriate last_type values
-        if cycle == "2_small_then_1_big":
-            last_type = ["small_1", "small_2", "big"][i % 3]
-        else:
-            last_type = "small" if i % 2 == 0 else "big"
-        nm = next_maintenance(last_type, cycle, last_km=last_km)
+        last_type = steps[i % len(steps)]
+        nm = next_maintenance(last_type, steps, last_km=last_km, interval_km=mt["interval_km"])
         conn.execute(
             text("""
                 INSERT INTO vehicles (
@@ -105,14 +134,14 @@ def _seed_vehicles(conn):
                     allowed_driver, vendor, model,
                     last_maintenance_date, last_maintenance_type,
                     last_maintenance_km, next_maintenance_km, next_maintenance_type,
-                    current_km, driver_id, maintenance_type, customer_id
+                    current_km, driver_id, maintenance_type_id, customer_id
                 ) VALUES (
                     :id, :plate, :nick, :ins_ts,
                     :insurance_valid_to, :license_valid_to,
                     'all_drivers', :vendor, :model,
                     :last_maint_date, :last_maint_type,
                     :last_maint_km, :next_maint_km, :next_maint_type,
-                    :current_km, :driver_id, :maint_cycle, :customer_id
+                    :current_km, :driver_id, :maint_type_id, :customer_id
                 )
                 ON CONFLICT (vehicle_id) DO NOTHING
             """),
@@ -132,7 +161,7 @@ def _seed_vehicles(conn):
                 "next_maint_type": nm["next_type"],
                 "current_km": last_km + 2000,
                 "driver_id": stable_uuid("driver", i),
-                "maint_cycle": cycle,
+                "maint_type_id": stable_uuid("maintenance_type", idx),
                 "customer_id": stable_uuid("customer", (i % 5) + 1),
             },
         )
@@ -225,12 +254,10 @@ def _seed_vehicle_care(conn):
         vehicle_id = stable_uuid("vehicle", i)
         care_id = stable_uuid("care", i)
         last_km = 10000 * i
-        cycle = MAINTENANCE_CYCLES[i % 2]
-        if cycle == "2_small_then_1_big":
-            last_type = ["small_1", "small_2", "big"][i % 3]
-        else:
-            last_type = "small" if i % 2 == 0 else "big"
-        nm = next_maintenance(last_type, cycle, last_km=last_km)
+        mt = MAINTENANCE_TYPES[i % 2]
+        steps = mt["steps"]
+        last_type = steps[i % len(steps)]
+        nm = next_maintenance(last_type, steps, last_km=last_km, interval_km=mt["interval_km"])
         invoice_url = None
         if i % 3 == 0:
             invoice_url = f"vehicles/{vehicle_id}/care/{care_id}/invoice.pdf"
@@ -364,6 +391,7 @@ def seed(engine):
     with engine.connect() as conn:
         _seed_drivers(conn)
         _seed_customers(conn)
+        _seed_maintenance_types(conn)
         _seed_vehicles(conn)
         _seed_accidents(conn)
         _seed_accident_attachments(conn)

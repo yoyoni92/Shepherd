@@ -4,9 +4,10 @@ import { Plus } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
 import { useCustomers } from '@/hooks/useCustomers'
+import { useMaintenanceTypes } from '@/hooks/useMaintenanceTypes'
 import { sortItems } from '@/lib/domain'
 import { plate as plateGuard, nonNegInt } from '@/lib/validation'
-import { VEHICLE_TYPES, VEHICLE_TYPE_LABEL, MAINTENANCE_TYPES, MAINTENANCE_TYPE_LABEL } from '@/lib/vehicleTypes'
+import { VEHICLE_TYPES, VEHICLE_TYPE_LABEL } from '@/lib/vehicleTypes'
 import type { UiVehicle, VehicleCreate } from '@/lib/api/schemas'
 import { Button } from '@/components/ui/button'
 import { SortChips, nextDir, type SortState } from '@/components/SortChips'
@@ -34,13 +35,14 @@ const accessor = (v: UiVehicle, key: VKey): string | number => {
 const formFields = (
   driverOpts: { value: string; label: string }[],
   customerOpts: { value: string; label: string }[],
+  maintenanceOpts: { value: string; label: string }[],
 ): FieldDef[] => [
   { key: 'licensing_plate', label: 'מספר רישוי', type: 'text', required: true, ltr: true, placeholder: '12-345-67', validate: plateGuard },
   { key: 'vehicle_type', label: 'סוג רכב', type: 'select', required: true, options: VEHICLE_TYPES.map((t) => ({ value: t, label: VEHICLE_TYPE_LABEL[t] })) },
   { key: 'vendor', label: 'יצרן', type: 'text' },
   { key: 'model', label: 'דגם', type: 'text' },
   { key: 'current_km', label: 'ק״מ נוכחי', type: 'number', validate: nonNegInt },
-  { key: 'maintenance_type', label: 'מחזור טיפול', type: 'select', options: MAINTENANCE_TYPES.map((t) => ({ value: t, label: MAINTENANCE_TYPE_LABEL[t] })) },
+  { key: 'maintenance_type_id', label: 'סוג טיפול', type: 'select', options: maintenanceOpts },
   { key: 'driver_id', label: 'נהג משויך', type: 'select', options: driverOpts },
   { key: 'customer_id', label: 'לקוח', type: 'select', options: customerOpts },
   { key: 'insurance_valid_to', label: 'תוקף ביטוח', type: 'date' },
@@ -53,7 +55,7 @@ const editInitial = (v: UiVehicle): FormValues => ({
   vendor: v.make === '—' ? '' : v.make,
   model: v.model,
   current_km: v.currentKm != null ? String(v.currentKm) : '',
-  maintenance_type: v.maintenanceType ?? '',
+  maintenance_type_id: v.maintenanceTypeId ?? '',
   driver_id: v.driverId ?? '',
   customer_id: v.customerId ?? '',
   insurance_valid_to: v.insurance ?? '',
@@ -69,7 +71,7 @@ function toPayload(values: FormValues): Partial<VehicleCreate> {
   put('vendor', values.vendor)
   put('model', values.model)
   if (values.current_km.trim()) out.current_km = Number(values.current_km)
-  put('maintenance_type', values.maintenance_type)
+  put('maintenance_type_id', values.maintenance_type_id)
   put('driver_id', values.driver_id)
   put('customer_id', values.customer_id)
   put('insurance_valid_to', values.insurance_valid_to)
@@ -81,6 +83,7 @@ export default function VehiclesPage() {
   const { vehicles, add, update, remove } = useVehicles()
   const { drivers } = useDrivers()
   const { customers } = useCustomers()
+  const { types: maintenanceTypes } = useMaintenanceTypes()
   const driverById = Object.fromEntries(drivers.map((d) => [d.id, d.name]))
   const [sort, setSort] = useState<SortState<VKey>>({ key: 'plate', dir: 'asc' })
   const [form, setForm] = useState<{ mode: 'add' } | { mode: 'edit'; v: UiVehicle } | null>(null)
@@ -89,6 +92,7 @@ export default function VehiclesPage() {
   const fields = formFields(
     drivers.map((d) => ({ value: d.id, label: d.name })),
     customers.map((c) => ({ value: c.id, label: c.name })),
+    maintenanceTypes.map((m) => ({ value: m.id, label: m.name })),
   )
 
   const onSubmit = (values: FormValues) => {

@@ -14,10 +14,15 @@ def _make_driver(client) -> str:
 
 
 def _make_vehicle(client, driver_id: str | None = None, next_maintenance_km: int | None = None):
+    mt = client.post(
+        "/maintenance-types",
+        json={"name": f"cycle-{uuid.uuid4().hex[:6]}", "interval_km": 10000, "steps": ["small", "big"]},
+        headers=admin_headers(),
+    ).json()
     plate = f"KM-{uuid.uuid4().hex[:6]}"
     r = client.post(
         "/vehicles",
-        json={"licensing_plate": plate, "driver_id": driver_id, "maintenance_type": "1_small_then_1_big"},
+        json={"licensing_plate": plate, "driver_id": driver_id, "maintenance_type_id": mt["id"]},
         headers=admin_headers(),
     )
     vehicle_id = r.json()["vehicle_id"]
