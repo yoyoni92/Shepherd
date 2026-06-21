@@ -121,6 +121,14 @@ class AttendanceStatusEnum(str, enum.Enum):
     absent = "absent"
 
 
+class VehicleTypeEnum(str, enum.Enum):
+    motorcycle = "motorcycle"
+    car = "car"
+    van = "van"
+    bus = "bus"
+    truck = "truck"
+
+
 # ---------------------------------------------------------------------------
 # SQLAlchemy Enum type helpers (named types matching PG enum names)
 # ---------------------------------------------------------------------------
@@ -206,6 +214,11 @@ attendance_status_type = SAEnum(
     name="attendance_status_enum",
     create_type=False,
 )
+vehicle_type_type = SAEnum(
+    VehicleTypeEnum,
+    name="vehicle_type_enum",
+    create_type=False,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +282,7 @@ class Vehicle(Base):
     )
     licensing_plate = mapped_column(Text, unique=True, nullable=False)
     nickname = mapped_column(Text, nullable=True)
+    vehicle_type = mapped_column(vehicle_type_type, nullable=True)
     inseration_ts = mapped_column(DateTime(timezone=True), nullable=True)
     insurance_valid_to = mapped_column(Date, nullable=True)
     license_valid_to = mapped_column(Date, nullable=True)

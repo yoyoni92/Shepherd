@@ -28,8 +28,9 @@ way (see gap A2).
 | Dashboard · KPIs | `GET /kpi/daily?limit=2` (+ `/customers` for the top-customer name) | ✅ | Six VP-grade tiles from the nightly `kpi_daily` rollup; trends derived from the latest 2 rows (`lib/kpis.ts` `deriveKpiTiles`). |
 | Dashboard · Alerts | `GET /events?status=open` | ✅ | Mapped from real events (`lib/alerts.ts` `alertsFromEvents`). |
 | Dashboard · Recent activity | `GET /events` (severity, then recency) | ✅ | `lib/events.ts` `sortEvents`; replaced the demo missions list. |
-| Vehicles | `GET/POST /vehicles`, `DELETE /vehicles/{vehicle_id}` | ✅ | Gap C1 closed: real DB fields only; driver name via `driver_id`→drivers join. Delete by **UUID**. |
-| Drivers | `GET/POST /drivers`, `DELETE /drivers/{driver_id}` | ✅ | Assigned vehicle via reverse-join; licence expiry from `drivers.license_valid_to` (nullable). |
+| Vehicles | `GET/POST/PATCH /vehicles`, `DELETE /vehicles/{vehicle_id}` | ✅ | Full CRUD; `vehicle_type` enum (אופנוע/רכב פרטי/מסחרית/אוטובוס/משאית); driver name via `driver_id`→join. Add/edit form with strict IL guards (plate 7–8 digits). |
+| Drivers | `GET/POST/PATCH /drivers`, `DELETE /drivers/{driver_id}` | ✅ | Full CRUD; add/edit form (phone 05X, licence 7–9 digits); assigned vehicle via reverse-join. |
+| Customers | `GET/POST/PATCH /customers`, `DELETE /customers/{id}` | ✅ | Full CRUD section; delete unlinks vehicles (server cascade) then removes. Fields name/phone/email/status. |
 | Events | `GET /events` | ✅ | Replaces Missions. Full list, severity+recency order, type/severity/status/vehicle filters. |
 | Attendance | `GET /attendance/{month}`, `PATCH /attendance/{driver_id}/{date}` | ✅ | Drivers as employees; webui builds the weekday skeleton and overlays records (gap B2 closed). |
 | Config | `GET /config`, `PUT /config/{key}` | ✅ | Real numeric keys only: `license_expiring_days`, `insurance_expiring_days`, `maintenance_km_buffer`, `image_confidence_min`. PUT body `{config_value}`. |

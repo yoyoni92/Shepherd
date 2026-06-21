@@ -12,6 +12,8 @@ import {
   type VehicleCreate,
   type DriverRead,
   type DriverCreate,
+  type CustomerRead,
+  type CustomerCreate,
   type EventRead,
   type ReportRead,
 } from './schemas'
@@ -46,6 +48,8 @@ async function send<T>(
 export const fetchVehicles = () => get('/vehicles', z.array(VehicleReadSchema))
 export const createVehicle = (v: VehicleCreate): Promise<VehicleRead> =>
   send('POST', '/vehicles', v, VehicleReadSchema)
+export const updateVehicle = (vehicleId: string, patch: Partial<VehicleCreate>): Promise<VehicleRead> =>
+  send('PATCH', `/vehicles/${vehicleId}`, patch, VehicleReadSchema)
 export const deleteVehicle = (vehicleId: string) =>
   send('DELETE', `/vehicles/${vehicleId}`, undefined)
 
@@ -53,14 +57,22 @@ export const deleteVehicle = (vehicleId: string) =>
 export const fetchDrivers = () => get('/drivers', z.array(DriverReadSchema))
 export const createDriver = (d: DriverCreate): Promise<DriverRead> =>
   send('POST', '/drivers', d, DriverReadSchema)
+export const updateDriver = (driverId: string, patch: Partial<DriverRead>): Promise<DriverRead> =>
+  send('PATCH', `/drivers/${driverId}`, patch, DriverReadSchema)
 export const deleteDriver = (driverId: string) => send('DELETE', `/drivers/${driverId}`, undefined)
 
 // Events / reports (read-only; back alerts)
 export const fetchEvents = () => get('/events', z.array(EventReadSchema))
 export const fetchReports = () => get('/reports', z.array(ReportReadSchema))
 
-// Customers (read-only; resolves the KPI top-customer name)
+// Customers
 export const fetchCustomers = () => get('/customers', z.array(CustomerReadSchema))
+export const createCustomer = (c: CustomerCreate): Promise<CustomerRead> =>
+  send('POST', '/customers', c, CustomerReadSchema)
+export const updateCustomer = (customerId: string, patch: Partial<CustomerRead>): Promise<CustomerRead> =>
+  send('PATCH', `/customers/${customerId}`, patch, CustomerReadSchema)
+// Deleting a customer unlinks them from any vehicles server-side (cascade), then removes them.
+export const deleteCustomer = (customerId: string) => send('DELETE', `/customers/${customerId}`, undefined)
 
 // KPI daily rollup: latest snapshots, newest first (dashboard tiles + trends)
 export const fetchKpiDaily = (limit = 2) => get(`/kpi/daily?limit=${limit}`, z.array(KpiDailyReadSchema))

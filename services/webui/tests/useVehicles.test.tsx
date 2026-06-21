@@ -29,6 +29,20 @@ describe('useVehicles', () => {
     await waitFor(() => expect(posted).toBe(true))
   })
 
+  it('patches a vehicle on update', async () => {
+    let patched: Record<string, unknown> | null = null
+    server.use(
+      http.patch(`${FLEET}/vehicles/:id`, async ({ params, request }) => {
+        patched = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json({ vehicle_id: params.id, licensing_plate: '12-345-67', ...patched })
+      }),
+    )
+    const { result } = renderHook(() => useVehicles(), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.vehicles).toHaveLength(3))
+    act(() => result.current.update({ id: 'v1', patch: { vehicle_type: 'truck', current_km: 99000 } }))
+    await waitFor(() => expect(patched).toMatchObject({ vehicle_type: 'truck', current_km: 99000 }))
+  })
+
   it('hits delete by UUID and rolls back on error', async () => {
     let hit = false
     server.use(

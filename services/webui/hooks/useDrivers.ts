@@ -1,6 +1,6 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchDrivers, createDriver, deleteDriver } from '@/lib/api/fleet'
+import { fetchDrivers, createDriver, updateDriver, deleteDriver } from '@/lib/api/fleet'
 import { toUiDriver } from '@/lib/adapters'
 import type { DriverRead, DriverCreate, UiDriver } from '@/lib/api/schemas'
 
@@ -12,6 +12,11 @@ export function useDrivers() {
 
   const add = useMutation({
     mutationFn: (d: DriverCreate) => createDriver(d),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<DriverRead> }) => updateDriver(id, patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 
@@ -33,6 +38,7 @@ export function useDrivers() {
     drivers,
     loading: query.isLoading,
     add: add.mutate,
+    update: update.mutate,
     remove: remove.mutate,
   }
 }

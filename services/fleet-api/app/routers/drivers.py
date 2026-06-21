@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from app import repo
 from app.auth import Action, assert_permitted
 from app.deps import Caller, Db
-from app.schemas import DriverCreate, DriverRead
+from app.schemas import DriverCreate, DriverRead, DriverUpdate
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -55,6 +55,20 @@ def get_driver(driver_id: UUID, session: Db, caller: Caller) -> DriverRead:
 def create_driver(body: DriverCreate, session: Db, caller: Caller) -> DriverRead:
     assert_permitted(caller.role, Action.MANAGE_DRIVERS)
     return _to_read(repo.create_driver(session, body.model_dump()))
+
+
+@router.patch(
+    "/{driver_id}",
+    response_model=DriverRead,
+    summary="Update driver (admin only)",
+    description="Partial update — only provided fields are written.",
+)
+def update_driver(driver_id: UUID, body: DriverUpdate, session: Db, caller: Caller) -> DriverRead:
+    assert_permitted(caller.role, Action.MANAGE_DRIVERS)
+    driver = repo.update_driver(session, driver_id, body.model_dump(exclude_unset=True))
+    if driver is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+    return _to_read(driver)
 
 
 @router.delete(

@@ -29,6 +29,20 @@ describe('useDrivers', () => {
     await waitFor(() => expect(posted).toBe(true))
   })
 
+  it('patches a driver on update', async () => {
+    let patched: Record<string, unknown> | null = null
+    server.use(
+      http.patch(`${FLEET}/drivers/:id`, async ({ params, request }) => {
+        patched = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json({ driver_id: params.id, full_name: 'n', phone_number: 'p', status: 'inactive', ...patched })
+      }),
+    )
+    const { result } = renderHook(() => useDrivers(), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.drivers).toHaveLength(2))
+    act(() => result.current.update({ id: 'd1', patch: { status: 'inactive' } }))
+    await waitFor(() => expect(patched).toMatchObject({ status: 'inactive' }))
+  })
+
   it('hits delete by UUID and rolls back on error', async () => {
     let hit = false
     server.use(

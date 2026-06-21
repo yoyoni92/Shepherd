@@ -2,7 +2,7 @@
 import { signIn } from 'next-auth/react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Truck } from 'lucide-react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -29,27 +29,15 @@ export default function LoginPage() {
       }}
     >
       <div className="w-full" style={{ maxWidth: 420 }}>
-        <div className="flex items-center gap-3 justify-center mb-7">
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: 46,
-              height: 46,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)',
-              boxShadow: '0 8px 24px rgba(59,130,246,.35)',
-            }}
-          >
-            <Truck size={26} color="#fff" />
-          </div>
-          <div className="text-right">
-            <div className="text-[19px] font-extrabold" style={{ letterSpacing: '-.3px' }}>
-              שפרד - ניהול צי רכב
-            </div>
-            <div className="text-[12px] text-faint" style={{ letterSpacing: '.5px' }}>
-              FLEET MANAGEMENT
-            </div>
-          </div>
+        <div className="flex justify-center mb-7">
+          <Image
+            src="/logo.png"
+            alt="Shepherd"
+            width={300}
+            height={163}
+            priority
+            style={{ width: 300, height: 'auto', borderRadius: 14 }}
+          />
         </div>
 
         <form

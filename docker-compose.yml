@@ -174,11 +174,14 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fleetops.io}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-shepherd}
-      NEXT_PUBLIC_FLEET_API_URL: http://fleet-api:8000
-      NEXT_PUBLIC_AGENT_URL: http://langgraph-agent:8000
-      NEXT_PUBLIC_RAG_URL: http://rag:8000
-      NEXT_PUBLIC_GATEWAY_URL: http://channel-gateway:8000
-      NEXT_PUBLIC_ASSISTANT_URL: ${NEXT_PUBLIC_ASSISTANT_URL:-http://ollama-assistant:8000}
+      # Server-only: the Fleet proxy injects the internal token; the generic proxy + health
+      # aggregator reach the private services. None of these are exposed to the browser.
+      FLEET_API_URL: http://fleet-api:8000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+      AGENT_URL: http://langgraph-agent:8000
+      RAG_URL: http://rag:8000
+      GATEWAY_URL: http://channel-gateway:8000
+      ASSISTANT_URL: http://ollama-assistant:8000
     ports:
       - "3000:3000"
     depends_on:

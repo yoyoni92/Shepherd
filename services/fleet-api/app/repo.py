@@ -2,7 +2,7 @@
 import json
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from shepherd_db.logic import next_maintenance
@@ -58,6 +58,17 @@ def create_vehicle(session: Session, data: dict) -> Vehicle:
     return vehicle
 
 
+def update_vehicle(session: Session, vehicle_id: UUID, data: dict) -> Vehicle | None:
+    vehicle = session.get(Vehicle, vehicle_id)
+    if vehicle is None:
+        return None
+    for key, value in data.items():
+        setattr(vehicle, key, value)
+    session.commit()
+    session.refresh(vehicle)
+    return vehicle
+
+
 def delete_vehicle(session: Session, vehicle_id: UUID) -> bool:
     vehicle = session.get(Vehicle, vehicle_id)
     if vehicle is None:
@@ -82,6 +93,17 @@ def list_drivers(session: Session) -> list[Driver]:
 def create_driver(session: Session, data: dict) -> Driver:
     driver = Driver(**data)
     session.add(driver)
+    session.commit()
+    session.refresh(driver)
+    return driver
+
+
+def update_driver(session: Session, driver_id: UUID, data: dict) -> Driver | None:
+    driver = session.get(Driver, driver_id)
+    if driver is None:
+        return None
+    for key, value in data.items():
+        setattr(driver, key, value)
     session.commit()
     session.refresh(driver)
     return driver
@@ -112,10 +134,25 @@ def create_customer(session: Session, data: dict) -> Customer:
     return customer
 
 
+def update_customer(session: Session, customer_id: UUID, data: dict) -> Customer | None:
+    customer = session.get(Customer, customer_id)
+    if customer is None:
+        return None
+    for key, value in data.items():
+        setattr(customer, key, value)
+    session.commit()
+    session.refresh(customer)
+    return customer
+
+
 def delete_customer(session: Session, customer_id: UUID) -> bool:
     customer = session.get(Customer, customer_id)
     if customer is None:
         return False
+    # cascade: unlink the customer from any vehicles before removing (FK would block)
+    session.execute(
+        update(Vehicle).where(Vehicle.customer_id == customer_id).values(customer_id=None)
+    )
     session.delete(customer)
     session.commit()
     return True

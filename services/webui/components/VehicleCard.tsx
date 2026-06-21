@@ -1,7 +1,8 @@
 'use client'
-import { Truck, Trash2 } from 'lucide-react'
+import { Truck, Trash2, Pencil } from 'lucide-react'
 import type { UiVehicle } from '@/lib/api/schemas'
 import { daysTo, fmtDate } from '@/lib/domain'
+import { VEHICLE_TYPE_LABEL } from '@/lib/vehicleTypes'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -10,10 +11,12 @@ const DASH = '—'
 export function VehicleCard({
   v,
   driverName,
+  onEdit,
   onRemove,
 }: {
   v: UiVehicle
   driverName?: string
+  onEdit: () => void
   onRemove: () => void
 }) {
   const insWarn = v.insurance != null && daysTo(v.insurance) < 30
@@ -39,8 +42,13 @@ export function VehicleCard({
             <div className="text-[15.5px] font-bold truncate">
               {v.make} {v.model}
             </div>
-            <div className="text-[12px] text-faint ltr">
-              {v.currentKm != null ? `${v.currentKm.toLocaleString()} ק״מ` : DASH}
+            <div className="text-[12px] text-faint">
+              {[
+                v.vehicleType ? VEHICLE_TYPE_LABEL[v.vehicleType] ?? v.vehicleType : null,
+                v.currentKm != null ? `${v.currentKm.toLocaleString()} ק״מ` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ') || DASH}
             </div>
           </div>
         </div>
@@ -75,8 +83,9 @@ export function VehicleCard({
       </div>
 
       <div className="flex gap-2 border-t border-line pt-3">
-        <Button variant="secondary" size="sm" className="flex-1">
-          פרטים
+        <Button variant="secondary" size="sm" className="flex-1" onClick={onEdit}>
+          <Pencil size={14} />
+          עריכה
         </Button>
         <Button variant="danger" size="sm" onClick={onRemove}>
           <Trash2 size={14} />

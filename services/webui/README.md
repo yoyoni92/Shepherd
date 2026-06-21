@@ -36,8 +36,9 @@ The shell (`components/Shell.tsx` = sidebar + topbar) wraps the seven design sec
 |-------|-------------|
 | `/` | Login (credentials, Hebrew RTL) |
 | `/dashboard` | 6 VP-grade KPI tiles (`kpi_daily` + trends) + alerts + recent events |
-| `/vehicles` | Sortable card grid; add/remove vehicles (optimistic) |
-| `/drivers` | Sortable card grid; add/remove drivers (optimistic) |
+| `/vehicles` | Sortable card grid; add/edit/remove with a validated form; vehicle type + assignments |
+| `/drivers` | Sortable card grid; add/edit/remove with a validated form |
+| `/customers` | Customer cards; add/edit/remove (delete unlinks vehicles server-side) |
 | `/events` | Real `events` list — severity+recency order, type/severity/status/vehicle filters |
 | `/attendance` | Monthly clock-in/out report, edit modal, CSV/PDF export (`lib/attendance.ts`) |
 | `/config` | `system_config` stepper editor (admin-gated, Zod-validated) |

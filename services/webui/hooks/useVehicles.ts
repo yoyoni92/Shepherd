@@ -1,6 +1,6 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchVehicles, createVehicle, deleteVehicle } from '@/lib/api/fleet'
+import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api/fleet'
 import { toUiVehicle } from '@/lib/adapters'
 import type { VehicleRead, VehicleCreate, UiVehicle } from '@/lib/api/schemas'
 
@@ -12,6 +12,11 @@ export function useVehicles() {
 
   const add = useMutation({
     mutationFn: (v: VehicleCreate) => createVehicle(v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<VehicleCreate> }) => updateVehicle(id, patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 
@@ -33,6 +38,7 @@ export function useVehicles() {
     vehicles,
     loading: query.isLoading,
     add: add.mutate,
+    update: update.mutate,
     remove: remove.mutate,
   }
 }

@@ -1,11 +1,13 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
   Truck,
   User,
+  Building2,
   TriangleAlert,
   CalendarCheck,
   Settings,
@@ -16,17 +18,19 @@ import {
 } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
+import { useCustomers } from '@/hooks/useCustomers'
 import { useEvents } from '@/hooks/useEvents'
 import { useHealth } from '@/hooks/useHealth'
 import { openCount } from '@/lib/events'
 import { summarizeHealth, type Overall } from '@/lib/health'
 
-type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'events'; statusDot?: boolean }
+type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'customers' | 'events'; statusDot?: boolean }
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'לוח בקרה', Icon: LayoutDashboard },
   { href: '/vehicles', label: 'רכבים', Icon: Truck, badge: 'vehicles' },
   { href: '/drivers', label: 'נהגים', Icon: User, badge: 'drivers' },
+  { href: '/customers', label: 'לקוחות', Icon: Building2, badge: 'customers' },
   { href: '/events', label: 'אירועים', Icon: TriangleAlert, badge: 'events' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
   { href: '/config', label: 'הגדרות', Icon: Settings },
@@ -40,12 +44,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname()
   const { vehicles } = useVehicles()
   const { drivers } = useDrivers()
+  const { customers } = useCustomers()
   const { events } = useEvents()
   const { services } = useHealth()
   const healthColor = HEALTH_DOT[summarizeHealth(services)]
   const counts: Record<string, number> = {
     vehicles: vehicles.length,
     drivers: drivers.length,
+    customers: customers.length,
     events: openCount(events),
   }
 
@@ -54,20 +60,16 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       className="bg-raised border-l border-line flex flex-col sticky top-0 h-screen shrink-0 transition-[width] duration-200 ease-out"
       style={{ width: collapsed ? 74 : 244, minWidth: collapsed ? 74 : 244, padding: '16px 14px' }}
     >
-      <div className="flex items-center gap-[11px] px-1.5 mb-3.5" style={{ height: 56 }}>
-        <div
-          className="flex items-center justify-center shrink-0"
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 9,
-            background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)',
-          }}
-        >
-          <Truck size={19} color="#fff" />
-        </div>
-        {!collapsed && (
-          <div className="text-[15px] font-extrabold whitespace-nowrap">ניהול צי רכב</div>
+      <div className="flex items-center justify-center px-1.5 mb-3.5" style={{ height: 56 }}>
+        {collapsed ? (
+          <div
+            className="flex items-center justify-center shrink-0"
+            style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}
+          >
+            <Truck size={19} color="#fff" />
+          </div>
+        ) : (
+          <Image src="/logo.png" alt="Shepherd" width={196} height={107} priority style={{ width: 196, height: 'auto' }} />
         )}
       </div>
 

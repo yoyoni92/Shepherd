@@ -6,7 +6,7 @@ from shepherd_contracts.auth import Role
 from app import repo
 from app.auth import Action, assert_permitted
 from app.deps import Caller, Db
-from app.schemas import VehicleCreate, VehicleRead
+from app.schemas import VehicleCreate, VehicleRead, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
@@ -16,6 +16,7 @@ def _to_read(v) -> VehicleRead:
         vehicle_id=v.vehicle_id,
         licensing_plate=v.licensing_plate,
         nickname=v.nickname,
+        vehicle_type=v.vehicle_type.value if v.vehicle_type else None,
         vendor=v.vendor,
         model=v.model,
         current_km=v.current_km,
@@ -86,6 +87,20 @@ def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleR
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plate already exists")
 
     vehicle = repo.create_vehicle(session, body.model_dump())
+    return _to_read(vehicle)
+
+
+@router.patch(
+    "/{vehicle_id}",
+    response_model=VehicleRead,
+    summary="Update vehicle (admin only)",
+    description="Partial update — only provided fields are written.",
+)
+def update_vehicle(vehicle_id: UUID, body: VehicleUpdate, session: Db, caller: Caller) -> VehicleRead:
+    assert_permitted(caller.role, Action.MANAGE_VEHICLES)
+    vehicle = repo.update_vehicle(session, vehicle_id, body.model_dump(exclude_unset=True))
+    if vehicle is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
     return _to_read(vehicle)
 
 

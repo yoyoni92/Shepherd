@@ -7,9 +7,9 @@ const ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:800
 
 // Real fleet-api shapes (services/fleet-api/app/schemas.py).
 const VEHICLES = [
-  { vehicle_id: 'v1', licensing_plate: '12-345-67', vendor: 'Toyota', model: 'Corolla', current_km: 60000, insurance_valid_to: '2026-09-02', license_valid_to: '2026-12-01', driver_id: 'd1', next_maintenance_km: 65000, last_maintenance_date: '2026-04-12' },
-  { vehicle_id: 'v2', licensing_plate: '88-201-55', vendor: 'Hyundai', model: 'Tucson', current_km: 70000, insurance_valid_to: '2026-07-05', license_valid_to: '2027-01-01', driver_id: 'd2', next_maintenance_km: 68000, last_maintenance_date: '2026-03-28' },
-  { vehicle_id: 'v3', licensing_plate: '45-990-12', vendor: 'Ford', model: 'Transit', current_km: 120000, insurance_valid_to: '2026-06-29', license_valid_to: '2026-06-30', driver_id: null, next_maintenance_km: 130000, last_maintenance_date: '2026-01-15' },
+  { vehicle_id: 'v1', licensing_plate: '12-345-67', vehicle_type: 'car', vendor: 'Toyota', model: 'Corolla', current_km: 60000, insurance_valid_to: '2026-09-02', license_valid_to: '2026-12-01', driver_id: 'd1', customer_id: 'c1', next_maintenance_km: 65000, last_maintenance_date: '2026-04-12' },
+  { vehicle_id: 'v2', licensing_plate: '88-201-55', vehicle_type: 'van', vendor: 'Hyundai', model: 'Tucson', current_km: 70000, insurance_valid_to: '2026-07-05', license_valid_to: '2027-01-01', driver_id: 'd2', customer_id: 'c1', next_maintenance_km: 68000, last_maintenance_date: '2026-03-28' },
+  { vehicle_id: 'v3', licensing_plate: '45-990-12', vehicle_type: 'truck', vendor: 'Ford', model: 'Transit', current_km: 120000, insurance_valid_to: '2026-06-29', license_valid_to: '2026-06-30', driver_id: null, customer_id: null, next_maintenance_km: 130000, last_maintenance_date: '2026-01-15' },
 ]
 
 const DRIVERS = [
@@ -52,6 +52,10 @@ export const handlers = [
     const body = (await request.json()) as Record<string, unknown>
     return HttpResponse.json({ vehicle_id: 'v99', ...body }, { status: 201 })
   }),
+  http.patch(`${FLEET}/vehicles/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ vehicle_id: params.id, licensing_plate: '12-345-67', ...body })
+  }),
   http.delete(`${FLEET}/vehicles/:id`, () => new HttpResponse(null, { status: 204 })),
 
   // Drivers
@@ -59,6 +63,10 @@ export const handlers = [
   http.post(`${FLEET}/drivers`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>
     return HttpResponse.json({ driver_id: 'd99', status: 'active', ...body }, { status: 201 })
+  }),
+  http.patch(`${FLEET}/drivers/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ driver_id: params.id, full_name: 'n', phone_number: 'p', status: 'active', ...body })
   }),
   http.delete(`${FLEET}/drivers/:id`, () => new HttpResponse(null, { status: 204 })),
 
@@ -68,6 +76,15 @@ export const handlers = [
 
   // Customers + KPI daily rollup
   http.get(`${FLEET}/customers`, () => HttpResponse.json(CUSTOMERS)),
+  http.post(`${FLEET}/customers`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ customer_id: 'c99', status: 'active', ...body }, { status: 201 })
+  }),
+  http.patch(`${FLEET}/customers/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ customer_id: params.id, full_name: 'n', status: 'active', ...body })
+  }),
+  http.delete(`${FLEET}/customers/:id`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${FLEET}/kpi/daily`, () => HttpResponse.json(KPI_DAILY)),
 
   // Attendance: month read returns one stored record for d1; PATCH echoes the upsert

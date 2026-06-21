@@ -7,6 +7,7 @@ export const VehicleReadSchema = z.object({
   vehicle_id: z.string(),
   licensing_plate: z.string(),
   nickname: z.string().nullish(),
+  vehicle_type: z.string().nullish(),
   vendor: z.string().nullish(),
   model: z.string().nullish(),
   current_km: z.number().nullish(),
@@ -26,8 +27,10 @@ export const VehicleReadSchema = z.object({
 export const VehicleCreateSchema = z.object({
   licensing_plate: z.string(),
   nickname: z.string().nullish(),
+  vehicle_type: z.string().nullish(),
   vendor: z.string().nullish(),
   model: z.string().nullish(),
+  current_km: z.number().nullish(),
   allowed_driver: z.string().nullish(),
   driver_id: z.string().nullish(),
   customer_id: z.string().nullish(),
@@ -88,6 +91,15 @@ export const KpiDailyReadSchema = z.object({
 export const CustomerReadSchema = z.object({
   customer_id: z.string(),
   full_name: z.string(),
+  phone_number: z.string().nullish(),
+  email: z.string().nullish(),
+  status: z.string().nullish(),
+})
+
+export const CustomerCreateSchema = z.object({
+  full_name: z.string(),
+  phone_number: z.string().nullish(),
+  email: z.string().nullish(),
 })
 
 export const AttendanceRecordReadSchema = z.object({
@@ -115,6 +127,7 @@ export type EventRead = z.infer<typeof EventReadSchema>
 export type ReportRead = z.infer<typeof ReportReadSchema>
 export type KpiDailyRead = z.infer<typeof KpiDailyReadSchema>
 export type CustomerRead = z.infer<typeof CustomerReadSchema>
+export type CustomerCreate = z.infer<typeof CustomerCreateSchema>
 export type AttendanceRecordRead = z.infer<typeof AttendanceRecordReadSchema>
 
 // ───────────────────────── UI view models ─────────────────────────
@@ -124,9 +137,11 @@ export type AttendanceRecordRead = z.infer<typeof AttendanceRecordReadSchema>
 export interface UiVehicle {
   id: string
   plate: string
+  vehicleType: string | null // enum value (motorcycle|car|van|bus|truck)
   make: string // vendor
   model: string
   driverId: string | null // assigned driver, resolved to a name via the drivers list
+  customerId: string | null
   currentKm: number | null
   insurance: string | null // insurance_valid_to
   licenseValidTo: string | null // annual רישוי (not a driver's licence)
@@ -142,4 +157,12 @@ export interface UiDriver {
   license: string
   licExpiry: string | null // drivers.license_valid_to (nullable)
   status: 'on' | 'off'
+}
+
+export interface UiCustomer {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  status: 'active' | 'inactive'
 }

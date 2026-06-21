@@ -11,8 +11,26 @@ from pydantic import BaseModel
 class VehicleCreate(BaseModel):
     licensing_plate: str
     nickname: str | None = None
+    vehicle_type: str | None = None  # motorcycle | car | van | bus | truck
     vendor: str | None = None
     model: str | None = None
+    current_km: int | None = None
+    allowed_driver: str | None = None
+    driver_id: UUID | None = None
+    customer_id: UUID | None = None
+    maintenance_type: str | None = None
+    insurance_valid_to: date | None = None
+    license_valid_to: date | None = None
+
+
+class VehicleUpdate(BaseModel):
+    """PATCH /vehicles/{id} — all fields optional; only provided keys are written."""
+    licensing_plate: str | None = None
+    nickname: str | None = None
+    vehicle_type: str | None = None
+    vendor: str | None = None
+    model: str | None = None
+    current_km: int | None = None
     allowed_driver: str | None = None
     driver_id: UUID | None = None
     customer_id: UUID | None = None
@@ -25,6 +43,7 @@ class VehicleRead(BaseModel):
     vehicle_id: UUID
     licensing_plate: str
     nickname: str | None = None
+    vehicle_type: str | None = None
     vendor: str | None = None
     model: str | None = None
     current_km: int | None = None
@@ -50,6 +69,14 @@ class DriverCreate(BaseModel):
     license_valid_to: date | None = None
 
 
+class DriverUpdate(BaseModel):
+    full_name: str | None = None
+    phone_number: str | None = None
+    license_number: str | None = None
+    license_valid_to: date | None = None
+    status: str | None = None
+
+
 class DriverRead(BaseModel):
     driver_id: UUID
     full_name: str
@@ -65,6 +92,13 @@ class CustomerCreate(BaseModel):
     full_name: str
     phone_number: str | None = None
     email: str | None = None
+
+
+class CustomerUpdate(BaseModel):
+    full_name: str | None = None
+    phone_number: str | None = None
+    email: str | None = None
+    status: str | None = None
 
 
 class CustomerRead(BaseModel):

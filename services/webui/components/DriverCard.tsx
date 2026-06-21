@@ -1,5 +1,5 @@
 'use client'
-import { Truck, Trash2 } from 'lucide-react'
+import { Truck, Trash2, Pencil } from 'lucide-react'
 import type { UiDriver } from '@/lib/api/schemas'
 import { daysTo, fmtDate } from '@/lib/domain'
 import { Avatar } from '@/components/Avatar'
@@ -11,10 +11,12 @@ const DASH = '—'
 export function DriverCard({
   d,
   vehiclePlate,
+  onEdit,
   onRemove,
 }: {
   d: UiDriver
   vehiclePlate?: string
+  onEdit: () => void
   onRemove: () => void
 }) {
   const on = d.status === 'on'
@@ -65,8 +67,9 @@ export function DriverCard({
       </div>
 
       <div className="flex gap-2 border-t border-line pt-3">
-        <Button variant="secondary" size="sm" className="flex-1">
-          פרופיל
+        <Button variant="secondary" size="sm" className="flex-1" onClick={onEdit}>
+          <Pencil size={14} />
+          עריכה
         </Button>
         <Button variant="danger" size="sm" onClick={onRemove}>
           <Trash2 size={14} />

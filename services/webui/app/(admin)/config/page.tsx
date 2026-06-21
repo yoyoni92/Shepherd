@@ -65,9 +65,6 @@ export default function ConfigPage() {
             <div className="flex-1 min-w-0">
               <div className="text-[14.5px] font-bold mb-[3px]">{f.label}</div>
               <div className="text-[12px] text-faint">{f.desc}</div>
-              <div className="text-[11px] font-mono mt-1 ltr" style={{ color: '#334155' }}>
-                {f.key}
-              </div>
             </div>
             <div className="flex items-center gap-2.5">
               <button
