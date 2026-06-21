@@ -3,7 +3,7 @@ export const VEHICLE_TYPES = ['motorcycle', 'car', 'van', 'bus', 'truck'] as con
 export type VehicleType = (typeof VEHICLE_TYPES)[number]
 
 export const VEHICLE_TYPE_LABEL: Record<string, string> = {
-  motorcycle: 'אופנוע',
+  motorcycle: 'קטנוע',
   car: 'רכב פרטי',
   van: 'מסחרית/ואן',
   bus: 'אוטובוס',

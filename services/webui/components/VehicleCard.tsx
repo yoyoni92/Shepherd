@@ -1,5 +1,5 @@
 'use client'
-import { Truck, Trash2, Pencil } from 'lucide-react'
+import { Truck, Trash2, Pencil, Bike, Car, Bus, Caravan, type LucideIcon } from 'lucide-react'
 import type { UiVehicle } from '@/lib/api/schemas'
 import { daysTo, fmtDate } from '@/lib/domain'
 import { VEHICLE_TYPE_LABEL } from '@/lib/vehicleTypes'
@@ -7,6 +7,15 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
 const DASH = '—'
+
+// A distinct icon per vehicle type (falls back to a generic truck).
+const TYPE_ICON: Record<string, LucideIcon> = {
+  motorcycle: Bike,
+  car: Car,
+  van: Caravan,
+  bus: Bus,
+  truck: Truck,
+}
 
 export function VehicleCard({
   v,
@@ -27,6 +36,7 @@ export function VehicleCard({
   ]
     .filter(Boolean)
     .join(' · ')
+  const TypeIcon = (v.vehicleType && TYPE_ICON[v.vehicleType]) || Truck
 
   return (
     <Card style={{ padding: '17px 18px' }}>
@@ -36,7 +46,7 @@ export function VehicleCard({
             className="flex items-center justify-center shrink-0 bg-panel2 border border-control text-accent"
             style={{ width: 44, height: 44, borderRadius: 11 }}
           >
-            <Truck size={22} />
+            <TypeIcon size={22} />
           </div>
           <div className="min-w-0">
             <div className="text-[15.5px] font-bold truncate">
