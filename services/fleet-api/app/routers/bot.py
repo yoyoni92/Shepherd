@@ -31,7 +31,12 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
     user = repo.get_bot_user_by_chat_id(session, chat_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
-    return BotWhoamiResponse(role=user.role.value, driver_id=user.driver_id, user_id=user.id)
+    return BotWhoamiResponse(
+        role=user.role.value,
+        driver_id=user.driver_id,
+        driver_name=user.driver.full_name if user.driver else None,
+        user_id=user.id,
+    )
 
 
 @router.post(
@@ -42,11 +47,15 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
 )
 def create_invite(body: BotInviteCreate, session: Db, caller: Caller) -> BotInviteResponse:
     assert_permitted(caller.role, Action.MANAGE_BOT_INVITES)
-    driver = repo.get_driver(session, body.driver_id)
-    if driver is None:
+    if body.role not in ("admin", "driver"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
+    # Driver invites must name a driver; admin invites may be standalone (no driver).
+    if body.role == "driver" and body.driver_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="driver_id required for a driver invite")
+    if body.driver_id is not None and repo.get_driver(session, body.driver_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
     token_str = str(uuid.uuid4())
-    invite = repo.create_bot_invite(session, body.driver_id, token_str)
+    invite = repo.create_bot_invite(session, body.driver_id, token_str, body.role)
     bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "ShepherdBot")
     return BotInviteResponse(
         token=invite.token,
@@ -80,6 +89,7 @@ def list_invites(session: Db, caller: Caller) -> list[BotInviteRead]:
             token=inv.token,
             driver_id=inv.driver_id,
             driver_name=inv.driver.full_name if inv.driver else None,
+            role=inv.role.value if hasattr(inv.role, "value") else inv.role,
             expires_at=inv.expires_at,
             created_at=inv.created_at,
         )
@@ -106,8 +116,10 @@ def revoke_invite(token: str, session: Db, caller: Caller) -> None:
     response_model=list[BotUserRead],
     summary="List bot users (admin only)",
 )
-def list_users(session: Db, caller: Caller) -> list[BotUserRead]:
+def list_users(session: Db, caller: Caller, role: str | None = None) -> list[BotUserRead]:
     assert_permitted(caller.role, Action.MANAGE_BOT_USERS)
+    if role is not None and role not in ("admin", "driver"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
     return [
         BotUserRead(
             user_id=u.id,
@@ -117,7 +129,7 @@ def list_users(session: Db, caller: Caller) -> list[BotUserRead]:
             driver_name=u.driver.full_name if u.driver else None,
             created_at=u.created_at,
         )
-        for u in repo.list_bot_users(session)
+        for u in repo.list_bot_users(session, role)
     ]
 
 

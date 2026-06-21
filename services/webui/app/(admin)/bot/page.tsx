@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, Plus } from 'lucide-react'
 import { useBotUsers, useBotInvites } from '@/hooks/useBotManagement'
+import { useDrivers } from '@/hooks/useDrivers'
 import type { BotUserRead, BotInviteRead } from '@/lib/api/schemas'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -182,6 +183,9 @@ function InviteRow({
     <tr style={{ borderBottom: '1px solid var(--line)' }}>
       <td style={{ padding: '10px 16px' }}>{invite.driver_name ?? '—'}</td>
       <td style={{ padding: '10px 16px' }}>
+        <RoleBadge role={invite.role} />
+      </td>
+      <td style={{ padding: '10px 16px' }}>
         <div className="flex items-center gap-1 min-w-0">
           <span
             className="text-[12px] ltr truncate"
@@ -208,12 +212,145 @@ function InviteRow({
   )
 }
 
+function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { createInvite } = useBotInvites()
+  const { drivers } = useDrivers()
+  const [role, setRole] = useState<'admin' | 'driver'>('admin')
+  const [driverId, setDriverId] = useState('')
+  const [link, setLink] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const close = () => {
+    setRole('admin')
+    setDriverId('')
+    setLink(null)
+    setErr(null)
+    onClose()
+  }
+
+  const submit = async () => {
+    setErr(null)
+    if (role === 'driver' && !driverId) {
+      setErr('יש לבחור נהג עבור הזמנת נהג')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await createInvite({ driverId: driverId || undefined, role })
+      setLink(res.deep_link)
+    } catch {
+      setErr('יצירת ההזמנה נכשלה')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fieldStyle = {
+    background: 'var(--panel-2, #0f172a)',
+    color: 'var(--muted)',
+    border: '1px solid var(--line)',
+  } as const
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && close()}>
+      <DialogContent style={{ maxWidth: 460 }}>
+        <div className="p-6 flex flex-col gap-4">
+          <DialogTitle className="text-[16px] font-bold">הוספת משתמש בוט</DialogTitle>
+          {link ? (
+            <>
+              <p className="text-[13px] text-faint">
+                שלח/י את הקישור למשתמש. בפתיחתו הוא יצורף עם ההרשאה שנבחרה.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={link}
+                  className="ltr flex-1 text-[12px] rounded-md px-2 py-2"
+                  style={fieldStyle}
+                />
+                <CopyButton text={link} />
+              </div>
+              <div className="flex justify-end mt-2">
+                <Button size="sm" onClick={close}>
+                  סיום
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                <label className="text-[12px] font-semibold text-faint">תפקיד</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={role === 'admin' ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setRole('admin')}
+                  >
+                    אדמין
+                  </Button>
+                  <Button
+                    variant={role === 'driver' ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setRole('driver')}
+                  >
+                    נהג
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[12px] font-semibold text-faint">
+                  {role === 'driver' ? 'נהג (חובה)' : 'קישור לנהג (אופציונלי)'}
+                </label>
+                <select
+                  value={driverId}
+                  onChange={(e) => setDriverId(e.target.value)}
+                  className="text-[13px] rounded-md px-2 py-2"
+                  style={fieldStyle}
+                >
+                  <option value="">— ללא —</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {err && (
+                <p className="text-[12px]" style={{ color: '#f87171' }}>
+                  {err}
+                </p>
+              )}
+              <div className="flex gap-2 justify-end mt-2">
+                <DialogClose asChild>
+                  <Button variant="secondary" size="sm" onClick={close}>
+                    ביטול
+                  </Button>
+                </DialogClose>
+                <Button size="sm" disabled={busy} onClick={submit}>
+                  {busy ? 'יוצר…' : 'צור הזמנה'}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function BotInvitesSection() {
   const { invites, revokeInvite, createInvite } = useBotInvites()
+  const [addOpen, setAddOpen] = useState(false)
 
   return (
     <section>
-      <h2 className="text-[15px] font-bold mb-3">הזמנות ממתינות</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-[15px] font-bold">הזמנות ממתינות</h2>
+        <Button size="sm" onClick={() => setAddOpen(true)}>
+          <Plus size={14} /> הוסף משתמש
+        </Button>
+      </div>
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         {invites.length === 0 ? (
           <div className="text-[13px] text-faint text-center py-10">אין הזמנות פעילות</div>
@@ -221,7 +358,7 @@ function BotInvitesSection() {
           <table className="w-full text-[13px]" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                {['שם נהג', 'קישור הזמנה', 'תפוגף ב', 'פעולות'].map((h) => (
+                {['שם נהג', 'תפקיד', 'קישור הזמנה', 'תפוגה ב', 'פעולות'].map((h) => (
                   <th
                     key={h}
                     className="text-right text-[11px] font-bold text-faint"
@@ -238,13 +375,14 @@ function BotInvitesSection() {
                   key={invite.token}
                   invite={invite}
                   onRevoke={() => revokeInvite(invite.token)}
-                  onRenew={() => createInvite(invite.driver_id)}
+                  onRenew={() => createInvite({ driverId: invite.driver_id ?? undefined, role: invite.role })}
                 />
               ))}
             </tbody>
           </table>
         )}
       </Card>
+      <AddBotUserDialog open={addOpen} onClose={() => setAddOpen(false)} />
     </section>
   )
 }

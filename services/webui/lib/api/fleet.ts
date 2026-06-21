@@ -128,8 +128,15 @@ export const getBotUsers = (): Promise<BotUserRead[]> => get('/users', z.array(B
 export const updateBotUserRole = (userId: string, role: 'admin' | 'driver'): Promise<BotUserRead> =>
   send('PATCH', `/users/${userId}/role`, { role }, BotUserReadSchema)
 export const getBotInvites = (): Promise<BotInviteRead[]> => get('/bot-invite', z.array(BotInviteReadSchema))
-export const createBotInvite = (driverId: string): Promise<BotInviteResponse> =>
-  send('POST', '/bot-invite', { driver_id: driverId }, BotInviteResponseSchema)
+export const createBotInvite = (
+  opts: { driverId?: string; role?: 'admin' | 'driver' },
+): Promise<BotInviteResponse> =>
+  send(
+    'POST',
+    '/bot-invite',
+    { driver_id: opts.driverId ?? null, role: opts.role ?? 'driver' },
+    BotInviteResponseSchema,
+  )
 export const revokeBotInvite = (token: string): Promise<void> =>
   send('DELETE', `/bot-invite/${token}`, undefined)
 

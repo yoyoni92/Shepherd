@@ -626,8 +626,9 @@ class BotInviteToken(Base):
     driver_id = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("drivers.driver_id"),
-        nullable=False,
+        nullable=True,
     )
+    role = mapped_column(user_role_type, nullable=False, server_default="driver")
     created_at = mapped_column(
         DateTime(timezone=True),
         nullable=False,

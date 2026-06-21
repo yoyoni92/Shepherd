@@ -64,7 +64,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       className="bg-raised border-l border-line flex flex-col sticky top-0 h-screen shrink-0 transition-[width] duration-200 ease-out"
       style={{ width: collapsed ? 74 : 244, minWidth: collapsed ? 74 : 244, padding: '16px 14px' }}
     >
-      <div className="flex items-center justify-center px-1.5 mb-3.5" style={{ height: 56 }}>
+      <div className="flex items-center justify-center px-1.5 mb-3.5" style={{ height: collapsed ? 56 : 'auto' }}>
         {collapsed ? (
           <div
             className="flex items-center justify-center shrink-0"
@@ -73,7 +73,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             <Truck size={19} color="#fff" />
           </div>
         ) : (
-          <Image src="/logo.png" alt="Shepherd" width={196} height={107} priority style={{ width: 196, height: 'auto' }} />
+          <Image src="/logo.png" alt="Shepherd" width={196} height={196} priority style={{ width: 196, height: 'auto', borderRadius: 12 }} />
         )}
       </div>
 

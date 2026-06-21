@@ -462,8 +462,11 @@ def get_bot_user_by_chat_id(session: Session, chat_id: int) -> BotUser | None:
     ).scalar_one_or_none()
 
 
-def list_bot_users(session: Session) -> list[BotUser]:
-    return list(session.execute(select(BotUser)).scalars())
+def list_bot_users(session: Session, role: str | None = None) -> list[BotUser]:
+    stmt = select(BotUser)
+    if role is not None:
+        stmt = stmt.where(BotUser.role == role)
+    return list(session.execute(stmt).scalars())
 
 
 def update_bot_user_role(session: Session, user_id: UUID, role: str) -> BotUser | None:
@@ -476,14 +479,18 @@ def update_bot_user_role(session: Session, user_id: UUID, role: str) -> BotUser 
     return user
 
 
-def create_bot_invite(session: Session, driver_id: UUID, token: str) -> BotInviteToken:
+def create_bot_invite(
+    session: Session, driver_id: UUID | None, token: str, role: str = "driver"
+) -> BotInviteToken:
     from datetime import datetime, timezone
-    session.execute(
-        update(BotInviteToken)
-        .where(BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None))
-        .values(expires_at=datetime.now(timezone.utc))
-    )
-    invite = BotInviteToken(token=token, driver_id=driver_id)
+    # Only a driver can have a prior token to invalidate; admin invites have no driver.
+    if driver_id is not None:
+        session.execute(
+            update(BotInviteToken)
+            .where(BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None))
+            .values(expires_at=datetime.now(timezone.utc))
+        )
+    invite = BotInviteToken(token=token, driver_id=driver_id, role=role)
     session.add(invite)
     session.commit()
     session.refresh(invite)
@@ -503,7 +510,7 @@ def claim_bot_invite(session: Session, token: str, telegram_chat_id: int) -> Bot
     if existing is not None:
         session.delete(existing)
         session.flush()
-    user = BotUser(telegram_chat_id=telegram_chat_id, role="driver", driver_id=invite.driver_id)
+    user = BotUser(telegram_chat_id=telegram_chat_id, role=invite.role, driver_id=invite.driver_id)
     session.add(user)
     session.commit()
     session.refresh(user)

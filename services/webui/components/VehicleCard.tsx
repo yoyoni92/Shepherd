@@ -20,11 +20,13 @@ const TYPE_ICON: Record<string, LucideIcon> = {
 export function VehicleCard({
   v,
   driverName,
+  customerName,
   onEdit,
   onRemove,
 }: {
   v: UiVehicle
   driverName?: string
+  customerName?: string
   onEdit: () => void
   onRemove: () => void
 }) {
@@ -76,6 +78,7 @@ export function VehicleCard({
 
       <div className="grid grid-cols-2 mb-3.5" style={{ gap: '11px 14px' }}>
         <Field label="נהג משויך" value={driverName ?? DASH} />
+        <Field label="לקוח" value={customerName ?? DASH} />
         <Field label="טיפול אחרון" value={v.lastService ? fmtDate(v.lastService) : DASH} ltr />
         <div>
           <div className="text-[11px] text-faint mb-0.5">תוקף ביטוח</div>

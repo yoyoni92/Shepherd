@@ -1,5 +1,9 @@
 # Shepherd - one compose, two environments (local dev / strong EC2 demo).
 # Services are added here as they are built (Phase 1+). Postgres is the foundation.
+# Pin the project name so containers/volumes are prefixed `dev-shepherd-` regardless of
+# the (misspelled) directory name, which would otherwise derive `shepard`.
+# This is the local-dev stack; a separate prod overlay would use its own name.
+name: dev-shepherd
 services:
   postgres:
     build:
@@ -211,11 +215,15 @@ services:
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-shepherd}
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-me-32chars}
       N8N_HOST: 0.0.0.0
-      WEBHOOK_URL: ${N8N_PUBLIC_URL:-http://localhost:5678}
+      # Telegram webhooks require HTTPS. The localtunnel sidecar (below) exposes n8n at
+      # https://<subdomain>.loca.lt and n8n auto-registers the bot webhook against this.
+      WEBHOOK_URL: https://${N8N_TUNNEL_SUBDOMAIN:-shepherd-dev-bot}.loca.lt/
       FLEET_API_URL: http://fleet-api:8000
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
+      # The workflow's S3 upload nodes read $env.S3_BUCKET; point it at the accidents bucket.
+      S3_BUCKET: ${S3_BUCKET_ACCIDENTS:-shepherd-accidents}
       S3_BUCKET_ACCIDENTS: ${S3_BUCKET_ACCIDENTS:-shepherd-accidents}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
@@ -236,6 +244,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # Dev-only public HTTPS tunnel so Telegram can reach the n8n webhook (loca.lt, no TLS
+  # setup). The subdomain must be globally unique; change N8N_TUNNEL_SUBDOMAIN to claim
+  # your own. Not for production - swap for Cloudflare Tunnel / Caddy on a real deploy.
+  localtunnel:
+    image: node:lts-alpine
+    command: npx -y localtunnel --port 5678 --local-host n8n --subdomain ${N8N_TUNNEL_SUBDOMAIN:-shepherd-dev-bot}
+    restart: unless-stopped
+    depends_on:
+      n8n:
+        condition: service_healthy
 
   ollama:
     build:

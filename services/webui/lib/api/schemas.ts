@@ -160,8 +160,9 @@ export type BotUserRead = z.infer<typeof BotUserReadSchema>
 
 export const BotInviteReadSchema = z.object({
   token: z.string(),
-  driver_id: z.string(),
+  driver_id: z.string().nullish(),
   driver_name: z.string().nullish(),
+  role: z.enum(['admin', 'driver']),
   expires_at: z.string(),
   created_at: z.string(),
 })

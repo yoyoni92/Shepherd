@@ -14,21 +14,23 @@ import { SortChips, nextDir, type SortState } from '@/components/SortChips'
 import { VehicleCard } from '@/components/VehicleCard'
 import { EntityFormModal, type FieldDef, type FormValues } from '@/components/EntityFormModal'
 
-type VKey = 'plate' | 'title' | 'insurance' | 'license' | 'km'
+type VKey = 'plate' | 'title' | 'insurance' | 'license' | 'km' | 'customer'
 
 const FIELDS: { key: VKey; label: string }[] = [
   { key: 'plate', label: 'לוחית' },
   { key: 'title', label: 'דגם' },
+  { key: 'customer', label: 'לקוח' },
   { key: 'insurance', label: 'ביטוח' },
   { key: 'license', label: 'רישוי' },
   { key: 'km', label: 'ק״מ' },
 ]
 
-const accessor = (v: UiVehicle, key: VKey): string | number => {
+const accessor = (v: UiVehicle, key: VKey, customerById: Record<string, string>): string | number => {
   if (key === 'title') return `${v.make} ${v.model}`
   if (key === 'insurance') return v.insurance ?? ''
   if (key === 'license') return v.licenseValidTo ?? ''
   if (key === 'km') return v.currentKm ?? 0
+  if (key === 'customer') return v.customerId ? (customerById[v.customerId] ?? '') : ''
   return v.plate
 }
 
@@ -85,9 +87,10 @@ export default function VehiclesPage() {
   const { customers } = useCustomers()
   const { types: maintenanceTypes } = useMaintenanceTypes()
   const driverById = Object.fromEntries(drivers.map((d) => [d.id, d.name]))
+  const customerById = Object.fromEntries(customers.map((c) => [c.id, c.name]))
   const [sort, setSort] = useState<SortState<VKey>>({ key: 'plate', dir: 'asc' })
   const [form, setForm] = useState<{ mode: 'add' } | { mode: 'edit'; v: UiVehicle } | null>(null)
-  const sorted = sortItems(vehicles, (v) => accessor(v, sort.key), sort.dir)
+  const sorted = sortItems(vehicles, (v) => accessor(v, sort.key, customerById), sort.dir)
 
   const fields = formFields(
     drivers.map((d) => ({ value: d.id, label: d.name })),
@@ -118,6 +121,7 @@ export default function VehiclesPage() {
             key={v.id}
             v={v}
             driverName={v.driverId ? driverById[v.driverId] : undefined}
+            customerName={v.customerId ? customerById[v.customerId] : undefined}
             onEdit={() => setForm({ mode: 'edit', v })}
             onRemove={() => remove(v.id)}
           />

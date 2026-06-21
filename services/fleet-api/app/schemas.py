@@ -326,11 +326,13 @@ class AttendancePatch(BaseModel):
 class BotWhoamiResponse(BaseModel):
     role: str
     driver_id: UUID | None = None
+    driver_name: str | None = None
     user_id: UUID
 
 
 class BotInviteCreate(BaseModel):
-    driver_id: UUID
+    driver_id: UUID | None = None
+    role: str = "driver"
 
 
 class BotInviteResponse(BaseModel):
@@ -352,8 +354,9 @@ class BotInviteClaimResponse(BaseModel):
 
 class BotInviteRead(BaseModel):
     token: str
-    driver_id: UUID
+    driver_id: UUID | None = None
     driver_name: str | None = None
+    role: str = "driver"
     expires_at: datetime
     created_at: datetime
 

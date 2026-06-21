@@ -20,7 +20,7 @@ function TelegramPanel({ driverId, botUsers }: { driverId: string; botUsers: Bot
   const handleCreate = async () => {
     setLoading(true)
     try {
-      const res = await createBotInvite(driverId)
+      const res = await createBotInvite({ driverId, role: 'driver' })
       setDeepLink(res.deep_link)
     } finally {
       setLoading(false)
