@@ -35,6 +35,13 @@ export function fmtDate(dateStr: string): string {
   return `${p(x.getDate())}/${p(x.getMonth() + 1)}/${x.getFullYear()}`
 }
 
+/** ISO datetime -> DD/MM/YYYY HH:MM (local time, LTR-rendered). */
+export function fmtDateTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 /** Generic immutable sort: case-insensitive for strings, dir asc/desc. */
 export function sortItems<T>(
   items: readonly T[],

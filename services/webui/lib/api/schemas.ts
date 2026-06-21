@@ -221,3 +221,62 @@ export interface UiCustomer {
   email: string | null
   status: 'active' | 'inactive'
 }
+
+export const AccidentAttachmentReadSchema = z.object({
+  attachment_id: z.string(),
+  category: z.string(),
+  file_url: z.string(),
+  uploaded_ts: z.string(),
+})
+
+export const AccidentReadSchema = z.object({
+  accident_id: z.string(),
+  vehicle_id: z.string(),
+  driver_id: z.string().nullish(),
+  datetime: z.string(),
+  location: z.string().nullish(),
+  description: z.string().nullish(),
+  another_driver_licensing_plate: z.string().nullish(),
+  another_driver_phone_number: z.string().nullish(),
+  another_driver_id_number: z.string().nullish(),
+  attachments: z.array(AccidentAttachmentReadSchema),
+})
+
+export type AccidentRead = z.infer<typeof AccidentReadSchema>
+export type AccidentAttachmentRead = z.infer<typeof AccidentAttachmentReadSchema>
+
+export interface UiAccidentAttachment {
+  id: string
+  category: string
+  fileUrl: string
+  uploadedTs: string
+}
+
+export interface UiAccident {
+  id: string
+  vehicleId: string
+  vehiclePlate: string
+  vehicleMake: string
+  vehicleModel: string
+  driverId: string | null
+  driverName: string | null
+  datetime: string
+  location: string | null
+  description: string | null
+  anotherDriverPlate: string | null
+  anotherDriverPhone: string | null
+  anotherDriverIdNumber: string | null
+  attachments: UiAccidentAttachment[]
+}
+
+export interface AccidentCreate {
+  vehicle_id: string
+  driver_id?: string
+  datetime: string
+  location?: string
+  description?: string
+  another_driver_licensing_plate?: string
+  another_driver_phone_number?: string
+  another_driver_id_number?: string
+  attachments: { category: string; file_url: string }[]
+}

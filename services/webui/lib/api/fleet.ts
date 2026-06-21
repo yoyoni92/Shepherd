@@ -12,6 +12,7 @@ import {
   BotUserReadSchema,
   BotInviteReadSchema,
   BotInviteResponseSchema,
+  AccidentReadSchema,
   type VehicleRead,
   type MaintenanceTypeCreate,
   type VehicleCreate,
@@ -24,6 +25,7 @@ import {
   type BotUserRead,
   type BotInviteRead,
   type BotInviteResponse,
+  type AccidentCreate,
 } from './schemas'
 
 // Browser calls the same-origin Next proxy (`app/api/fleet/[...path]`), which injects the
@@ -139,5 +141,10 @@ export const createBotInvite = (
   )
 export const revokeBotInvite = (token: string): Promise<void> =>
   send('DELETE', `/bot-invite/${token}`, undefined)
+
+// Accidents
+export const fetchAccidents = () => get('/accidents', z.array(AccidentReadSchema))
+export const createAccident = (a: AccidentCreate): Promise<{ accident_id: string }> =>
+  send('POST', '/accidents', a, z.object({ accident_id: z.string() }))
 
 export type { VehicleRead, DriverRead, EventRead, ReportRead, BotUserRead, BotInviteRead, BotInviteResponse }

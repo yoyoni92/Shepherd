@@ -3,10 +3,13 @@ import type {
   DriverRead,
   CustomerRead,
   MaintenanceTypeRead,
+  AccidentRead,
   UiVehicle,
   UiDriver,
   UiCustomer,
   UiMaintenanceType,
+  UiAccident,
+  UiAccidentAttachment,
 } from './api/schemas'
 
 /** VehicleRead -> card view model. `driverId` is resolved to a name in the vehicles page. */
@@ -61,5 +64,35 @@ export function toUiDriver(d: DriverRead): UiDriver {
     license: d.license_number ?? '—',
     licExpiry: d.license_valid_to ?? null,
     status: d.status === 'active' ? 'on' : 'off',
+  }
+}
+
+export function toUiAccident(
+  a: AccidentRead,
+  vehicleById: Record<string, UiVehicle>,
+  driverById: Record<string, UiDriver>,
+): UiAccident {
+  const v = vehicleById[a.vehicle_id]
+  const d = a.driver_id ? driverById[a.driver_id] : undefined
+  return {
+    id: a.accident_id,
+    vehicleId: a.vehicle_id,
+    vehiclePlate: v?.plate ?? '—',
+    vehicleMake: v?.make ?? '—',
+    vehicleModel: v?.model ?? '',
+    driverId: a.driver_id ?? null,
+    driverName: d?.name ?? null,
+    datetime: a.datetime,
+    location: a.location ?? null,
+    description: a.description ?? null,
+    anotherDriverPlate: a.another_driver_licensing_plate ?? null,
+    anotherDriverPhone: a.another_driver_phone_number ?? null,
+    anotherDriverIdNumber: a.another_driver_id_number ?? null,
+    attachments: a.attachments.map((att) => ({
+      id: att.attachment_id,
+      category: att.category,
+      fileUrl: att.file_url,
+      uploadedTs: att.uploaded_ts,
+    })),
   }
 }
