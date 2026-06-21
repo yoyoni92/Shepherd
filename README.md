@@ -9,12 +9,11 @@ Design & build plans: [`../plans/`](../plans/README.md) (design) and
 
 ```
 libs/             shared contracts (pydantic models + provider interfaces)
-db/               Postgres schema, migrations, seed           [T1-T5 done]
-services/         fleet-api [done], channel-gateway [done], doc-extractor [done],
-                  image-analyser [done], rag [done], langgraph-agent [done],
-                  guardrails [done], webui [done]
-n8n/              workflow JSON + Code-node units              [planned]
-infra/            docker-compose, env                          [planned]
+db/               Postgres schema, migrations, seed           [migrations 0001-0009]
+services/         fleet-api, channel-gateway, doc-extractor,
+                  image-analyser, rag, langgraph-agent,
+                  guardrails, webui, n8n
+plans/            design & implementation plans
 ```
 
 ## Dev setup
@@ -51,8 +50,18 @@ POST /check/output, prompt log V1-V5 (surface #4), 0% FP on valid fleet set
 (32 tests, 90% coverage).
 
 `services/webui` complete: Next.js 15 + Tailwind + TanStack Query admin console
-(login, KPI dashboard, Fleet Chat, Ollama Assistant, Upload, Config editor, Review Queue).
+(login, KPI dashboard, Fleet Chat, Ollama Assistant, Upload, Config editor, Review Queue,
+Bot Management - invite panel on driver card, bot users table, pending invites).
 DB-blind assistant enforced at network + ESLint module-boundary level.
 Deviation from Gradio/Streamlit noted: modern React SPA satisfies rubric "app.py or equivalent".
 Stack: Next.js App Router, next-auth credentials, Zod, MSW, Vitest + RTL, Playwright e2e.
 Served at port 3000.
+
+`services/n8n` added: invite-only Hebrew Telegram bot (n8nio/n8n, port 5678).
+84-node workflow covers driver flows (clock-in/out, accident protocol, vehicle issue,
+broadcast) and admin flows (attendance, fleet summary, broadcast). Accident flow is
+an 8-step multi-step state machine stored in `bot_sessions`. Access controlled via
+one-time invite tokens (`bot_invite_tokens` table); role management via WebUI.
+New Fleet API endpoints: `GET /whoami`, `POST /bot-invite`, `POST /bot-invite/claim`,
+`PATCH /users/:id/role`. New DB tables: `users`, `bot_invite_tokens`, `bot_sessions`
+(migrations 0008-0009).

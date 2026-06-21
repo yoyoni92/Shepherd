@@ -321,6 +321,56 @@ class AttendancePatch(BaseModel):
     status: str  # present | late | leave | absent
 
 
+# --- Bot users and invites ---
+
+class BotWhoamiResponse(BaseModel):
+    role: str
+    driver_id: UUID | None = None
+    user_id: UUID
+
+
+class BotInviteCreate(BaseModel):
+    driver_id: UUID
+
+
+class BotInviteResponse(BaseModel):
+    token: str
+    deep_link: str
+    expires_at: datetime
+
+
+class BotInviteClaimRequest(BaseModel):
+    token: str
+    telegram_chat_id: int
+
+
+class BotInviteClaimResponse(BaseModel):
+    driver_id: UUID | None = None
+    role: str
+    user_id: UUID
+
+
+class BotInviteRead(BaseModel):
+    token: str
+    driver_id: UUID
+    driver_name: str | None = None
+    expires_at: datetime
+    created_at: datetime
+
+
+class BotUserRead(BaseModel):
+    user_id: UUID
+    telegram_chat_id: int
+    role: str
+    driver_id: UUID | None = None
+    driver_name: str | None = None
+    created_at: datetime
+
+
+class UserRolePatch(BaseModel):
+    role: str
+
+
 # --- KPI daily rollup ---
 
 class KpiDailyRead(BaseModel):

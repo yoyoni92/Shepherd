@@ -9,6 +9,9 @@ import {
   CustomerReadSchema,
   AttendanceRecordReadSchema,
   MaintenanceTypeReadSchema,
+  BotUserReadSchema,
+  BotInviteReadSchema,
+  BotInviteResponseSchema,
   type VehicleRead,
   type MaintenanceTypeCreate,
   type VehicleCreate,
@@ -18,6 +21,9 @@ import {
   type CustomerCreate,
   type EventRead,
   type ReportRead,
+  type BotUserRead,
+  type BotInviteRead,
+  type BotInviteResponse,
 } from './schemas'
 
 // Browser calls the same-origin Next proxy (`app/api/fleet/[...path]`), which injects the
@@ -117,4 +123,14 @@ export async function fetchConfig(): Promise<Record<string, unknown>> {
 export const updateConfig = (key: string, value: unknown) =>
   send('PUT', `/config/${key}`, { config_value: value })
 
-export type { VehicleRead, DriverRead, EventRead, ReportRead }
+// Bot management
+export const getBotUsers = (): Promise<BotUserRead[]> => get('/users', z.array(BotUserReadSchema))
+export const updateBotUserRole = (userId: string, role: 'admin' | 'driver'): Promise<BotUserRead> =>
+  send('PATCH', `/users/${userId}/role`, { role }, BotUserReadSchema)
+export const getBotInvites = (): Promise<BotInviteRead[]> => get('/bot-invite', z.array(BotInviteReadSchema))
+export const createBotInvite = (driverId: string): Promise<BotInviteResponse> =>
+  send('POST', '/bot-invite', { driver_id: driverId }, BotInviteResponseSchema)
+export const revokeBotInvite = (token: string): Promise<void> =>
+  send('DELETE', `/bot-invite/${token}`, undefined)
+
+export type { VehicleRead, DriverRead, EventRead, ReportRead, BotUserRead, BotInviteRead, BotInviteResponse }

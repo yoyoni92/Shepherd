@@ -200,6 +200,43 @@ services:
       retries: 5
       start_period: 30s
 
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-shepherd}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-shepherd}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-shepherd}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-me-32chars}
+      N8N_HOST: 0.0.0.0
+      WEBHOOK_URL: ${N8N_PUBLIC_URL:-http://localhost:5678}
+      FLEET_API_URL: http://fleet-api:8000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
+      S3_BUCKET_ACCIDENTS: ${S3_BUCKET_ACCIDENTS:-shepherd-accidents}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./services/n8n/workflows:/workflows:ro
+    entrypoint: >
+      sh -c "n8n import:workflow --input=/workflows/*.json 2>/dev/null || true && n8n start"
+    depends_on:
+      fleet-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:5678/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   ollama:
     build:
       context: ./services/ollama
@@ -241,3 +278,4 @@ services:
 volumes:
   pgdata:
   ollama_data:
+  n8n_data:

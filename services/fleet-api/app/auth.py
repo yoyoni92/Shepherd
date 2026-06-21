@@ -24,6 +24,8 @@ class Action(str, Enum):
     READ_KPI = "read_kpi"
     MANAGE_ATTENDANCE = "manage_attendance"
     MANAGE_MAINTENANCE_TYPES = "manage_maintenance_types"
+    MANAGE_BOT_USERS = "manage_bot_users"
+    MANAGE_BOT_INVITES = "manage_bot_invites"
 
 
 # {action: {role: ownership_required}}
@@ -46,6 +48,8 @@ _MATRIX: dict[Action, dict[Role, bool | None]] = {
     Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None},
     Action.MANAGE_ATTENDANCE: {Role.admin: False, Role.driver: None,  Role.customer: None},
     Action.MANAGE_MAINTENANCE_TYPES: {Role.admin: False, Role.driver: None,  Role.customer: None},
+    Action.MANAGE_BOT_USERS:         {Role.admin: False, Role.driver: None,  Role.customer: None},
+    Action.MANAGE_BOT_INVITES:       {Role.admin: False, Role.driver: None,  Role.customer: None},
 }
 
 

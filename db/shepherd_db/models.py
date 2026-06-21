@@ -3,6 +3,7 @@
 import enum
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -49,6 +50,8 @@ class AccidentAttachmentCategoryEnum(str, enum.Enum):
     photo_our_vehicle = "photo_our_vehicle"
     photo_other_vehicle = "photo_other_vehicle"
     photo_accident_area = "photo_accident_area"
+    another_driver_license = "another_driver_license"
+    accident_video = "accident_video"
 
 
 class TicketTypeEnum(str, enum.Enum):
@@ -115,6 +118,11 @@ class VehicleTypeEnum(str, enum.Enum):
     van = "van"
     bus = "bus"
     truck = "truck"
+
+
+class UserRoleEnum(str, enum.Enum):
+    admin = "admin"
+    driver = "driver"
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +202,11 @@ attendance_status_type = SAEnum(
 vehicle_type_type = SAEnum(
     VehicleTypeEnum,
     name="vehicle_type_enum",
+    create_type=False,
+)
+user_role_type = SAEnum(
+    UserRoleEnum,
+    name="user_role_enum",
     create_type=False,
 )
 
@@ -604,3 +617,63 @@ class ChannelIdentity(Base):
     )
 
     __table_args__ = (UniqueConstraint("channel", "external_id"),)
+
+
+class BotInviteToken(Base):
+    __tablename__ = "bot_invite_tokens"
+
+    token = mapped_column(Text, primary_key=True)
+    driver_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("drivers.driver_id"),
+        nullable=False,
+    )
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    expires_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now() + INTERVAL '7 days'"),
+    )
+    used_at = mapped_column(DateTime(timezone=True), nullable=True)
+
+    driver = relationship("Driver", foreign_keys=[driver_id])
+
+
+class BotUser(Base):
+    __tablename__ = "users"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    telegram_chat_id = mapped_column(BigInteger, nullable=False, unique=True)
+    role = mapped_column(user_role_type, nullable=False, server_default="driver")
+    driver_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("drivers.driver_id"),
+        nullable=True,
+    )
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+    driver = relationship("Driver", foreign_keys=[driver_id])
+
+
+class BotSession(Base):
+    __tablename__ = "bot_sessions"
+
+    chat_id = mapped_column(BigInteger, primary_key=True)
+    state = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )

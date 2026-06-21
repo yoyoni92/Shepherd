@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Activity,
   LogOut,
+  Bot,
   type LucideIcon,
 } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
   { href: '/customers', label: 'לקוחות', Icon: Building2, badge: 'customers' },
   { href: '/events', label: 'משימות', Icon: TriangleAlert, badge: 'events' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
+  { href: '/bot', label: 'ניהול בוט', Icon: Bot },
   { href: '/maintenance-types', label: 'סוגי טיפול', Icon: Wrench },
   { href: '/config', label: 'הגדרות', Icon: Settings },
   { href: '/health', label: 'מצב מערכת', Icon: Activity, statusDot: true },

@@ -1,0 +1,1593 @@
+{
+  "name": "Shepherd Telegram Bot",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 300],
+      "parameters": {
+        "updates": ["*"]
+      },
+      "credentials": {
+        "telegramApi": { "id": "1", "name": "Shepherd Telegram Bot" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Code: Normalize Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst msg = body.message || body.callback_query?.message;\nconst chatId = msg?.chat?.id || body.callback_query?.from?.id;\nconst isCallback = !!body.callback_query;\nconst callbackData = body.callback_query?.data || null;\nconst callbackQueryId = body.callback_query?.id || null;\nconst text = body.message?.text || null;\nconst video = body.message?.video || null;\nconst photo = body.message?.photo || null;\nconst messageId = msg?.message_id || null;\nconst startToken = text?.startsWith('/start ') ? text.slice(7).trim() : null;\nconst isStart = text === '/start' || !!startToken;\n\nreturn [{ json: { chatId, isCallback, callbackData, callbackQueryId, text, video, photo: photo ? photo[photo.length - 1] : null, messageId, startToken, isStart } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "HTTP: GET whoami",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/whoami?chat_id={{ $json.chatId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "{\"role\":\"admin\"}" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Code: Merge whoami",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300],
+      "parameters": {
+        "jsCode": "const normalized = $('Code: Normalize Update').first().json;\nconst whoamiRaw = $input.first().json;\nconst whoamiStatus = $input.first().json.$response?.statusCode || 200;\nconst whoami = (whoamiStatus === 200 && whoamiRaw && !whoamiRaw.error) ? whoamiRaw : null;\nreturn [{ json: { ...normalized, whoami, whoamiStatus } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "Postgres: Read Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1000, 300],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT state FROM bot_sessions WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Normalize Update').first().json.chatId]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "Code: Route Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Merge whoami').first().json;\nconst sessionRows = $input.all();\nconst sessionState = (sessionRows && sessionRows.length > 0 && sessionRows[0].json && sessionRows[0].json.state) ? sessionRows[0].json.state : {};\nconst state = (typeof sessionState === 'string') ? JSON.parse(sessionState) : (sessionState || {});\n\nconst { chatId, isCallback, callbackData, text, video, photo, startToken, isStart, whoami } = ctx;\n\nlet route;\n\nif (!whoami || whoami.error || whoami.detail === 'Not found') {\n  route = startToken ? 'unknown_with_token' : 'unknown_no_token';\n} else if (state && state.flow) {\n  route = 'active_flow';\n} else if (isCallback) {\n  const map = {\n    clock_in: 'cmd_clock_in',\n    clock_out: 'cmd_clock_out',\n    accident_start: 'cmd_accident',\n    vehicle_issue: 'cmd_vehicle_issue',\n    update_details: 'cmd_update_details',\n    attendance_csv: 'cmd_attendance_csv',\n    my_vehicle: 'cmd_my_vehicle',\n    admin_attendance: 'cmd_admin_attendance',\n    admin_broadcast: 'cmd_admin_broadcast',\n    admin_summary: 'cmd_admin_summary',\n    admin_maintenance: 'cmd_admin_maintenance',\n  };\n  route = map[callbackData] || (whoami.role === 'admin' ? 'admin_main' : 'driver_main');\n} else if (isStart) {\n  route = whoami.role === 'admin' ? 'admin_main' : 'driver_main';\n} else {\n  route = whoami.role === 'admin' ? 'admin_main' : 'driver_main';\n}\n\nreturn [{ json: { ...ctx, sessionState: state, route } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0007-0007-0007-000000000007",
+      "name": "Switch: Main Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1500, 300],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "unknown_with_token", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "0", "renameOutput": true, "outputKeyName": "unknown_with_token" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "unknown_no_token", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "1", "renameOutput": true, "outputKeyName": "unknown_no_token" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "active_flow", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "2", "renameOutput": true, "outputKeyName": "active_flow" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "driver_main", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "3", "renameOutput": true, "outputKeyName": "driver_main" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "admin_main", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "4", "renameOutput": true, "outputKeyName": "admin_main" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_clock_in", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "5", "renameOutput": true, "outputKeyName": "cmd_clock_in" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_clock_out", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "6", "renameOutput": true, "outputKeyName": "cmd_clock_out" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_accident", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "7", "renameOutput": true, "outputKeyName": "cmd_accident" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_attendance_csv", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "8", "renameOutput": true, "outputKeyName": "cmd_attendance_csv" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_my_vehicle", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "9", "renameOutput": true, "outputKeyName": "cmd_my_vehicle" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_admin_attendance", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "10", "renameOutput": true, "outputKeyName": "cmd_admin_attendance" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_admin_broadcast", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "11", "renameOutput": true, "outputKeyName": "cmd_admin_broadcast" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_admin_summary", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "12", "renameOutput": true, "outputKeyName": "cmd_admin_summary" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.route }}", "rightValue": "cmd_admin_maintenance", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "13", "renameOutput": true, "outputKeyName": "cmd_admin_maintenance" }
+          ]
+        },
+        "fallbackOutput": "none"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "HTTP: Claim Invite Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLEET_API_URL }}/bot-invite/claim",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "{\"role\":\"admin\"}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ token: $json.startToken, telegram_chat_id: String($json.chatId) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0011-0011-0011-000000000011",
+      "name": "Code: Check Claim Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 0],
+      "parameters": {
+        "jsCode": "const claimResult = $input.first().json;\nconst ctx = $('Switch: Main Router').first().json;\nconst status = claimResult.$response?.statusCode || 200;\nconst success = status >= 200 && status < 300;\nreturn [{ json: { ...ctx, claimSuccess: success } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0012-0012-0012-000000000012",
+      "name": "Switch: Claim OK?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [2300, 0],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.claimSuccess }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }, "outputKey": "0", "renameOutput": true, "outputKeyName": "success" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.claimSuccess }}", "rightValue": false, "operator": { "type": "boolean", "operation": "false" } }] }, "outputKey": "1", "renameOutput": true, "outputKeyName": "failure" }
+          ]
+        },
+        "fallbackOutput": "none"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0013-0013-0013-000000000013",
+      "name": "HTTP: Send Driver Menu After Claim",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, -60],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '🎉 ברוך הבא למערכת Shepard!\\n\\n🚗 ניהול נהג - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [ [{text:'⏱ כניסה לעבודה', callback_data:'clock_in'},{text:'🚪 יציאה מעבודה', callback_data:'clock_out'}], [{text:'🔧 דיווח תקלה', callback_data:'vehicle_issue'},{text:'🚨 דיווח תאונה', callback_data:'accident_start'}], [{text:'✏️ עדכון פרטים', callback_data:'update_details'},{text:'📊 דוח נוכחות', callback_data:'attendance_csv'}], [{text:'🚗 הרכב שלי', callback_data:'my_vehicle'}] ] } }) }}"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0014-0014-0014-000000000014",
+      "name": "HTTP: Send Invalid Token Msg",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 60],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '❌ הקישור אינו תקף או שפג תוקפו.\\nפנה/י למנהל לקבלת קישור חדש.', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0020-0020-0020-000000000020",
+      "name": "HTTP: Send Access Denied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 120],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: 'הגישה למערכת מוגבלת. 🔒\\nלקבלת גישה פנה/י למנהל שלך.', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0030-0030-0030-000000000030",
+      "name": "HTTP: Send Driver Main Menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '🚗 ניהול נהג - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [ [{text:'⏱ כניסה לעבודה', callback_data:'clock_in'},{text:'🚪 יציאה מעבודה', callback_data:'clock_out'}], [{text:'🔧 דיווח תקלה', callback_data:'vehicle_issue'},{text:'🚨 דיווח תאונה', callback_data:'accident_start'}], [{text:'✏️ עדכון פרטים', callback_data:'update_details'},{text:'📊 דוח נוכחות', callback_data:'attendance_csv'}], [{text:'🚗 הרכב שלי', callback_data:'my_vehicle'}] ] } }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0040-0040-0040-000000000040",
+      "name": "HTTP: Send Admin Main Menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '⚙️ פאנל ניהול - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [ [{text:'👥 נוכחות היום', callback_data:'admin_attendance'},{text:'📢 שידור הודעה', callback_data:'admin_broadcast'}], [{text:'🚗 סיכום צי', callback_data:'admin_summary'},{text:'✏️ עדכון נהג', callback_data:'admin_update_driver'}], [{text:'🔧 תחזוקה', callback_data:'admin_maintenance'}] ] } }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0050-0050-0050-000000000050",
+      "name": "Code: Clock In Time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 540],
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\nconst now = new Date();\nconst israelOffset = 3 * 60;\nconst israelTime = new Date(now.getTime() + israelOffset * 60000);\nconst hh = String(israelTime.getUTCHours()).padStart(2, '0');\nconst mm = String(israelTime.getUTCMinutes()).padStart(2, '0');\nconst timeStr = `${hh}:${mm}`;\nconst dateStr = israelTime.toISOString().slice(0, 10);\nreturn [{ json: { ...ctx, clockTime: timeStr, workDate: dateStr } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0051-0051-0051-000000000051",
+      "name": "Postgres: Upsert Clock In",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2050, 540],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO attendance_records (driver_id, work_date, clock_in, status) VALUES ($1, $2, $3, 'present') ON CONFLICT (driver_id, work_date) DO UPDATE SET clock_in = EXCLUDED.clock_in WHERE attendance_records.clock_in IS NULL",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.whoami.driver_id, $json.workDate, $json.clockTime]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0052-0052-0052-000000000052",
+      "name": "HTTP: Send Clock In Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 540],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Clock In Time').first().json.chatId, text: `✅ כניסה נרשמה בהצלחה בשעה ${$('Code: Clock In Time').first().json.clockTime}.`, parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0060-0060-0060-000000000060",
+      "name": "Code: Clock Out Time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 660],
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\nconst now = new Date();\nconst israelOffset = 3 * 60;\nconst israelTime = new Date(now.getTime() + israelOffset * 60000);\nconst hh = String(israelTime.getUTCHours()).padStart(2, '0');\nconst mm = String(israelTime.getUTCMinutes()).padStart(2, '0');\nconst timeStr = `${hh}:${mm}`;\nconst dateStr = israelTime.toISOString().slice(0, 10);\nreturn [{ json: { ...ctx, clockTime: timeStr, workDate: dateStr } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0061-0061-0061-000000000061",
+      "name": "Postgres: Update Clock Out",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2050, 660],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE attendance_records SET clock_out = $3 WHERE driver_id = $1 AND work_date = $2 AND clock_in IS NOT NULL AND clock_out IS NULL",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.whoami.driver_id, $json.workDate, $json.clockTime]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0062-0062-0062-000000000062",
+      "name": "HTTP: Send Clock Out Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 660],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Clock Out Time').first().json.chatId, text: '✅ יציאה נרשמה.', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0070-0070-0070-000000000070",
+      "name": "HTTP: GET Driver Vehicle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 780],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/vehicles?driver_id={{ $json.whoami.driver_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "{\"role\":\"admin\"}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0071-0071-0071-000000000071",
+      "name": "Code: Start Accident Flow",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 780],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Main Router').item.json;\nconst vehicleResult = $input.first().json;\nconst vehicles = Array.isArray(vehicleResult) ? vehicleResult : (vehicleResult.items || [vehicleResult]);\nconst vehicle = vehicles[0];\nif (!vehicle || !vehicle.vehicle_id) {\n  return [{ json: { ...ctx, errorMsg: 'לא נמצא רכב משויך לחשבונך.' } }];\n}\nconst now = new Date();\nconst israelOffset = 3 * 60;\nconst israelTime = new Date(now.getTime() + israelOffset * 60000);\nconst datetimeStr = israelTime.toISOString().replace('T', ' ').slice(0, 16);\nreturn [{ json: { ...ctx, vehicleId: vehicle.vehicle_id, accidentDatetime: datetimeStr, hasVehicle: true } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0072-0072-0072-000000000072",
+      "name": "Postgres: Save Accident Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2300, 780],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state = $2::jsonb, updated_at = NOW()",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({flow:'accident', step:'awaiting_safe', vehicleId: $json.vehicleId, accidentDatetime: $json.accidentDatetime, attachments:[]})]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0073-0073-0073-000000000073",
+      "name": "HTTP: Send Accident Step 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 780],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Start Accident Flow').first().json.chatId, text: '🚨 דיווח תאונה\\n\\nקודם כל - תירגע/י. 🫁\\nשתה/י מים, נשום/י עמוק.\\n\\n📍 עצור/י במקום בטוח בצד הדרך.\\n🚫 אל תזיז/י את הרכב עדיין!\\n\\nכשאת/ה במקום בטוח ועצרת, לחץ/י להמשך:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ אני במקום בטוח ועצרתי', callback_data:'accident_safe'}]] } }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0080-0080-0080-000000000080",
+      "name": "Code: Active Flow Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 900],
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\nconst state = ctx.sessionState || {};\nconst flow = state.flow || '';\nconst step = state.step || '';\nconst callbackData = ctx.callbackData || '';\nconst hasVideo = !!ctx.video;\nconst hasPhoto = !!ctx.photo;\nconst hasText = !!ctx.text;\n\nlet activeRoute = 'unknown_active';\n\nif (flow === 'accident') {\n  if (step === 'awaiting_safe' && callbackData === 'accident_safe') activeRoute = 'accident_safe';\n  else if (step === 'awaiting_video' && hasVideo) activeRoute = 'accident_video';\n  else if (step === 'awaiting_vehicle_clear' && callbackData === 'accident_road_clear') activeRoute = 'accident_road_clear';\n  else if (step === 'awaiting_insurance_photo' && hasPhoto) activeRoute = 'accident_insurance_photo';\n  else if (step === 'awaiting_driver_license_photo' && hasPhoto) activeRoute = 'accident_driver_license';\n  else if (step === 'awaiting_car_license_photo' && hasPhoto) activeRoute = 'accident_car_license';\n  else if (step === 'awaiting_manager_call' && callbackData === 'accident_manager_called') activeRoute = 'accident_complete';\n  else activeRoute = 'accident_wait';\n} else if (flow === 'broadcast') {\n  if (step === 'awaiting_message' && hasText) activeRoute = 'broadcast_message';\n  else if (step === 'awaiting_confirm' && callbackData === 'broadcast_confirm') activeRoute = 'broadcast_confirm';\n  else if (step === 'awaiting_confirm' && callbackData === 'broadcast_cancel') activeRoute = 'broadcast_cancel';\n  else activeRoute = 'broadcast_wait';\n}\n\nreturn [{ json: { ...ctx, activeRoute } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0081-0081-0081-000000000081",
+      "name": "Switch: Active Flow Routes",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [2050, 900],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_safe", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "0", "renameOutput": true, "outputKeyName": "accident_safe" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_video", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "1", "renameOutput": true, "outputKeyName": "accident_video" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_road_clear", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "2", "renameOutput": true, "outputKeyName": "accident_road_clear" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_insurance_photo", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "3", "renameOutput": true, "outputKeyName": "accident_insurance_photo" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_driver_license", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "4", "renameOutput": true, "outputKeyName": "accident_driver_license" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_car_license", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "5", "renameOutput": true, "outputKeyName": "accident_car_license" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "accident_complete", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "6", "renameOutput": true, "outputKeyName": "accident_complete" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "broadcast_message", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "7", "renameOutput": true, "outputKeyName": "broadcast_message" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "broadcast_confirm", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "8", "renameOutput": true, "outputKeyName": "broadcast_confirm" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "combinator": "and", "conditions": [{ "leftValue": "={{ $json.activeRoute }}", "rightValue": "broadcast_cancel", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "9", "renameOutput": true, "outputKeyName": "broadcast_cancel" }
+          ]
+        },
+        "fallbackOutput": "none"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0090-0090-0090-000000000090",
+      "name": "Postgres: Accident Safe - Update Step",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2300, 840],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = state || $2::jsonb, updated_at = NOW() WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({step:'awaiting_video'})]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0091-0091-0091-000000000091",
+      "name": "HTTP: Send Awaiting Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 840],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Switch: Active Flow Routes').item.json.chatId, text: '📹 כעת צלם/י סרטון של האירוע.\\n\\nבסרטון:\\n- הסבר/י מה קרה בתאונה\\n- הראה/י את אזור התאונה\\n- הראה/י את כל הרכבים המעורבים\\n- הראה/י את הנזק לרכב שלך\\n\\nשלח/י את הסרטון כאן:', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0100-0100-0100-000000000100",
+      "name": "Code: Handle Accident Video",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 960],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst state = ctx.sessionState || {};\nconst fileId = ctx.video?.file_id;\nreturn [{ json: { ...ctx, fileId, category: 'accident_video', nextStep: 'awaiting_vehicle_clear', fileExt: 'mp4' } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0101-0101-0101-000000000101",
+      "name": "HTTP: TG GetFile Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 960],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/getFile?file_id={{ $json.fileId }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0102-0102-0102-000000000102",
+      "name": "Code: Build S3 Key Video",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2800, 960],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Handle Accident Video').first().json;\nconst fileResult = $input.first().json;\nconst filePath = fileResult.result?.file_path || fileResult.file_path;\nconst ext = ctx.fileExt || filePath.split('.').pop();\nconst state = ctx.sessionState || {};\nconst s3Key = `accidents/${ctx.chatId}/${ctx.category}.${ext}`;\nconst tgFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`;\nconst s3Bucket = process.env.S3_BUCKET || 'shepard-media';\nconst s3Region = process.env.AWS_REGION || 'us-east-1';\nconst fileUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;\nreturn [{ json: { ...ctx, filePath, s3Key, tgFileUrl, fileUrl, s3Bucket, s3Region } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0103-0103-0103-000000000103",
+      "name": "HTTP: Download TG File Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 960],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.tgFileUrl }}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0104-0104-0104-000000000104",
+      "name": "HTTP: S3 Upload Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 960],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $('Code: Build S3 Key Video').first().json.s3Bucket }}.s3.{{ $('Code: Build S3 Key Video').first().json.s3Region }}.amazonaws.com/{{ $('Code: Build S3 Key Video').first().json.s3Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "video/mp4" }]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "response": { "response": { "neverError": true } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0105-0105-0105-000000000105",
+      "name": "Postgres: Save Video Attachment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3550, 960],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_vehicle_clear\"') || jsonb_build_object('attachments', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3))), updated_at = NOW() WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Handle Accident Video').first().json.chatId, $('Code: Handle Accident Video').first().json.category, $('Code: Build S3 Key Video').first().json.fileUrl]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0106-0106-0106-000000000106",
+      "name": "HTTP: Send Awaiting Road Clear",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3800, 960],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Accident Video').first().json.chatId, text: '✅ הסרטון התקבל.\\n\\n🚗 כעת פנה/י את הכביש בצורה בטוחה\\n   והזז/י את הרכב לצד.\\n\\nכשהכביש פנוי:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ הכביש פנוי', callback_data:'accident_road_clear'}]] } }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0110-0110-0110-000000000110",
+      "name": "Postgres: Accident Road Clear Step",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2300, 1080],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_insurance_photo\"'), updated_at = NOW() WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0111-0111-0111-000000000111",
+      "name": "HTTP: Send Awaiting Insurance Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 1080],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Switch: Active Flow Routes').item.json.chatId, text: '📸 צלם/י את מסמך הביטוח של הצד השני', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0120-0120-0120-000000000120",
+      "name": "Code: Handle Insurance Photo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 1200],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst fileId = ctx.photo?.file_id;\nreturn [{ json: { ...ctx, fileId, category: 'another_driver_insurance', nextStep: 'awaiting_driver_license_photo', fileExt: 'jpg' } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0121-0121-0121-000000000121",
+      "name": "HTTP: TG GetFile Insurance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 1200],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/getFile?file_id={{ $json.fileId }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0122-0122-0122-000000000122",
+      "name": "Code: Build S3 Key Insurance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2800, 1200],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Handle Insurance Photo').first().json;\nconst fileResult = $input.first().json;\nconst filePath = fileResult.result?.file_path || fileResult.file_path;\nconst ext = filePath.split('.').pop() || 'jpg';\nconst s3Key = `accidents/${ctx.chatId}/${ctx.category}.${ext}`;\nconst tgFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`;\nconst s3Bucket = process.env.S3_BUCKET || 'shepard-media';\nconst s3Region = process.env.AWS_REGION || 'us-east-1';\nconst fileUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;\nreturn [{ json: { ...ctx, filePath, s3Key, tgFileUrl, fileUrl, s3Bucket, s3Region } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0123-0123-0123-000000000123",
+      "name": "HTTP: Download TG File Insurance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 1200],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.tgFileUrl }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0124-0124-0124-000000000124",
+      "name": "HTTP: S3 Upload Insurance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 1200],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $('Code: Build S3 Key Insurance').first().json.s3Bucket }}.s3.{{ $('Code: Build S3 Key Insurance').first().json.s3Region }}.amazonaws.com/{{ $('Code: Build S3 Key Insurance').first().json.s3Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "image/jpeg" }]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": { "response": { "response": { "neverError": true } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0125-0125-0125-000000000125",
+      "name": "Postgres: Save Insurance Attachment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3550, 1200],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_driver_license_photo\"') || jsonb_build_object('attachments', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3))), updated_at = NOW() WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Handle Insurance Photo').first().json.chatId, $('Code: Handle Insurance Photo').first().json.category, $('Code: Build S3 Key Insurance').first().json.fileUrl]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0126-0126-0126-000000000126",
+      "name": "HTTP: Send Awaiting Driver License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3800, 1200],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Insurance Photo').first().json.chatId, text: '📸 צלם/י את רישיון הנהיגה של הצד השני', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0130-0130-0130-000000000130",
+      "name": "Code: Handle Driver License Photo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 1320],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst fileId = ctx.photo?.file_id;\nreturn [{ json: { ...ctx, fileId, category: 'another_driver_license', nextStep: 'awaiting_car_license_photo', fileExt: 'jpg' } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0131-0131-0131-000000000131",
+      "name": "HTTP: TG GetFile Driver License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 1320],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/getFile?file_id={{ $json.fileId }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0132-0132-0132-000000000132",
+      "name": "Code: Build S3 Key Driver License",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2800, 1320],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Handle Driver License Photo').first().json;\nconst fileResult = $input.first().json;\nconst filePath = fileResult.result?.file_path || fileResult.file_path;\nconst ext = filePath.split('.').pop() || 'jpg';\nconst s3Key = `accidents/${ctx.chatId}/${ctx.category}.${ext}`;\nconst tgFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`;\nconst s3Bucket = process.env.S3_BUCKET || 'shepard-media';\nconst s3Region = process.env.AWS_REGION || 'us-east-1';\nconst fileUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;\nreturn [{ json: { ...ctx, filePath, s3Key, tgFileUrl, fileUrl, s3Bucket, s3Region } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0133-0133-0133-000000000133",
+      "name": "HTTP: Download TG File Driver License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 1320],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.tgFileUrl }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0134-0134-0134-000000000134",
+      "name": "HTTP: S3 Upload Driver License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 1320],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $('Code: Build S3 Key Driver License').first().json.s3Bucket }}.s3.{{ $('Code: Build S3 Key Driver License').first().json.s3Region }}.amazonaws.com/{{ $('Code: Build S3 Key Driver License').first().json.s3Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "image/jpeg" }]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": { "response": { "response": { "neverError": true } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0135-0135-0135-000000000135",
+      "name": "Postgres: Save Driver License Attachment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3550, 1320],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_car_license_photo\"') || jsonb_build_object('attachments', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3))), updated_at = NOW() WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Handle Driver License Photo').first().json.chatId, $('Code: Handle Driver License Photo').first().json.category, $('Code: Build S3 Key Driver License').first().json.fileUrl]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0136-0136-0136-000000000136",
+      "name": "HTTP: Send Awaiting Car License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3800, 1320],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Driver License Photo').first().json.chatId, text: '📸 צלם/י את רישיון הרכב של הצד השני', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0140-0140-0140-000000000140",
+      "name": "Code: Handle Car License Photo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 1440],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst fileId = ctx.photo?.file_id;\nreturn [{ json: { ...ctx, fileId, category: 'another_car_registration', nextStep: 'awaiting_manager_call', fileExt: 'jpg' } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0141-0141-0141-000000000141",
+      "name": "HTTP: TG GetFile Car License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 1440],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/getFile?file_id={{ $json.fileId }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0142-0142-0142-000000000142",
+      "name": "Code: Build S3 Key Car License",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2800, 1440],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Handle Car License Photo').first().json;\nconst fileResult = $input.first().json;\nconst filePath = fileResult.result?.file_path || fileResult.file_path;\nconst ext = filePath.split('.').pop() || 'jpg';\nconst s3Key = `accidents/${ctx.chatId}/${ctx.category}.${ext}`;\nconst tgFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`;\nconst s3Bucket = process.env.S3_BUCKET || 'shepard-media';\nconst s3Region = process.env.AWS_REGION || 'us-east-1';\nconst fileUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;\nreturn [{ json: { ...ctx, filePath, s3Key, tgFileUrl, fileUrl, s3Bucket, s3Region } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0143-0143-0143-000000000143",
+      "name": "HTTP: Download TG File Car License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 1440],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.tgFileUrl }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0144-0144-0144-000000000144",
+      "name": "HTTP: S3 Upload Car License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 1440],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://{{ $('Code: Build S3 Key Car License').first().json.s3Bucket }}.s3.{{ $('Code: Build S3 Key Car License').first().json.s3Region }}.amazonaws.com/{{ $('Code: Build S3 Key Car License').first().json.s3Key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "image/jpeg" }]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": { "response": { "response": { "neverError": true } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0145-0145-0145-000000000145",
+      "name": "Postgres: Save Car License and Submit Accident",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3550, 1440],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = jsonb_set( jsonb_set(state, '{step}', '\"awaiting_manager_call\"'), '{attachments}', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3)) ), updated_at = NOW() WHERE chat_id = $1 RETURNING state",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Handle Car License Photo').first().json.chatId, $('Code: Handle Car License Photo').first().json.category, $('Code: Build S3 Key Car License').first().json.fileUrl]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0146-0146-0146-000000000146",
+      "name": "Code: Prepare Accident POST",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3800, 1440],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Handle Car License Photo').first().json;\nconst stateRow = $input.first().json;\nconst state = (typeof stateRow.state === 'string') ? JSON.parse(stateRow.state) : stateRow.state;\nconst now = new Date();\nconst israelOffset = 3 * 60;\nconst israelTime = new Date(now.getTime() + israelOffset * 60000);\nconst datetimeStr = israelTime.toISOString();\nreturn [{ json: { ...ctx, accidentPayload: { vehicle_id: state.vehicleId || ctx.sessionState?.vehicleId, datetime: state.accidentDatetime || datetimeStr, location: null, description: null, attachments: state.attachments || [] } } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0147-0147-0147-000000000147",
+      "name": "HTTP: POST Create Accident",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4050, 1440],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLEET_API_URL }}/accidents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "={{ JSON.stringify({role: 'driver', driver_id: $('Switch: Active Flow Routes').item.json.whoami?.driver_id}) }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($('Code: Prepare Accident POST').first().json.accidentPayload) }}",
+        "options": { "response": { "response": { "neverError": true, "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0148-0148-0148-000000000148",
+      "name": "HTTP: Send Awaiting Manager Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4300, 1440],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Car License Photo').first().json.chatId, text: '📞 צור/י קשר עם המנהל שלך עכשיו\\n   ופעל/י לפי הנחיותיו.\\n\\nכשסיימת לדבר:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ דיברתי עם המנהל', callback_data:'accident_manager_called'}]] } }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0150-0150-0150-000000000150",
+      "name": "Postgres: Clear Accident Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2300, 1560],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0151-0151-0151-000000000151",
+      "name": "HTTP: Send Accident Complete to Driver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 1560],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Switch: Active Flow Routes').item.json.chatId, text: '✅ דיווח התאונה הושלם.\\nהמנהלים קיבלו עדכון.', parse_mode: 'HTML' }) }}"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0152-0152-0152-000000000152",
+      "name": "HTTP: GET Admins for Accident Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2800, 1560],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/users?role=admin",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "{\"role\":\"admin\"}" }
+          ]
+        },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0153-0153-0153-000000000153",
+      "name": "Code: Notify Admins Accident",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3050, 1560],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst adminsResult = $input.first().json;\nconst admins = Array.isArray(adminsResult) ? adminsResult : (adminsResult.items || []);\nconst now = new Date();\nconst israelOffset = 3 * 60;\nconst israelTime = new Date(now.getTime() + israelOffset * 60000);\nconst datetimeStr = israelTime.toISOString().replace('T', ' ').slice(0, 16);\nconst driverName = ctx.whoami?.full_name || ctx.whoami?.name || 'לא ידוע';\nconst notifications = admins.filter(a => a.telegram_chat_id).map(a => ({\n  chat_id: a.telegram_chat_id,\n  text: `🚨 דיווח תאונה חדש\\n\\nנהג: ${driverName}\\nזמן: ${datetimeStr}`,\n  parse_mode: 'HTML'\n}));\nreturn notifications.map(n => ({ json: { notification: n, token: process.env.TELEGRAM_BOT_TOKEN } }));"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0154-0154-0154-000000000154",
+      "name": "HTTP: Send Accident Notify to Each Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 1560],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json.notification) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0160-0160-0160-000000000160",
+      "name": "Postgres: Get Attendance Today",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1800, 1680],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT d.full_name, a.clock_in, a.clock_out FROM attendance_records a JOIN drivers d ON d.driver_id = a.driver_id WHERE a.work_date = CURRENT_DATE ORDER BY a.clock_in",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0161-0161-0161-000000000161",
+      "name": "Code: Format Attendance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 1680],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Main Router').item.json;\nconst rows = $input.all().map(i => i.json);\nlet lines = ['👥 נוכחות היום\\n━━━━━━━━━━━━━━━━'];\nif (rows.length === 0) {\n  lines.push('אין נתוני נוכחות להיום.');\n} else {\n  rows.forEach(r => {\n    const clockIn = r.clock_in || '--:--';\n    const clockOut = r.clock_out || null;\n    const indicator = clockOut ? '✅' : '⏳';\n    const outStr = clockOut ? ` - ${clockOut}` : '';\n    lines.push(`${indicator} ${r.full_name}: ${clockIn}${outStr}`);\n  });\n}\nreturn [{ json: { ...ctx, attendanceText: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0162-0162-0162-000000000162",
+      "name": "HTTP: Send Attendance Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 1680],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.attendanceText, parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0170-0170-0170-000000000170",
+      "name": "HTTP: GET Fleet KPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 1800],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/kpi/latest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "{\"role\":\"admin\"}" }
+          ]
+        },
+        "options": { "response": { "response": { "neverError": true, "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0171-0171-0171-000000000171",
+      "name": "Code: Format Fleet Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 1800],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Main Router').item.json;\nconst kpi = $input.first().json;\nconst activeDrivers = kpi.active_drivers ?? kpi.drivers_clocked_in ?? 'N/A';\nconst activeVehicles = kpi.active_vehicles ?? kpi.vehicles_in_use ?? 'N/A';\nconst text = `🚗 סיכום צי\\n━━━━━━━━━━━━━━━━\\n\\nנהגים מחוברים: ${activeDrivers}\\nרכבים פעילים: ${activeVehicles}`;\nreturn [{ json: { ...ctx, summaryText: text } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0172-0172-0172-000000000172",
+      "name": "HTTP: Send Fleet Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 1800],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.summaryText, parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0180-0180-0180-000000000180",
+      "name": "Postgres: Set Broadcast Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1800, 1920],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state = $2::jsonb, updated_at = NOW()",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({flow:'broadcast', step:'awaiting_message'})]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0181-0181-0181-000000000181",
+      "name": "HTTP: Send Broadcast Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 1920],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Switch: Main Router').item.json.chatId, text: 'הקלד/י את ההודעה לשליחה לכל הנהגים:', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0190-0190-0190-000000000190",
+      "name": "HTTP: GET Drivers for Broadcast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 2040],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/users?role=driver",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}" },
+            { "name": "X-Caller-Context", "value": "{\"role\":\"admin\"}" }
+          ]
+        },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0191-0191-0191-000000000191",
+      "name": "Code: Prepare Broadcast Confirm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2550, 2040],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst driversResult = $input.first().json;\nconst drivers = Array.isArray(driversResult) ? driversResult : (driversResult.items || []);\nconst withChat = drivers.filter(d => d.telegram_chat_id);\nconst count = withChat.length;\nconst broadcastMsg = ctx.text;\nreturn [{ json: { ...ctx, broadcastMsg, driverCount: count, drivers: withChat } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0192-0192-0192-000000000192",
+      "name": "Postgres: Save Broadcast State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2800, 2040],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bot_sessions SET state = $2::jsonb, updated_at = NOW() WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({flow:'broadcast', step:'awaiting_confirm', message: $json.broadcastMsg, count: $json.driverCount, drivers: $json.drivers})]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0193-0193-0193-000000000193",
+      "name": "HTTP: Send Broadcast Confirm Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 2040],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Prepare Broadcast Confirm').first().json.chatId, text: `שולח ל-${$('Code: Prepare Broadcast Confirm').first().json.driverCount} נהגים - אישור?`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ שלח', callback_data:'broadcast_confirm'},{text:'❌ ביטול', callback_data:'broadcast_cancel'}]] } }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0200-0200-0200-000000000200",
+      "name": "Code: Prepare Broadcast Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 2160],
+      "parameters": {
+        "jsCode": "const ctx = $('Switch: Active Flow Routes').item.json;\nconst state = ctx.sessionState || {};\nconst broadcastMsg = state.message || '';\nconst drivers = state.drivers || [];\nreturn drivers.filter(d => d.telegram_chat_id).map(d => ({ json: { chatId: ctx.chatId, recipientChatId: d.telegram_chat_id, broadcastMsg } }));"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0201-0201-0201-000000000201",
+      "name": "HTTP: Send Broadcast Message to Each Driver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 2160],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.recipientChatId, text: $json.broadcastMsg, parse_mode: 'HTML' }) }}"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0202-0202-0202-000000000202",
+      "name": "Postgres: Clear Broadcast Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2800, 2160],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Switch: Active Flow Routes').item.json.chatId]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0203-0203-0203-000000000203",
+      "name": "HTTP: Send Broadcast Sent Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3050, 2160],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Switch: Active Flow Routes').item.json.chatId, text: '✅ ההודעה נשלחה.', parse_mode: 'HTML' }) }}"
+      }
+    },
+
+    {
+      "id": "a1b2c3d4-0210-0210-0210-000000000210",
+      "name": "Postgres: Clear Broadcast Cancel Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2300, 2280],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$json.chatId]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": { "id": "2", "name": "Shepherd DB" }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0211-0211-0211-000000000211",
+      "name": "HTTP: Send Broadcast Cancelled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2550, 2280],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Switch: Active Flow Routes').item.json.chatId, text: '❌ השידור בוטל.', parse_mode: 'HTML' }) }}"
+      }
+    }
+  ],
+
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{ "node": "Code: Normalize Update", "type": "main", "index": 0 }]]
+    },
+    "Code: Normalize Update": {
+      "main": [[{ "node": "HTTP: GET whoami", "type": "main", "index": 0 }]]
+    },
+    "HTTP: GET whoami": {
+      "main": [[{ "node": "Code: Merge whoami", "type": "main", "index": 0 }]]
+    },
+    "Code: Merge whoami": {
+      "main": [[{ "node": "Postgres: Read Session", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Read Session": {
+      "main": [[{ "node": "Code: Route Decision", "type": "main", "index": 0 }]]
+    },
+    "Code: Route Decision": {
+      "main": [[{ "node": "Switch: Main Router", "type": "main", "index": 0 }]]
+    },
+    "Switch: Main Router": {
+      "main": [
+        [{ "node": "HTTP: Claim Invite Token", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Access Denied", "type": "main", "index": 0 }],
+        [{ "node": "Code: Active Flow Router", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Driver Main Menu", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Admin Main Menu", "type": "main", "index": 0 }],
+        [{ "node": "Code: Clock In Time", "type": "main", "index": 0 }],
+        [{ "node": "Code: Clock Out Time", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: GET Driver Vehicle", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Driver Main Menu", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Driver Main Menu", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Driver Main Menu", "type": "main", "index": 0 }],
+        [{ "node": "Postgres: Get Attendance Today", "type": "main", "index": 0 }],
+        [{ "node": "Postgres: Set Broadcast Session", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: GET Fleet KPI", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Admin Main Menu", "type": "main", "index": 0 }]
+      ]
+    },
+
+    "HTTP: Claim Invite Token": {
+      "main": [[{ "node": "Code: Check Claim Result", "type": "main", "index": 0 }]]
+    },
+    "Code: Check Claim Result": {
+      "main": [[{ "node": "Switch: Claim OK?", "type": "main", "index": 0 }]]
+    },
+    "Switch: Claim OK?": {
+      "main": [
+        [{ "node": "HTTP: Send Driver Menu After Claim", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Send Invalid Token Msg", "type": "main", "index": 0 }]
+      ]
+    },
+
+    "Code: Clock In Time": {
+      "main": [[{ "node": "Postgres: Upsert Clock In", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Upsert Clock In": {
+      "main": [[{ "node": "HTTP: Send Clock In Confirm", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Clock Out Time": {
+      "main": [[{ "node": "Postgres: Update Clock Out", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Update Clock Out": {
+      "main": [[{ "node": "HTTP: Send Clock Out Confirm", "type": "main", "index": 0 }]]
+    },
+
+    "HTTP: GET Driver Vehicle": {
+      "main": [[{ "node": "Code: Start Accident Flow", "type": "main", "index": 0 }]]
+    },
+    "Code: Start Accident Flow": {
+      "main": [[{ "node": "Postgres: Save Accident Session", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Save Accident Session": {
+      "main": [[{ "node": "HTTP: Send Accident Step 1", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Active Flow Router": {
+      "main": [[{ "node": "Switch: Active Flow Routes", "type": "main", "index": 0 }]]
+    },
+    "Switch: Active Flow Routes": {
+      "main": [
+        [{ "node": "Postgres: Accident Safe - Update Step", "type": "main", "index": 0 }],
+        [{ "node": "Code: Handle Accident Video", "type": "main", "index": 0 }],
+        [{ "node": "Postgres: Accident Road Clear Step", "type": "main", "index": 0 }],
+        [{ "node": "Code: Handle Insurance Photo", "type": "main", "index": 0 }],
+        [{ "node": "Code: Handle Driver License Photo", "type": "main", "index": 0 }],
+        [{ "node": "Code: Handle Car License Photo", "type": "main", "index": 0 }],
+        [{ "node": "Postgres: Clear Accident Session", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: GET Drivers for Broadcast", "type": "main", "index": 0 }],
+        [{ "node": "Code: Prepare Broadcast Send", "type": "main", "index": 0 }],
+        [{ "node": "Postgres: Clear Broadcast Cancel Session", "type": "main", "index": 0 }]
+      ]
+    },
+
+    "Postgres: Accident Safe - Update Step": {
+      "main": [[{ "node": "HTTP: Send Awaiting Video", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Handle Accident Video": {
+      "main": [[{ "node": "HTTP: TG GetFile Video", "type": "main", "index": 0 }]]
+    },
+    "HTTP: TG GetFile Video": {
+      "main": [[{ "node": "Code: Build S3 Key Video", "type": "main", "index": 0 }]]
+    },
+    "Code: Build S3 Key Video": {
+      "main": [[{ "node": "HTTP: Download TG File Video", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Download TG File Video": {
+      "main": [[{ "node": "HTTP: S3 Upload Video", "type": "main", "index": 0 }]]
+    },
+    "HTTP: S3 Upload Video": {
+      "main": [[{ "node": "Postgres: Save Video Attachment", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Save Video Attachment": {
+      "main": [[{ "node": "HTTP: Send Awaiting Road Clear", "type": "main", "index": 0 }]]
+    },
+
+    "Postgres: Accident Road Clear Step": {
+      "main": [[{ "node": "HTTP: Send Awaiting Insurance Photo", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Handle Insurance Photo": {
+      "main": [[{ "node": "HTTP: TG GetFile Insurance", "type": "main", "index": 0 }]]
+    },
+    "HTTP: TG GetFile Insurance": {
+      "main": [[{ "node": "Code: Build S3 Key Insurance", "type": "main", "index": 0 }]]
+    },
+    "Code: Build S3 Key Insurance": {
+      "main": [[{ "node": "HTTP: Download TG File Insurance", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Download TG File Insurance": {
+      "main": [[{ "node": "HTTP: S3 Upload Insurance", "type": "main", "index": 0 }]]
+    },
+    "HTTP: S3 Upload Insurance": {
+      "main": [[{ "node": "Postgres: Save Insurance Attachment", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Save Insurance Attachment": {
+      "main": [[{ "node": "HTTP: Send Awaiting Driver License", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Handle Driver License Photo": {
+      "main": [[{ "node": "HTTP: TG GetFile Driver License", "type": "main", "index": 0 }]]
+    },
+    "HTTP: TG GetFile Driver License": {
+      "main": [[{ "node": "Code: Build S3 Key Driver License", "type": "main", "index": 0 }]]
+    },
+    "Code: Build S3 Key Driver License": {
+      "main": [[{ "node": "HTTP: Download TG File Driver License", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Download TG File Driver License": {
+      "main": [[{ "node": "HTTP: S3 Upload Driver License", "type": "main", "index": 0 }]]
+    },
+    "HTTP: S3 Upload Driver License": {
+      "main": [[{ "node": "Postgres: Save Driver License Attachment", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Save Driver License Attachment": {
+      "main": [[{ "node": "HTTP: Send Awaiting Car License", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Handle Car License Photo": {
+      "main": [[{ "node": "HTTP: TG GetFile Car License", "type": "main", "index": 0 }]]
+    },
+    "HTTP: TG GetFile Car License": {
+      "main": [[{ "node": "Code: Build S3 Key Car License", "type": "main", "index": 0 }]]
+    },
+    "Code: Build S3 Key Car License": {
+      "main": [[{ "node": "HTTP: Download TG File Car License", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Download TG File Car License": {
+      "main": [[{ "node": "HTTP: S3 Upload Car License", "type": "main", "index": 0 }]]
+    },
+    "HTTP: S3 Upload Car License": {
+      "main": [[{ "node": "Postgres: Save Car License and Submit Accident", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Save Car License and Submit Accident": {
+      "main": [[{ "node": "Code: Prepare Accident POST", "type": "main", "index": 0 }]]
+    },
+    "Code: Prepare Accident POST": {
+      "main": [[{ "node": "HTTP: POST Create Accident", "type": "main", "index": 0 }]]
+    },
+    "HTTP: POST Create Accident": {
+      "main": [[{ "node": "HTTP: Send Awaiting Manager Call", "type": "main", "index": 0 }]]
+    },
+
+    "Postgres: Clear Accident Session": {
+      "main": [[{ "node": "HTTP: Send Accident Complete to Driver", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Send Accident Complete to Driver": {
+      "main": [[{ "node": "HTTP: GET Admins for Accident Notify", "type": "main", "index": 0 }]]
+    },
+    "HTTP: GET Admins for Accident Notify": {
+      "main": [[{ "node": "Code: Notify Admins Accident", "type": "main", "index": 0 }]]
+    },
+    "Code: Notify Admins Accident": {
+      "main": [[{ "node": "HTTP: Send Accident Notify to Each Admin", "type": "main", "index": 0 }]]
+    },
+
+    "Postgres: Get Attendance Today": {
+      "main": [[{ "node": "Code: Format Attendance", "type": "main", "index": 0 }]]
+    },
+    "Code: Format Attendance": {
+      "main": [[{ "node": "HTTP: Send Attendance Report", "type": "main", "index": 0 }]]
+    },
+
+    "HTTP: GET Fleet KPI": {
+      "main": [[{ "node": "Code: Format Fleet Summary", "type": "main", "index": 0 }]]
+    },
+    "Code: Format Fleet Summary": {
+      "main": [[{ "node": "HTTP: Send Fleet Summary", "type": "main", "index": 0 }]]
+    },
+
+    "Postgres: Set Broadcast Session": {
+      "main": [[{ "node": "HTTP: Send Broadcast Prompt", "type": "main", "index": 0 }]]
+    },
+
+    "HTTP: GET Drivers for Broadcast": {
+      "main": [[{ "node": "Code: Prepare Broadcast Confirm", "type": "main", "index": 0 }]]
+    },
+    "Code: Prepare Broadcast Confirm": {
+      "main": [[{ "node": "Postgres: Save Broadcast State", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Save Broadcast State": {
+      "main": [[{ "node": "HTTP: Send Broadcast Confirm Prompt", "type": "main", "index": 0 }]]
+    },
+
+    "Code: Prepare Broadcast Send": {
+      "main": [[{ "node": "HTTP: Send Broadcast Message to Each Driver", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Send Broadcast Message to Each Driver": {
+      "main": [[{ "node": "Postgres: Clear Broadcast Session", "type": "main", "index": 0 }]]
+    },
+    "Postgres: Clear Broadcast Session": {
+      "main": [[{ "node": "HTTP: Send Broadcast Sent Confirm", "type": "main", "index": 0 }]]
+    },
+
+    "Postgres: Clear Broadcast Cancel Session": {
+      "main": [[{ "node": "HTTP: Send Broadcast Cancelled", "type": "main", "index": 0 }]]
+    }
+  },
+
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

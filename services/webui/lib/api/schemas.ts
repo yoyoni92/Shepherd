@@ -148,6 +148,32 @@ export type MaintenanceTypeRead = z.infer<typeof MaintenanceTypeReadSchema>
 export type MaintenanceTypeCreate = z.infer<typeof MaintenanceTypeCreateSchema>
 export type AttendanceRecordRead = z.infer<typeof AttendanceRecordReadSchema>
 
+export const BotUserReadSchema = z.object({
+  user_id: z.string(),
+  telegram_chat_id: z.number(),
+  role: z.enum(['admin', 'driver']),
+  driver_id: z.string().nullish(),
+  driver_name: z.string().nullish(),
+  created_at: z.string(),
+})
+export type BotUserRead = z.infer<typeof BotUserReadSchema>
+
+export const BotInviteReadSchema = z.object({
+  token: z.string(),
+  driver_id: z.string(),
+  driver_name: z.string().nullish(),
+  expires_at: z.string(),
+  created_at: z.string(),
+})
+export type BotInviteRead = z.infer<typeof BotInviteReadSchema>
+
+export const BotInviteResponseSchema = z.object({
+  token: z.string(),
+  deep_link: z.string(),
+  expires_at: z.string(),
+})
+export type BotInviteResponse = z.infer<typeof BotInviteResponseSchema>
+
 // ───────────────────────── UI view models ─────────────────────────
 // Component-facing shapes. Fields the backend does not provide are nullable
 // and render as "—" (tracked in API_ALIGNMENT.md gaps C1/C2).

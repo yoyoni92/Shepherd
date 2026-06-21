@@ -10,6 +10,8 @@ from shepherd_db.models import (
     Accident,
     AccidentAttachment,
     AttendanceRecord,
+    BotInviteToken,
+    BotUser,
     Event,
     KmUpdate,
     KpiDaily,
@@ -448,6 +450,89 @@ def upsert_attendance(session: Session, driver_id: UUID, work_date, data: dict) 
 def list_kpi_daily(session: Session, limit: int = 2) -> list[KpiDaily]:
     stmt = select(KpiDaily).order_by(KpiDaily.snapshot_date.desc()).limit(limit)
     return list(session.execute(stmt).scalars())
+
+
+# ---------------------------------------------------------------------------
+# Bot users and invite tokens
+# ---------------------------------------------------------------------------
+
+def get_bot_user_by_chat_id(session: Session, chat_id: int) -> BotUser | None:
+    return session.execute(
+        select(BotUser).where(BotUser.telegram_chat_id == chat_id)
+    ).scalar_one_or_none()
+
+
+def list_bot_users(session: Session) -> list[BotUser]:
+    return list(session.execute(select(BotUser)).scalars())
+
+
+def update_bot_user_role(session: Session, user_id: UUID, role: str) -> BotUser | None:
+    user = session.get(BotUser, user_id)
+    if user is None:
+        return None
+    user.role = role
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def create_bot_invite(session: Session, driver_id: UUID, token: str) -> BotInviteToken:
+    from datetime import datetime, timezone
+    session.execute(
+        update(BotInviteToken)
+        .where(BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None))
+        .values(expires_at=datetime.now(timezone.utc))
+    )
+    invite = BotInviteToken(token=token, driver_id=driver_id)
+    session.add(invite)
+    session.commit()
+    session.refresh(invite)
+    return invite
+
+
+def claim_bot_invite(session: Session, token: str, telegram_chat_id: int) -> BotUser | None:
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    invite = session.get(BotInviteToken, token)
+    if invite is None or invite.used_at is not None or invite.expires_at < now:
+        return None
+    invite.used_at = now
+    existing = session.execute(
+        select(BotUser).where(BotUser.telegram_chat_id == telegram_chat_id)
+    ).scalar_one_or_none()
+    if existing is not None:
+        session.delete(existing)
+        session.flush()
+    user = BotUser(telegram_chat_id=telegram_chat_id, role="driver", driver_id=invite.driver_id)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def list_pending_bot_invites(session: Session) -> list[BotInviteToken]:
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    return list(
+        session.execute(
+            select(BotInviteToken).where(
+                BotInviteToken.used_at.is_(None),
+                BotInviteToken.expires_at > now,
+            )
+        ).scalars()
+    )
+
+
+def revoke_bot_invite(session: Session, token: str) -> str:
+    from datetime import datetime, timezone
+    invite = session.get(BotInviteToken, token)
+    if invite is None:
+        return "not_found"
+    if invite.used_at is not None:
+        return "already_used"
+    invite.expires_at = datetime.now(timezone.utc)
+    session.commit()
+    return "ok"
 
 
 def set_config(session: Session, key: str, value: object) -> SystemConfig:

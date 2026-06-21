@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useDrivers } from '@/hooks/useDrivers'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useBotUsers } from '@/hooks/useBotManagement'
 import { sortItems } from '@/lib/domain'
 import { phoneIL, driverLicense } from '@/lib/validation'
 import type { UiDriver, DriverCreate, DriverRead } from '@/lib/api/schemas'
@@ -56,6 +57,7 @@ function toPayload(values: FormValues): Partial<DriverRead> {
 export default function DriversPage() {
   const { drivers, add, update, remove } = useDrivers()
   const { vehicles } = useVehicles()
+  const { users: botUsers } = useBotUsers()
   const vehicleByDriver = Object.fromEntries(
     vehicles.filter((v) => v.driverId).map((v) => [v.driverId as string, v.plate]),
   )
@@ -86,6 +88,7 @@ export default function DriversPage() {
             key={d.id}
             d={d}
             vehiclePlate={vehicleByDriver[d.id]}
+            botUsers={botUsers}
             onEdit={() => setForm({ mode: 'edit', d })}
             onRemove={() => remove(d.id)}
           />

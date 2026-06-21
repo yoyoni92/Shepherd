@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from app.routers import (
     accidents,
     attendance,
+    bot,
     care,
     config,
     customers,
@@ -44,6 +45,7 @@ app.include_router(config.router)
 app.include_router(kpi.router)
 app.include_router(attendance.router)
 app.include_router(maintenance_types.router)
+app.include_router(bot.router)
 
 
 @app.get("/health", tags=["health"], summary="Health check", description="Returns 200 when the service is up.")
