@@ -86,3 +86,61 @@ def test_log_accident_customer_forbidden(client):
         headers=customer_headers(str(uuid.uuid4())),
     )
     assert r.status_code == 403
+
+
+def test_list_accidents_returns_list(client):
+    r = client.get("/accidents", headers=admin_headers())
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_list_accidents_includes_attachments(client):
+    vehicle_id = _make_vehicle(client)
+    post = client.post(
+        "/accidents",
+        json={
+            "vehicle_id": vehicle_id,
+            "datetime": datetime.now(tz=timezone.utc).isoformat(),
+            "location": "Haifa-list-test",
+            "attachments": [
+                {"category": "photo_our_vehicle", "file_url": "s3://bucket/photo.jpg"}
+            ],
+        },
+        headers=admin_headers(),
+    )
+    assert post.status_code == 201
+
+    r = client.get("/accidents", headers=admin_headers())
+    items = r.json()
+    match = next((i for i in items if i.get("location") == "Haifa-list-test"), None)
+    assert match is not None
+    assert len(match["attachments"]) == 1
+    assert match["attachments"][0]["category"] == "photo_our_vehicle"
+    assert match["attachments"][0]["file_url"] == "s3://bucket/photo.jpg"
+
+
+def test_list_accidents_admin_sets_driver_id(client):
+    driver_id = _make_driver(client)
+    vehicle_id = _make_vehicle(client)
+    post = client.post(
+        "/accidents",
+        json={
+            "vehicle_id": vehicle_id,
+            "driver_id": driver_id,
+            "datetime": datetime.now(tz=timezone.utc).isoformat(),
+        },
+        headers=admin_headers(),
+    )
+    assert post.status_code == 201
+    accident_id = post.json()["accident_id"]
+
+    r = client.get("/accidents", headers=admin_headers())
+    match = next((i for i in r.json() if str(i["accident_id"]) == accident_id), None)
+    assert match is not None
+    assert match["driver_id"] == driver_id
+
+
+def test_list_accidents_forbidden_for_driver(client):
+    driver_id = _make_driver(client)
+    r = client.get("/accidents", headers=driver_headers(driver_id))
+    assert r.status_code == 403

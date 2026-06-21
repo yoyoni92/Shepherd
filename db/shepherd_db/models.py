@@ -358,6 +358,7 @@ class Accident(Base):
 
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
     driver = relationship("Driver", foreign_keys=[driver_id])
+    attachments = relationship("AccidentAttachment", back_populates="accident")
 
 
 class AccidentAttachment(Base):
@@ -381,7 +382,7 @@ class AccidentAttachment(Base):
         server_default=text("now()"),
     )
 
-    accident = relationship("Accident", foreign_keys=[accident_id])
+    accident = relationship("Accident", foreign_keys=[accident_id], back_populates="attachments")
 
 
 class KmUpdate(Base):

@@ -4,9 +4,48 @@ from shepherd_contracts.auth import Role
 from app import repo
 from app.auth import Action, assert_permitted
 from app.deps import Caller, Db
-from app.schemas import AccidentCreate, AccidentRead
+from app.schemas import (
+    AccidentCreate,
+    AccidentRead,
+    AccidentListItem,
+    AccidentAttachmentOut,
+)
 
 router = APIRouter(prefix="/accidents", tags=["accidents"])
+
+
+def _to_list_item(a) -> AccidentListItem:
+    return AccidentListItem(
+        accident_id=a.accident_id,
+        vehicle_id=a.vehicle_id,
+        driver_id=a.driver_id,
+        datetime=a.datetime,
+        location=a.location,
+        description=a.description,
+        another_driver_licensing_plate=a.another_driver_licensing_plate,
+        another_driver_phone_number=a.another_driver_phone_number,
+        another_driver_id_number=a.another_driver_id_number,
+        attachments=[
+            AccidentAttachmentOut(
+                attachment_id=att.attachment_id,
+                category=att.category,
+                file_url=att.file_url,
+                uploaded_ts=att.uploaded_ts,
+            )
+            for att in a.attachments
+        ],
+    )
+
+
+@router.get(
+    "",
+    response_model=list[AccidentListItem],
+    summary="List all accidents",
+    description="Returns all accidents ordered by datetime desc, with attachments. Admin only.",
+)
+def list_accidents(session: Db, caller: Caller) -> list[AccidentListItem]:
+    assert_permitted(caller.role, Action.READ_ACCIDENTS)
+    return [_to_list_item(a) for a in repo.list_accidents(session)]
 
 
 @router.post(
@@ -16,7 +55,8 @@ router = APIRouter(prefix="/accidents", tags=["accidents"])
     summary="Log accident",
     description=(
         "Record an accident with optional attachments. "
-        "Admin can log for any vehicle; driver only for their own vehicle. "
+        "Admin can log for any vehicle and supply driver_id; "
+        "driver only for their own vehicle. "
         "Emits an accident_logged event."
     ),
 )
@@ -31,7 +71,11 @@ def log_accident(body: AccidentCreate, session: Db, caller: Caller) -> AccidentR
         is_owner = True
     assert_permitted(caller.role, Action.LOG_ACCIDENT, is_owner=is_owner)
 
-    driver_id = caller.driver_id if caller.role == Role.driver else None
+    if caller.role == Role.driver:
+        driver_id = caller.driver_id
+    else:
+        driver_id = str(body.driver_id) if body.driver_id else None
+
     data = {
         "vehicle_id": body.vehicle_id,
         "driver_id": driver_id,

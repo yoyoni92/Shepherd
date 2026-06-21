@@ -143,6 +143,7 @@ class AccidentAttachmentIn(BaseModel):
 
 class AccidentCreate(BaseModel):
     vehicle_id: UUID
+    driver_id: UUID | None = None
     datetime: datetime
     location: str | None = None
     description: str | None = None
@@ -154,6 +155,26 @@ class AccidentCreate(BaseModel):
 
 class AccidentRead(BaseModel):
     accident_id: UUID
+
+
+class AccidentAttachmentOut(BaseModel):
+    attachment_id: UUID
+    category: str
+    file_url: str
+    uploaded_ts: datetime
+
+
+class AccidentListItem(BaseModel):
+    accident_id: UUID
+    vehicle_id: UUID
+    driver_id: UUID | None
+    datetime: datetime
+    location: str | None
+    description: str | None
+    another_driver_licensing_plate: str | None
+    another_driver_phone_number: str | None
+    another_driver_id_number: str | None
+    attachments: list[AccidentAttachmentOut]
 
 
 # --- Vehicle Care ---
@@ -319,6 +340,26 @@ class AttendancePatch(BaseModel):
     clock_in: str | None = None
     clock_out: str | None = None
     status: str  # present | late | leave | absent
+
+
+class AttendanceDayRead(BaseModel):
+    driver_id: UUID
+    driver_name: str | None = None
+    clock_in: str | None = None
+    clock_out: str | None = None
+    status: str
+
+
+class ClockRequest(BaseModel):
+    driver_id: UUID
+
+
+class ClockResponse(BaseModel):
+    result: str  # ok | already_in | no_open | blocked
+    time: str | None = None
+    hours: str | None = None
+    window_start: str | None = None
+    window_end: str | None = None
 
 
 # --- Bot users and invites ---

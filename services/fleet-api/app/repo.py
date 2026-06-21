@@ -3,7 +3,7 @@ import json
 from uuid import UUID
 
 from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from shepherd_db.logic import next_maintenance
 from shepherd_db.models import (
@@ -229,6 +229,14 @@ def create_accident(session: Session, data: dict, attachments: list[dict]) -> UU
     return accident.accident_id
 
 
+def list_accidents(session: Session) -> list[Accident]:
+    return list(session.scalars(
+        select(Accident)
+        .options(selectinload(Accident.attachments))
+        .order_by(Accident.datetime.desc())
+    ))
+
+
 # ---------------------------------------------------------------------------
 # Vehicle care
 # ---------------------------------------------------------------------------
@@ -415,14 +423,68 @@ def delete_maintenance_type(session: Session, type_id: UUID) -> bool:
 # Attendance (drivers as employees)
 # ---------------------------------------------------------------------------
 
-def list_attendance_month(session: Session, year: int, month: int) -> list[AttendanceRecord]:
+def list_attendance_month(
+    session: Session, year: int, month: int, driver_id: UUID | None = None
+) -> list[AttendanceRecord]:
     from calendar import monthrange
     from datetime import date
 
     start = date(year, month, 1)
     end = date(year, month, monthrange(year, month)[1])
     stmt = select(AttendanceRecord).where(AttendanceRecord.work_date.between(start, end))
-    return list(session.execute(stmt).scalars())
+    if driver_id is not None:
+        stmt = stmt.where(AttendanceRecord.driver_id == driver_id)
+    return list(session.execute(stmt.order_by(AttendanceRecord.work_date)).scalars())
+
+
+def list_attendance_day(session: Session, work_date) -> list[tuple[AttendanceRecord, str]]:
+    """Records for a single day joined with driver names (for the admin view)."""
+    stmt = (
+        select(AttendanceRecord, Driver.full_name)
+        .join(Driver, Driver.driver_id == AttendanceRecord.driver_id)
+        .where(AttendanceRecord.work_date == work_date)
+        .order_by(AttendanceRecord.clock_in)
+    )
+    return [(r, name) for r, name in session.execute(stmt).all()]
+
+
+def attendance_clock_in(session: Session, driver_id: UUID, time_str: str, work_date) -> tuple[str, str | None]:
+    rec = session.execute(
+        select(AttendanceRecord).where(
+            AttendanceRecord.driver_id == driver_id,
+            AttendanceRecord.work_date == work_date,
+        )
+    ).scalar_one_or_none()
+    if rec is not None and rec.clock_in:
+        return ("already_in", rec.clock_in)
+    if rec is None:
+        rec = AttendanceRecord(driver_id=driver_id, work_date=work_date, clock_in=time_str, status="present")
+        session.add(rec)
+    else:
+        rec.clock_in = time_str
+    session.commit()
+    return ("ok", time_str)
+
+
+def attendance_clock_out(
+    session: Session, driver_id: UUID, time_str: str, work_date
+) -> tuple[str, str | None, str | None]:
+    rec = session.execute(
+        select(AttendanceRecord).where(
+            AttendanceRecord.driver_id == driver_id,
+            AttendanceRecord.work_date == work_date,
+            AttendanceRecord.clock_in.is_not(None),
+            AttendanceRecord.clock_out.is_(None),
+        )
+    ).scalar_one_or_none()
+    if rec is None:
+        return ("no_open", None, None)
+    rec.clock_out = time_str
+    ih, im = (int(x) for x in rec.clock_in.split(":"))
+    oh, om = (int(x) for x in time_str.split(":"))
+    hours = f"{((oh * 60 + om) - (ih * 60 + im)) / 60:.2f}"
+    session.commit()
+    return ("ok", time_str, hours)
 
 
 def upsert_attendance(session: Session, driver_id: UUID, work_date, data: dict) -> AttendanceRecord:

@@ -13,6 +13,7 @@ class Action(str, Enum):
     MANAGE_CUSTOMERS = "manage_customers"
     KM_UPDATE = "km_update"
     LOG_ACCIDENT = "log_accident"
+    READ_ACCIDENTS = "read_accidents"
     LOG_CARE = "log_care"
     SUBMIT_DOCUMENT = "submit_document"
     WRITE_REPORTS = "write_reports"
@@ -37,6 +38,7 @@ _MATRIX: dict[Action, dict[Role, bool | None]] = {
     Action.MANAGE_CUSTOMERS: {Role.admin: False, Role.driver: None,  Role.customer: None},
     Action.KM_UPDATE:        {Role.admin: False, Role.driver: True,  Role.customer: None},
     Action.LOG_ACCIDENT:     {Role.admin: False, Role.driver: True,  Role.customer: None},
+    Action.READ_ACCIDENTS:   {Role.admin: False, Role.driver: None,  Role.customer: None},
     Action.LOG_CARE:         {Role.admin: False, Role.driver: None,  Role.customer: None},
     Action.SUBMIT_DOCUMENT:  {Role.admin: False, Role.driver: True,  Role.customer: True},
     Action.WRITE_REPORTS:    {Role.admin: False, Role.driver: None,  Role.customer: None},
