@@ -2,7 +2,7 @@
 import { Truck, Trash2, Pencil, Bike, Car, Bus, Caravan, type LucideIcon } from 'lucide-react'
 import type { UiVehicle } from '@/lib/api/schemas'
 import { daysTo, fmtDate } from '@/lib/domain'
-import { VEHICLE_TYPE_LABEL } from '@/lib/vehicleTypes'
+import { VEHICLE_TYPE_LABEL, MAINTENANCE_TYPE_LABEL } from '@/lib/vehicleTypes'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -89,7 +89,11 @@ export function VehicleCard({
             {v.licenseValidTo ? fmtDate(v.licenseValidTo) : DASH}
           </div>
         </div>
-        <Field label="טיפול הבא" value={nextMaint || DASH} className="col-span-2" />
+        <Field label="טיפול הבא" value={nextMaint || DASH} />
+        <Field
+          label="מחזור טיפול"
+          value={v.maintenanceType ? MAINTENANCE_TYPE_LABEL[v.maintenanceType] ?? v.maintenanceType : DASH}
+        />
       </div>
 
       <div className="flex gap-2 border-t border-line pt-3">

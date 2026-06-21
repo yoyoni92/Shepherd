@@ -148,6 +148,7 @@ export interface UiVehicle {
   lastService: string | null // last_maintenance_date
   nextMaintenanceKm: number | null
   nextMaintenanceType: string | null
+  maintenanceType: string | null // service cycle (1_small_then_1_big | 2_small_then_1_big)
 }
 
 export interface UiDriver {

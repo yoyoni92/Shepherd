@@ -8,12 +8,12 @@ describe('toUiVehicle', () => {
       vehicle_id: 'v1', licensing_plate: '12-345-67', vehicle_type: 'truck', vendor: 'Toyota', model: 'Corolla',
       current_km: 84000, insurance_valid_to: '2026-09-02', license_valid_to: '2026-07-01',
       driver_id: 'd9', customer_id: 'c2', last_maintenance_date: '2026-04-12',
-      next_maintenance_km: 90000, next_maintenance_type: 'service',
+      next_maintenance_km: 90000, next_maintenance_type: 'service', maintenance_type: '1_small_then_1_big',
     }
     expect(toUiVehicle(v)).toEqual({
       id: 'v1', plate: '12-345-67', vehicleType: 'truck', make: 'Toyota', model: 'Corolla',
       driverId: 'd9', customerId: 'c2', currentKm: 84000, insurance: '2026-09-02', licenseValidTo: '2026-07-01',
-      lastService: '2026-04-12', nextMaintenanceKm: 90000, nextMaintenanceType: 'service',
+      lastService: '2026-04-12', nextMaintenanceKm: 90000, nextMaintenanceType: 'service', maintenanceType: '1_small_then_1_big',
     })
   })
 

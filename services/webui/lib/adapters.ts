@@ -16,6 +16,7 @@ export function toUiVehicle(v: VehicleRead): UiVehicle {
     lastService: v.last_maintenance_date ?? null,
     nextMaintenanceKm: v.next_maintenance_km ?? null,
     nextMaintenanceType: v.next_maintenance_type ?? null,
+    maintenanceType: v.maintenance_type ?? null,
   }
 }
 
