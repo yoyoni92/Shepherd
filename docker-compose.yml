@@ -192,7 +192,9 @@ services:
       db-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/api/auth/session || exit 1"]
+      # 127.0.0.1, not localhost: inside the container localhost resolves to ::1 (IPv6),
+      # but the standalone server binds IPv4 0.0.0.0 — the probe must hit 127.0.0.1.
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/api/auth/session || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
