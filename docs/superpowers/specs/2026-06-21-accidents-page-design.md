@@ -130,8 +130,11 @@ Dedicated modal (not reusing `EntityFormModal` - file inputs are not
 supported there).
 
 **Required fields:**
-- `vehicle_id` - select from vehicles list
+- `vehicle_id` - select from vehicles list; option labels show "{plate} - {make} {model}"
 - `datetime` - `<input type="datetime-local">`
+
+**Optional select fields:**
+- `driver_id` - select from drivers list; option labels show driver name
 
 **Optional text fields:**
 - `location` - text
@@ -139,6 +142,11 @@ supported there).
 - `another_driver_licensing_plate` - text, LTR
 - `another_driver_phone_number` - text
 - `another_driver_id_number` - text
+
+fleet-api `AccidentCreate` schema must accept an optional `driver_id` field so
+admin callers can assign the driver. The router currently ignores `driver_id`
+from the request body for admin callers - that logic must be updated to use the
+supplied value when present.
 
 **Optional file slots** (one per category, all optional):
 
