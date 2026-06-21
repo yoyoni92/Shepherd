@@ -5,13 +5,15 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from shepherd_db.models import VehicleTypeEnum
+
 
 # --- Vehicles ---
 
 class VehicleCreate(BaseModel):
     licensing_plate: str
     nickname: str | None = None
-    vehicle_type: str | None = None  # motorcycle | car | van | bus | truck
+    vehicle_type: VehicleTypeEnum | None = None  # motorcycle | car | van | bus | truck
     vendor: str | None = None
     model: str | None = None
     current_km: int | None = None
@@ -27,7 +29,7 @@ class VehicleUpdate(BaseModel):
     """PATCH /vehicles/{id} — all fields optional; only provided keys are written."""
     licensing_plate: str | None = None
     nickname: str | None = None
-    vehicle_type: str | None = None
+    vehicle_type: VehicleTypeEnum | None = None
     vendor: str | None = None
     model: str | None = None
     current_km: int | None = None
@@ -43,7 +45,7 @@ class VehicleRead(BaseModel):
     vehicle_id: UUID
     licensing_plate: str
     nickname: str | None = None
-    vehicle_type: str | None = None
+    vehicle_type: VehicleTypeEnum | None = None
     vendor: str | None = None
     model: str | None = None
     current_km: int | None = None

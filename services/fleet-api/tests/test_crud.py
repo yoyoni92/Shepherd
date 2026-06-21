@@ -52,6 +52,12 @@ def test_delete_customer_nulls_vehicle_link(client):
     assert got.json()["customer_id"] is None
 
 
+def test_invalid_vehicle_type_rejected(client):
+    # vehicle_type is an enum on the API now → bad value is a 422, not a DB 500
+    resp = client.post("/vehicles", headers=H(), json={"licensing_plate": _plate(), "vehicle_type": "spaceship"})
+    assert resp.status_code == 422
+
+
 def test_patch_forbidden_for_driver(client):
     resp = client.patch(
         "/vehicles/00000000-0000-0000-0000-000000000000",
