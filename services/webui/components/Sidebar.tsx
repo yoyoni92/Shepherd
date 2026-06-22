@@ -16,17 +16,19 @@ import {
   Activity,
   LogOut,
   Bot,
+  ShieldAlert,
   type LucideIcon,
 } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
 import { useCustomers } from '@/hooks/useCustomers'
 import { useEvents } from '@/hooks/useEvents'
+import { useAccidents } from '@/hooks/useAccidents'
 import { useHealth } from '@/hooks/useHealth'
 import { openCount } from '@/lib/events'
 import { summarizeHealth, type Overall } from '@/lib/health'
 
-type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'customers' | 'events'; statusDot?: boolean }
+type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'customers' | 'events' | 'accidents'; statusDot?: boolean }
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'לוח בקרה', Icon: LayoutDashboard },
@@ -34,6 +36,7 @@ const NAV: NavItem[] = [
   { href: '/drivers', label: 'נהגים', Icon: User, badge: 'drivers' },
   { href: '/customers', label: 'לקוחות', Icon: Building2, badge: 'customers' },
   { href: '/events', label: 'משימות', Icon: TriangleAlert, badge: 'events' },
+  { href: '/accidents', label: 'תאונות', Icon: ShieldAlert, badge: 'accidents' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
   { href: '/bot', label: 'ניהול בוט', Icon: Bot },
   { href: '/maintenance-types', label: 'סוגי טיפול', Icon: Wrench },
@@ -50,6 +53,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const { drivers } = useDrivers()
   const { customers } = useCustomers()
   const { events } = useEvents()
+  const { accidents } = useAccidents()
   const { services } = useHealth()
   const healthColor = HEALTH_DOT[summarizeHealth(services)]
   const counts: Record<string, number> = {
@@ -57,6 +61,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     drivers: drivers.length,
     customers: customers.length,
     events: openCount(events),
+    accidents: accidents.length,
   }
 
   return (
