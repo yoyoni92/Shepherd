@@ -43,6 +43,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
     ports:
       - "8000:8000"
     depends_on:
@@ -240,12 +241,16 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./services/n8n/workflows:/workflows:ro
-    # --separate imports every *.json in the directory (router + all sub-workflows).
-    # import deactivates workflows, so re-activate the router (the only one with a
-    # Telegram Trigger) before start; sub-workflows run on demand via Execute and
-    # don't need to be active. This runs before `n8n start`, so it persists.
+    # --separate imports every *.json (router + subs); import deactivates them.
+    # This n8n version publishes per-workflow (publish:workflow --id), and the
+    # router can only publish once its referenced sub-workflows are published -
+    # so publish all subs first, then the router, before `n8n start` registers
+    # the Telegram webhook. ($$ escapes $ for the container shell.)
     entrypoint: >
-      sh -c "n8n import:workflow --separate --input=/workflows 2>/dev/null || true && n8n update:workflow --active=true --id=shepherdtelegrambot01 2>/dev/null || true && n8n start"
+      sh -c "n8n import:workflow --separate --input=/workflows 2>/dev/null || true;
+      for id in subinviteclaim subclock subaccident subattendancecsv submyvehicle subvehicleissue subupdatedetails subbroadcast subattendanceadmin subfleetsummary submaintenance subupdatedriver shepherdtelegrambot01;
+      do n8n publish:workflow --id=$$id 2>/dev/null || true; done;
+      n8n start"
     depends_on:
       fleet-api:
         condition: service_healthy
