@@ -163,6 +163,7 @@ export const BotInviteReadSchema = z.object({
   driver_id: z.string().nullish(),
   driver_name: z.string().nullish(),
   role: z.enum(['admin', 'driver']),
+  phone_number: z.string().nullish(),
   expires_at: z.string(),
   created_at: z.string(),
 })

@@ -131,12 +131,12 @@ export const updateBotUserRole = (userId: string, role: 'admin' | 'driver'): Pro
   send('PATCH', `/users/${userId}/role`, { role }, BotUserReadSchema)
 export const getBotInvites = (): Promise<BotInviteRead[]> => get('/bot-invite', z.array(BotInviteReadSchema))
 export const createBotInvite = (
-  opts: { driverId?: string; role?: 'admin' | 'driver' },
+  opts: { driverId?: string; role?: 'admin' | 'driver'; phoneNumber?: string },
 ): Promise<BotInviteResponse> =>
   send(
     'POST',
     '/bot-invite',
-    { driver_id: opts.driverId ?? null, role: opts.role ?? 'driver' },
+    { driver_id: opts.driverId ?? null, role: opts.role ?? 'driver', phone_number: opts.phoneNumber ?? null },
     BotInviteResponseSchema,
   )
 export const revokeBotInvite = (token: string): Promise<void> =>

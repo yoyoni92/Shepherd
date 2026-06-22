@@ -36,7 +36,7 @@ export function useBotInvites() {
   const query = useQuery({ queryKey: INVITES_KEY, queryFn: getBotInvites })
 
   const createInvite = useMutation({
-    mutationFn: (opts: { driverId?: string; role?: 'admin' | 'driver' }) => createBotInvite(opts),
+    mutationFn: (opts: { driverId?: string; role?: 'admin' | 'driver'; phoneNumber?: string }) => createBotInvite(opts),
     onSuccess: () => qc.invalidateQueries({ queryKey: INVITES_KEY }),
   })
 

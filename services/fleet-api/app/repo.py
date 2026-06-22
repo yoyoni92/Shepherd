@@ -541,8 +541,17 @@ def update_bot_user_role(session: Session, user_id: UUID, role: str) -> BotUser 
     return user
 
 
+def _normalize_phone(p: str) -> str:
+    import re
+    digits = re.sub(r'\D', '', p)
+    if digits.startswith('972'):
+        digits = '0' + digits[3:]
+    return digits
+
+
 def create_bot_invite(
-    session: Session, driver_id: UUID | None, token: str, role: str = "driver"
+    session: Session, driver_id: UUID | None, token: str, role: str = "driver",
+    phone_number: str | None = None,
 ) -> BotInviteToken:
     from datetime import datetime, timezone
     # Only a driver can have a prior token to invalidate; admin invites have no driver.
@@ -552,19 +561,24 @@ def create_bot_invite(
             .where(BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None))
             .values(expires_at=datetime.now(timezone.utc))
         )
-    invite = BotInviteToken(token=token, driver_id=driver_id, role=role)
+    invite = BotInviteToken(token=token, driver_id=driver_id, role=role, phone_number=phone_number)
     session.add(invite)
     session.commit()
     session.refresh(invite)
     return invite
 
 
-def claim_bot_invite(session: Session, token: str, telegram_chat_id: int) -> BotUser | None:
+def claim_bot_invite(
+    session: Session, token: str, telegram_chat_id: int, phone_number: str | None = None,
+) -> BotUser | None | str:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     invite = session.get(BotInviteToken, token)
     if invite is None or invite.used_at is not None or invite.expires_at < now:
         return None
+    if invite.phone_number:
+        if not phone_number or _normalize_phone(invite.phone_number) != _normalize_phone(phone_number):
+            return "phone_mismatch"
     invite.used_at = now
     existing = session.execute(
         select(BotUser).where(BotUser.telegram_chat_id == telegram_chat_id)

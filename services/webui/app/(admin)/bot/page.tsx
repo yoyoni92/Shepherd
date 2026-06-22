@@ -185,6 +185,7 @@ function InviteRow({
       <td style={{ padding: '10px 16px' }}>
         <RoleBadge role={invite.role} />
       </td>
+      <td className="ltr" style={{ padding: '10px 16px', color: 'var(--muted)' }}>{invite.phone_number ?? '—'}</td>
       <td style={{ padding: '10px 16px' }}>
         <div className="flex items-center gap-1 min-w-0">
           <span
@@ -217,6 +218,7 @@ function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const { drivers } = useDrivers()
   const [role, setRole] = useState<'admin' | 'driver'>('admin')
   const [driverId, setDriverId] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [link, setLink] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -224,6 +226,7 @@ function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const close = () => {
     setRole('admin')
     setDriverId('')
+    setPhoneNumber('')
     setLink(null)
     setErr(null)
     onClose()
@@ -237,7 +240,7 @@ function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
     }
     setBusy(true)
     try {
-      const res = await createInvite({ driverId: driverId || undefined, role })
+      const res = await createInvite({ driverId: driverId || undefined, role, phoneNumber: phoneNumber.trim() || undefined })
       setLink(res.deep_link)
     } catch {
       setErr('יצירת ההזמנה נכשלה')
@@ -316,6 +319,17 @@ function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
                   ))}
                 </select>
               </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[12px] font-semibold text-faint">מספר טלפון (אופציונלי - לאימות זהות)</label>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="0501234567"
+                  className="text-[13px] rounded-md px-2 py-2 ltr"
+                  style={fieldStyle}
+                />
+              </div>
               {err && (
                 <p className="text-[12px]" style={{ color: '#f87171' }}>
                   {err}
@@ -358,7 +372,7 @@ function BotInvitesSection() {
           <table className="w-full text-[13px]" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                {['שם נהג', 'תפקיד', 'קישור הזמנה', 'תפוגה ב', 'פעולות'].map((h) => (
+                {['שם נהג', 'תפקיד', 'טלפון', 'קישור הזמנה', 'תפוגה ב', 'פעולות'].map((h) => (
                   <th
                     key={h}
                     className="text-right text-[11px] font-bold text-faint"

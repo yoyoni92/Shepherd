@@ -374,6 +374,7 @@ class BotWhoamiResponse(BaseModel):
 class BotInviteCreate(BaseModel):
     driver_id: UUID | None = None
     role: str = "driver"
+    phone_number: str | None = None
 
 
 class BotInviteResponse(BaseModel):
@@ -385,6 +386,7 @@ class BotInviteResponse(BaseModel):
 class BotInviteClaimRequest(BaseModel):
     token: str
     telegram_chat_id: int
+    phone_number: str | None = None
 
 
 class BotInviteClaimResponse(BaseModel):
@@ -398,6 +400,7 @@ class BotInviteRead(BaseModel):
     driver_id: UUID | None = None
     driver_name: str | None = None
     role: str = "driver"
+    phone_number: str | None = None
     expires_at: datetime
     created_at: datetime
 

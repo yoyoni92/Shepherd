@@ -641,6 +641,7 @@ class BotInviteToken(Base):
         server_default=text("now() + INTERVAL '7 days'"),
     )
     used_at = mapped_column(DateTime(timezone=True), nullable=True)
+    phone_number = mapped_column(Text, nullable=True)
 
     driver = relationship("Driver", foreign_keys=[driver_id])
 

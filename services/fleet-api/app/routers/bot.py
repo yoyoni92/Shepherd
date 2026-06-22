@@ -55,7 +55,7 @@ def create_invite(body: BotInviteCreate, session: Db, caller: Caller) -> BotInvi
     if body.driver_id is not None and repo.get_driver(session, body.driver_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
     token_str = str(uuid.uuid4())
-    invite = repo.create_bot_invite(session, body.driver_id, token_str, body.role)
+    invite = repo.create_bot_invite(session, body.driver_id, token_str, body.role, body.phone_number)
     bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "ShepherdBot")
     return BotInviteResponse(
         token=invite.token,
@@ -71,10 +71,12 @@ def create_invite(body: BotInviteCreate, session: Db, caller: Caller) -> BotInvi
     summary="Claim an invite token and link a telegram user",
 )
 def claim_invite(body: BotInviteClaimRequest, session: Db) -> BotInviteClaimResponse:
-    user = repo.claim_bot_invite(session, body.token, body.telegram_chat_id)
-    if user is None:
+    result = repo.claim_bot_invite(session, body.token, body.telegram_chat_id, body.phone_number)
+    if result == "phone_mismatch":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="phone_mismatch")
+    if result is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
-    return BotInviteClaimResponse(driver_id=user.driver_id, role=user.role.value, user_id=user.id)
+    return BotInviteClaimResponse(driver_id=result.driver_id, role=result.role.value, user_id=result.id)
 
 
 @router.get(
@@ -90,6 +92,7 @@ def list_invites(session: Db, caller: Caller) -> list[BotInviteRead]:
             driver_id=inv.driver_id,
             driver_name=inv.driver.full_name if inv.driver else None,
             role=inv.role.value if hasattr(inv.role, "value") else inv.role,
+            phone_number=inv.phone_number,
             expires_at=inv.expires_at,
             created_at=inv.created_at,
         )
