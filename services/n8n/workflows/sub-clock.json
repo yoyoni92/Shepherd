@@ -1,0 +1,348 @@
+{
+  "id": "subclock",
+  "name": "Shepherd · ⏱ Clock In / Out",
+  "nodes": [
+    {
+      "id": "b1c2d3e4-7001-7001-7001-000000007001",
+      "name": "On Parent Call",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "a1b2c3d4-6004-6004-6004-000000006004",
+      "name": "HTTP: POST Clock Out",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLEET_API_URL }}/attendance/clock-out",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ driver_id: $json.whoami.driver_id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-6006-6006-6006-000000006006",
+      "name": "HTTP: Send Clock Out Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-6005-6005-6005-000000006005",
+      "name": "Code: Format Clock Out",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst r = $input.first().json || {};\nlet text;\nif (r.result==='blocked') text=`⛔ דיווח נוכחות אפשרי רק בין ${r.window_start} ל-${r.window_end}.`;\nelse if (r.result==='no_open') text='לא נמצאה כניסה פתוחה להיום.';\nelse if (r.result==='ok') text=`✅ יציאה נרשמה. סה\"כ: ${r.hours} שעות.`;\nelse text='⚠️ אירעה שגיאה ברישום היציאה.';\nreturn [{ json: { chatId: ctx.chatId, text } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-6003-6003-6003-000000006003",
+      "name": "HTTP: Send Clock In Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-6001-6001-6001-000000006001",
+      "name": "HTTP: POST Clock In",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLEET_API_URL }}/attendance/clock-in",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ driver_id: $json.whoami.driver_id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-6002-6002-6002-000000006002",
+      "name": "Code: Format Clock In",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst r = $input.first().json || {};\nlet text;\nif (r.result==='blocked') text=`⛔ דיווח נוכחות אפשרי רק בין ${r.window_start} ל-${r.window_end}.`;\nelse if (r.result==='already_in') text=`כבר נרשמת כניסה היום בשעה ${r.time}.`;\nelse if (r.result==='ok') text=`✅ כניסה נרשמה בהצלחה בשעה ${r.time}.`;\nelse text='⚠️ אירעה שגיאה ברישום הכניסה.';\nreturn [{ json: { chatId: ctx.chatId, text } }];"
+      }
+    },
+    {
+      "id": "b1c2d3e4-7002-7002-7002-000000007002",
+      "name": "Switch: Step",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cmd_clock_in",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "0",
+              "renameOutput": true,
+              "outputKeyName": "cmd_clock_in"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cmd_clock_out",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "1",
+              "renameOutput": true,
+              "outputKeyName": "cmd_clock_out"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1c2d3e4-7003-7003-7003-000000007003",
+      "name": "Note 7003",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -150
+      ],
+      "parameters": {
+        "content": "## ⏱ Clock In / Out\n\nDriver attendance. Two one-shot routes. Calls Fleet API `POST /attendance/clock-in|clock-out` (idempotent, reporting-window enforced server-side), maps the JSON result to a Hebrew message, sends it.\n\n**Routes:** `cmd_clock_in`, `cmd_clock_out`",
+        "height": 120,
+        "width": 900,
+        "color": 7
+      }
+    }
+  ],
+  "connections": {
+    "HTTP: POST Clock Out": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Clock Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Clock Out": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Clock Out Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Clock In": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Clock In",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Clock In": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Clock In Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Parent Call": {
+      "main": [
+        [
+          {
+            "node": "Switch: Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Step": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Clock In",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: POST Clock Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

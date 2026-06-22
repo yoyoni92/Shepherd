@@ -1,0 +1,157 @@
+{
+  "id": "submyvehicle",
+  "name": "Shepherd · 🚗 My Vehicle",
+  "nodes": [
+    {
+      "id": "b1c2d3e4-7009-7009-7009-000000007009",
+      "name": "On Parent Call",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1001-1001-1001-000000001001",
+      "name": "HTTP: GET My Vehicle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/vehicles?driver_id={{ $json.whoami.driver_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "X-Caller-Context",
+              "value": "{\"role\":\"admin\"}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1002-1002-1002-000000001002",
+      "name": "Code: Format My Vehicle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst res = $input.first().json;\nconst arr = Array.isArray(res) ? res : (res.items || [res]);\nconst v = arr[0];\nlet text;\nif (!v || !v.vehicle_id) text = '🚗 לא נמצא רכב משויך לחשבונך.';\nelse text = `🚗 הרכב שלך\\n━━━━━━━━━━━━━━━━\\n\\nיצרן: ${v.vendor||'-'}\\nדגם: ${v.model||'-'}\\nלוחית: ${v.licensing_plate||'-'}\\nסוג: ${v.vehicle_type||'-'}\\nק\"מ נוכחי: ${v.current_km??'-'}`;\nreturn [{ json: { chatId: ctx.chatId, text } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1003-1003-1003-000000001003",
+      "name": "HTTP: Send My Vehicle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "b1c2d3e4-7010-7010-7010-000000007010",
+      "name": "Note 7010",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -150
+      ],
+      "parameters": {
+        "content": "## 🚗 My Vehicle\n\nOne-shot. `GET /vehicles?driver_id=`, formats the assigned vehicle card, sends it.\n\n**Routes:** `cmd_my_vehicle`",
+        "height": 120,
+        "width": 900,
+        "color": 7
+      }
+    }
+  ],
+  "connections": {
+    "HTTP: GET My Vehicle": {
+      "main": [
+        [
+          {
+            "node": "Code: Format My Vehicle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format My Vehicle": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send My Vehicle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Parent Call": {
+      "main": [
+        [
+          {
+            "node": "HTTP: GET My Vehicle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

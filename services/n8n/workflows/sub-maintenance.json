@@ -1,0 +1,1012 @@
+{
+  "id": "submaintenance",
+  "name": "Shepherd · 🛠 Maintenance (admin)",
+  "nodes": [
+    {
+      "id": "b1c2d3e4-7024-7024-7024-000000007024",
+      "name": "On Parent Call",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1051-1051-1051-000000001051",
+      "name": "Code: Build Maint Type Keyboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        600
+      ],
+      "parameters": {
+        "jsCode": "const setv = $('Code: MaintLog SetVehicle').first().json;\nconst res = $input.first().json;\nconst types = Array.isArray(res)?res:(res.items||[]);\nconst rows = types.slice(0,50).map(t=>[{ text: t.name, callback_data:('ml_type_'+t.name).slice(0,64) }]);\nconst keyboard = { inline_keyboard: rows.length?rows:[[{text:'כללי', callback_data:'ml_type_כללי'}]] };\nconst newState = { flow:'maint_log', step:'awaiting_type', vehicleId: setv.vehicleId };\nreturn [{ json: { chatId: setv.chatId, keyboard, newState } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1045-1045-1045-000000001045",
+      "name": "HTTP: GET Vehicles For Maint",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        400
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/vehicles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "X-Caller-Context",
+              "value": "{\"role\":\"admin\"}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1060-1060-1060-000000001060",
+      "name": "Postgres: Clear MaintLog Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1020,
+        1000
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: MaintLog Validate KM').first().json.chatId]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "Shepherd DB"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1061-1061-1061-000000001061",
+      "name": "HTTP: Send Maint Logged Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        1000
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: MaintLog Validate KM').first().json.chatId, text: '✅ אירוע התחזוקה נרשם.', parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1058-1058-1058-000000001058",
+      "name": "IF: MaintLog KM Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        540,
+        1000
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1044-1044-1044-000000001044",
+      "name": "HTTP: Send Overdue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1062-1062-1062-000000001062",
+      "name": "HTTP: Send Maint KM Invalid",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        1000
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: MaintLog Validate KM').first().json.chatId, text: $('Code: MaintLog Validate KM').first().json.errorMsg, parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1049-1049-1049-000000001049",
+      "name": "Code: MaintLog SetVehicle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        600
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst vehicleId = ctx.callbackData.replace('ml_veh_','');\nreturn [{ json: { chatId: ctx.chatId, vehicleId } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1041-1041-1041-000000001041",
+      "name": "HTTP: Send Maintenance Menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '🔧 תחזוקה', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📋 תחזוקות באיחור', callback_data:'maint_overdue'}],[{text:'➕ רשום אירוע תחזוקה', callback_data:'maint_log'}]] } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1048-1048-1048-000000001048",
+      "name": "HTTP: Send Maint Vehicle Keyboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Build Maint Vehicle Keyboard').first().json.chatId, text: 'בחר/י רכב:', parse_mode:'HTML', reply_markup: $('Code: Build Maint Vehicle Keyboard').first().json.keyboard }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1053-1053-1053-000000001053",
+      "name": "HTTP: Send Maint Type Keyboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: Build Maint Type Keyboard').first().json.chatId, text: 'בחר/י סוג תחזוקה:', parse_mode:'HTML', reply_markup: $('Code: Build Maint Type Keyboard').first().json.keyboard }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1054-1054-1054-000000001054",
+      "name": "Code: MaintLog SetType",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        800
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst state = ctx.sessionState||{};\nconst maintType = ctx.callbackData.replace('ml_type_','');\nconst newState = { flow:'maint_log', step:'awaiting_km', vehicleId: state.vehicleId, maintType };\nreturn [{ json: { chatId: ctx.chatId, newState } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1059-1059-1059-000000001059",
+      "name": "HTTP: POST Vehicle Care",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        1000
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLEET_API_URL }}/vehicle_care",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "X-Caller-Context",
+              "value": "{\"role\":\"admin\"}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ vehicle_id: $json.vehicleId, service_date: $json.serviceDate, maintenance_type: $json.maintType, km_at_service: $json.km }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1056-1056-1056-000000001056",
+      "name": "HTTP: Send Maint KM Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        800
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $('Code: MaintLog SetType').first().json.chatId, text: 'הזן/י ק\"מ נוכחי במד:', parse_mode:'HTML' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1057-1057-1057-000000001057",
+      "name": "Code: MaintLog Validate KM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        1000
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst state = ctx.sessionState||{};\nconst raw = (ctx.text||'').trim();\nconst km = parseInt(raw,10);\nconst valid = /^\\d+$/.test(raw) && km>=0;\nconst today = new Date().toISOString().slice(0,10);\nreturn [{ json: { chatId: ctx.chatId, valid, km, vehicleId: state.vehicleId, maintType: state.maintType, serviceDate: today, errorMsg:'⚠️ ק\"מ לא תקין. הזן/י מספר.' } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1052-1052-1052-000000001052",
+      "name": "Postgres: Save MaintLog Vehicle",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1020,
+        600
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Build Maint Type Keyboard').first().json.chatId, JSON.stringify($('Code: Build Maint Type Keyboard').first().json.newState)]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "Shepherd DB"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1043-1043-1043-000000001043",
+      "name": "Code: Format Overdue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst all = $input.all().map(i=>i.json);\nconst rows = all.filter(r=>r.licensing_plate && r.current_km!=null && r.next_maintenance_km!=null && r.current_km>=r.next_maintenance_km)\n  .sort((a,b)=>(b.current_km-b.next_maintenance_km)-(a.current_km-a.next_maintenance_km));\nlet text;\nif (!rows.length) text='✅ אין תחזוקות באיחור.';\nelse { text='📋 תחזוקות באיחור\\n━━━━━━━━━━━━━━━━\\n';\n  for (const r of rows) text+=`\\n🚗 ${r.licensing_plate} (${r.vendor||''} ${r.model||''})\\n   ק\"מ: ${r.current_km} / יעד: ${r.next_maintenance_km}\\n   סוג: ${r.next_maintenance_type||'-'}\\n`;\n}\nreturn [{ json: { chatId: ctx.chatId, text } }];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-1047-1047-1047-000000001047",
+      "name": "Postgres: Set MaintLog Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        400
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: Build Maint Vehicle Keyboard').first().json.chatId, JSON.stringify($('Code: Build Maint Vehicle Keyboard').first().json.newState)]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "Shepherd DB"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1050-1050-1050-000000001050",
+      "name": "HTTP: GET Maint Types",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        540,
+        600
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/maintenance-types",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "X-Caller-Context",
+              "value": "{\"role\":\"admin\"}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1055-1055-1055-000000001055",
+      "name": "Postgres: Save MaintLog Type",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        540,
+        800
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
+        "additionalFields": {
+          "queryParams": "={{ JSON.stringify([$('Code: MaintLog SetType').first().json.chatId, JSON.stringify($('Code: MaintLog SetType').first().json.newState)]) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "Shepherd DB"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-6011-6011-6011-000000006011",
+      "name": "HTTP: GET Vehicles Overdue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FLEET_API_URL }}/vehicles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "X-Caller-Context",
+              "value": "{\"role\":\"admin\"}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-1046-1046-1046-000000001046",
+      "name": "Code: Build Maint Vehicle Keyboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('On Parent Call').first().json;\nconst res = $input.first().json;\nconst vehicles = Array.isArray(res)?res:(res.items||[]);\nconst rows = vehicles.slice(0,50).map(v=>[{ text: (v.licensing_plate||'')+' '+(v.model||''), callback_data:'ml_veh_'+v.vehicle_id }]);\nconst keyboard = { inline_keyboard: rows.length?rows:[[{text:'אין רכבים', callback_data:'noop'}]] };\nconst newState = { flow:'maint_log', step:'awaiting_vehicle' };\nreturn [{ json: { chatId: ctx.chatId, keyboard, newState } }];"
+      }
+    },
+    {
+      "id": "b1c2d3e4-7025-7025-7025-000000007025",
+      "name": "Switch: Step",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cmd_admin_maintenance",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "0",
+              "renameOutput": true,
+              "outputKeyName": "cmd_admin_maintenance"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cmd_maint_overdue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "1",
+              "renameOutput": true,
+              "outputKeyName": "cmd_maint_overdue"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cmd_maint_log",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "2",
+              "renameOutput": true,
+              "outputKeyName": "cmd_maint_log"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "maint_log_vehicle",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "3",
+              "renameOutput": true,
+              "outputKeyName": "maint_log_vehicle"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "maint_log_type",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "4",
+              "renameOutput": true,
+              "outputKeyName": "maint_log_type"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "maint_log_km",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "5",
+              "renameOutput": true,
+              "outputKeyName": "maint_log_km"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1c2d3e4-7026-7026-7026-000000007026",
+      "name": "Note 7026",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -150
+      ],
+      "parameters": {
+        "content": "## 🛠 Maintenance (admin)\n\nMenu → view overdue (`GET /vehicles`, filter km past due) OR log event (3-step: pick vehicle → type → km → `POST /vehicle_care`).\n\n**Routes:** `cmd_admin_maintenance`, `cmd_maint_overdue`, `cmd_maint_log`, `maint_log_vehicle`, `maint_log_type`, `maint_log_km`",
+        "height": 120,
+        "width": 900,
+        "color": 7
+      }
+    }
+  ],
+  "connections": {
+    "Code: Build Maint Type Keyboard": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Save MaintLog Vehicle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: GET Vehicles For Maint": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Maint Vehicle Keyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Clear MaintLog Session": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Maint Logged Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: MaintLog KM Valid": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Vehicle Care",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Send Maint KM Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: MaintLog SetVehicle": {
+      "main": [
+        [
+          {
+            "node": "HTTP: GET Maint Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: MaintLog SetType": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Save MaintLog Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Vehicle Care": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Clear MaintLog Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: MaintLog Validate KM": {
+      "main": [
+        [
+          {
+            "node": "IF: MaintLog KM Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Save MaintLog Vehicle": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Maint Type Keyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Overdue": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Set MaintLog Session": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Maint Vehicle Keyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: GET Maint Types": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Maint Type Keyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Save MaintLog Type": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Maint KM Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: GET Vehicles Overdue": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Maint Vehicle Keyboard": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Set MaintLog Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Parent Call": {
+      "main": [
+        [
+          {
+            "node": "Switch: Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Step": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Maintenance Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: GET Vehicles Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: GET Vehicles For Maint",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: MaintLog SetVehicle",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: MaintLog SetType",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: MaintLog Validate KM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

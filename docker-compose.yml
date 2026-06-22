@@ -233,8 +233,10 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./services/n8n/workflows:/workflows:ro
+    # --separate imports every *.json in the directory (router + all sub-workflows),
+    # which a single --input glob cannot do.
     entrypoint: >
-      sh -c "n8n import:workflow --input=/workflows/*.json 2>/dev/null || true && n8n start"
+      sh -c "n8n import:workflow --separate --input=/workflows 2>/dev/null || true && n8n start"
     depends_on:
       fleet-api:
         condition: service_healthy

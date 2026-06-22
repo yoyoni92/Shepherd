@@ -1,11 +1,59 @@
 # Shepherd Telegram Bot - Workflow Reference
 
-This document explains **every node** in `shepherd-telegram-bot.json`, grouped by
-flow, and how each node is configured. The bot is Hebrew-only, invite-only, and
-n8n owns Telegram directly (no Channel Gateway in the path).
+The bot is Hebrew-only, invite-only, and n8n owns Telegram directly (no Channel
+Gateway in the path). It is split into a **thin router workflow + one
+sub-workflow per feature** (n8n Execute Sub-workflow). This document explains the
+architecture and each flow.
 
-- **Workflow file:** `shepherd-telegram-bot.json`
-- **Nodes:** 151 | **Trigger:** Telegram webhook
+- **Router:** `shepherd-telegram-bot.json` (id `shepherdtelegrambot01`) - the only
+  workflow with the Telegram Trigger; it must be **activated** in the n8n UI.
+- **Sub-workflows:** `sub-*.json` (12 files) - one per case, each starting with an
+  Execute Workflow Trigger.
+- **Trigger:** Telegram webhook (on the router only).
+
+## Architecture
+
+```
+ROUTER  (shepherd-telegram-bot)
+  Telegram Trigger → Normalize → GET /whoami → Merge → Read Session (bot_sessions)
+    → Code: Route Decision  (computes {feature, route})
+    → Switch: Feature
+        menu_driver / menu_admin / access_denied  → inline send (1 node)
+        every other feature                       → Execute Sub-workflow (passes ctx)
+
+SUB  (sub-<feature>)
+  On Parent Call (Execute Workflow Trigger, passthrough → emits ctx as $json)
+    → [single chain]                 (one-shot features), or
+    → Switch: Step (on ctx.route)    → step handler chains   (multi-step features)
+```
+
+- The **parent owns all routing**: `Route Decision` merges the old Route Decision +
+  Active Flow Router into one node, producing `feature` (which sub) and `route`
+  (which step). Active-flow resume maps `sessionState.flow → feature`.
+- The sub receives the full `ctx` (`chatId, whoami, callbackData, text, video,
+  photo, sessionState, route`) on `$json` from its trigger. Inside a sub, the
+  cross-node anchor is `$('On Parent Call').first().json` (see Pattern E).
+
+### Sub-workflow map
+
+| Feature (`feature`) | Workflow | Routes | File |
+|---|---|---|---|
+| clock | Shepherd · Clock In/Out | cmd_clock_in, cmd_clock_out | `sub-clock.json` |
+| accident | Shepherd · Accident Protocol | cmd_accident + 7 steps | `sub-accident.json` |
+| attendance_csv | Shepherd · Monthly Attendance CSV | cmd_attendance_csv | `sub-attendance-csv.json` |
+| my_vehicle | Shepherd · My Vehicle | cmd_my_vehicle | `sub-my-vehicle.json` |
+| vehicle_issue | Shepherd · Report Vehicle Issue | cmd_vehicle_issue, vehicle_issue_text | `sub-vehicle-issue.json` |
+| update_details | Shepherd · Update My Details | cmd_update_details + 2 steps | `sub-update-details.json` |
+| broadcast | Shepherd · Broadcast | cmd_admin_broadcast + 3 | `sub-broadcast.json` |
+| attendance_admin | Shepherd · Today's Attendance | cmd_admin_attendance | `sub-attendance-admin.json` |
+| fleet_summary | Shepherd · Fleet Summary | cmd_admin_summary | `sub-fleet-summary.json` |
+| maintenance | Shepherd · Maintenance | cmd_admin_maintenance, overdue, log+3 | `sub-maintenance.json` |
+| update_driver | Shepherd · Update Driver | cmd_admin_update_driver + 3 | `sub-update-driver.json` |
+| invite_claim | Shepherd · Invite Claim | unknown_with_token | `sub-invite-claim.json` |
+
+`menu_driver`, `menu_admin`, `access_denied` are single-node sends kept inline in
+the router. All 13 files auto-import via the container entrypoint
+(`n8n import:workflow --separate --input=/workflows`).
 - **Credentials required (create in n8n UI):**
   - `Shepherd Telegram Bot` (Telegram API) - referenced as credential id `1`
   - `Shepherd DB` (Postgres) - referenced as credential id `2`
@@ -42,8 +90,18 @@ Direct call to the Bot API because the built-in Telegram node cannot send
 Same headers as B plus `Content-Type: application/json`, `sendBody: true`,
 `contentType: json`, and a `body` expression building the JSON payload.
 
+### Data-access policy (important)
+The workflow reaches the database **directly for one table only: `bot_sessions`**
+(its own conversation/orchestration state). Every other read or write goes
+through the Fleet API so auth, validation, and business rules are enforced in one
+place. That includes clock-in/out (`POST /attendance/clock-in|clock-out`, which
+enforce the reporting window server-side), driver edits (`PATCH /drivers/{id}`),
+attendance reads (`GET /attendance/today`, `GET /attendance/{month}?driver_id=`),
+overdue maintenance (`GET /vehicles`, filtered in a Code node), and config.
+
 ### Pattern D - Session read/write (`postgres`, cred `Shepherd DB`)
-Multi-step flows persist state in the `bot_sessions` table keyed by `chat_id`.
+The **only** direct-DB pattern. Multi-step flows persist state in `bot_sessions`
+keyed by `chat_id`.
 - **Create/replace session:**
   `INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1,$2::jsonb,NOW())
    ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()`
@@ -54,16 +112,19 @@ Multi-step flows persist state in the `bot_sessions` table keyed by `chat_id`.
 
 ### Pattern E - Cross-node data access (`code`)
 Because Postgres/HTTP nodes overwrite `$json`, downstream nodes re-read the
-originating node by name: `$('Node Name').first().json`. The two anchor nodes
-used most are `Switch: Main Router` (top-level command context) and
-`Code: Active Flow Router` (mid-flow context).
+originating node by name: `$('Node Name').first().json`. **Inside a sub-workflow**
+the context anchor is `$('On Parent Call').first().json` (the Execute Workflow
+Trigger that emits the `ctx` passed by the router). In the router itself, context
+comes from `$('Code: Merge whoami')` / `$('Code: Route Decision')`.
 
 ### `chat_id` shape
 `telegram_chat_id` is a Postgres `BIGINT`; Telegram chat ids exceed 32-bit.
 
 ---
 
-## Pipeline backbone (every update flows through these)
+## Router backbone (every update flows through these)
+
+Lives in `shepherd-telegram-bot.json`.
 
 | Node | Type | What it does |
 |---|---|---|
@@ -72,35 +133,12 @@ used most are `Switch: Main Router` (top-level command context) and
 | **HTTP: GET whoami** | httpRequest (B) | `GET /whoami?chat_id=` - resolves the chat to a bot user. `neverError` so a 404 (unknown user) doesn't abort. |
 | **Code: Merge whoami** | code | Merges the normalized fields with the whoami result. `whoami=null` when status≠200, marking an unknown user. |
 | **Postgres: Read Session** | postgres (D) | Reads `bot_sessions.state` for this chat (drives active-flow routing). |
-| **Code: Route Decision** | code | Computes `route`: unknown→`unknown_with_token`/`unknown_no_token`; active session→`active_flow`; else maps `callbackData` to a `cmd_*` route via a lookup table; default to `driver_main`/`admin_main` by role. |
-| **Switch: Main Router** | switch (19 outputs) | Routes on `route`. See table below. |
+| **Code: Route Decision** | code | Computes `{feature, route}`: unknown→`invite_claim`/`access_denied`; active session→`flowToFeature[flow]` + the resumed step; callback→feature+`cmd_*` via lookup; default→`menu_driver`/`menu_admin`. |
+| **Switch: Feature** | switch (15 outputs) | Routes on `feature`. Inline sends for `menu_driver`/`menu_admin`/`access_denied`; every other feature → an **Execute Sub-workflow** node (see the Sub-workflow map above). |
 
-### Switch: Main Router outputs
-
-| # | route | First node | Flow |
-|---|---|---|---|
-| 0 | unknown_with_token | HTTP: Claim Invite Token | Invite claim |
-| 1 | unknown_no_token | HTTP: Send Access Denied | Locked |
-| 2 | active_flow | Code: Active Flow Router | Resume multi-step |
-| 3 | driver_main | HTTP: Send Driver Main Menu | Driver menu |
-| 4 | admin_main | HTTP: Send Admin Main Menu | Admin menu |
-| 5 | cmd_clock_in | Code: Clock In Time | 4.1 |
-| 6 | cmd_clock_out | Code: Clock Out Time | 4.1 |
-| 7 | cmd_accident | HTTP: GET Driver Vehicle | 4.3 |
-| 8 | cmd_attendance_csv | Postgres: Get My Attendance Month | 4.5 |
-| 9 | cmd_my_vehicle | HTTP: GET My Vehicle | 4.6 |
-| 10 | cmd_vehicle_issue | Postgres: Set VehicleIssue Session | 4.2 |
-| 11 | cmd_update_details | Postgres: Set UpdateDetails Session | 4.4 |
-| 12 | cmd_admin_attendance | Postgres: Get Attendance Today | 5.1 |
-| 13 | cmd_admin_broadcast | Postgres: Set Broadcast Session | 5.2 |
-| 14 | cmd_admin_summary | HTTP: GET Fleet KPI | 5.3 |
-| 15 | cmd_admin_maintenance | HTTP: Send Maintenance Menu | 5.5 |
-| 16 | cmd_admin_update_driver | HTTP: GET Drivers List | 5.4 |
-| 17 | cmd_maint_overdue | Postgres: Get Overdue Maintenance | 5.5 |
-| 18 | cmd_maint_log | HTTP: GET Vehicles For Maint | 5.5 |
-
-> The earlier off-by-one (outputs 10+ shifted one slot) is fixed: the rules
-> array and connections array are rebuilt together from one ordered list.
+The fine-grained `route` (e.g. `cmd_clock_in`, `accident_video`,
+`update_details_value`) is passed into the sub-workflow, whose inner
+`Switch: Step` dispatches to the matching step handler.
 
 ---
 
@@ -150,22 +188,19 @@ When a session exists, the backbone routes to:
 
 ## Flow 4.1 - Clock In / Clock Out
 
-Both flows are gated by the **attendance reporting window** (feature flag, default
-off = any time allowed). Config keys in `system_config`:
-`attendance_window_enabled`, `attendance_window_start`, `attendance_window_end`
-(editable on the WebUI config page).
+Goes through the Fleet API; the **attendance reporting window** (feature flag,
+default off = any time allowed) is enforced **server-side** in the endpoint, not in
+n8n. Config keys (`system_config`, editable on the WebUI config page):
+`attendance_window_enabled`, `attendance_window_start`, `attendance_window_end`.
 
 **Clock in** (`cmd_clock_in`):
 | Node | Type | Detail |
 |---|---|---|
-| Postgres: Clock In Window | postgres | Reads the 3 `attendance_window_*` config keys (`alwaysOutputData`). |
-| Code: Clock In Time | code | Computes Israel-time `HH:MM`/`YYYY-MM-DD`; sets `blocked`+`blockMsg` if the window is enabled and now is outside `start..end`. |
-| IF: Clock In Allowed | if | `blocked` → block message; else → write. |
-| HTTP: Send Clock Blocked | httpRequest (A) | `⛔ דיווח נוכחות אפשרי רק בין ...` (shared by both flows). |
-| Postgres: Upsert Clock In | postgres | `INSERT ... ON CONFLICT (driver_id,work_date) DO UPDATE SET clock_in=... WHERE clock_in IS NULL` (idempotent). |
-| HTTP: Send Clock In Confirm | httpRequest (A) | `✅ כניסה נרשמה...` |
+| HTTP: POST Clock In | httpRequest (C) | `POST /attendance/clock-in {driver_id}`. Returns `{result, time, window_start, window_end}`; `result` ∈ `ok`/`already_in`/`blocked`. Idempotent + window check are in the API. |
+| Code: Format Clock In | code | Maps `result` → Hebrew (`✅ כניסה נרשמה...` / `כבר נרשמת...` / `⛔ דיווח נוכחות אפשרי רק בין ...`). |
+| HTTP: Send Clock In Result | httpRequest (A) | Sends the message. |
 
-**Clock out** (`cmd_clock_out`): `Postgres: Clock Out Window` → `Code: Clock Out Time` → `IF: Clock Out Allowed` → (blocked) `HTTP: Send Clock Blocked` / (allowed) `Postgres: Update Clock Out` → `HTTP: Send Clock Out Confirm`.
+**Clock out** (`cmd_clock_out`): `HTTP: POST Clock Out` (`result` ∈ `ok`/`no_open`/`blocked`, plus `hours`) → `Code: Format Clock Out` → `HTTP: Send Clock Out Result`.
 
 ---
 

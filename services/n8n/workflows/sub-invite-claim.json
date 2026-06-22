@@ -1,0 +1,264 @@
+{
+  "id": "subinviteclaim",
+  "name": "Shepherd · 🔑 Invite Claim",
+  "nodes": [
+    {
+      "id": "b1c2d3e4-7030-7030-7030-000000007030",
+      "name": "On Parent Call",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0014-0014-0014-000000000014",
+      "name": "HTTP: Send Invalid Token Msg",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '❌ הקישור אינו תקף או שפג תוקפו.\\nפנה/י למנהל לקבלת קישור חדש.', parse_mode: 'HTML' }) }}"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "HTTP: Claim Invite Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLEET_API_URL }}/bot-invite/claim",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            },
+            {
+              "name": "X-Caller-Context",
+              "value": "{\"role\":\"admin\"}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ token: $json.startToken, telegram_chat_id: String($json.chatId) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0012-0012-0012-000000000012",
+      "name": "Switch: Claim OK?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.claimSuccess }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "0",
+              "renameOutput": true,
+              "outputKeyName": "success"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.claimSuccess }}",
+                    "rightValue": false,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "1",
+              "renameOutput": true,
+              "outputKeyName": "failure"
+            }
+          ]
+        },
+        "fallbackOutput": "none"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0013-0013-0013-000000000013",
+      "name": "HTTP: Send Driver Menu After Claim",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '🎉 ברוך הבא למערכת Shepard!\\n\\n🚗 ניהול נהג - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [ [{text:'⏱ כניסה לעבודה', callback_data:'clock_in'},{text:'🚪 יציאה מעבודה', callback_data:'clock_out'}], [{text:'🔧 דיווח תקלה', callback_data:'vehicle_issue'},{text:'🚨 דיווח תאונה', callback_data:'accident_start'}], [{text:'✏️ עדכון פרטים', callback_data:'update_details'},{text:'📊 דוח נוכחות', callback_data:'attendance_csv'}], [{text:'🚗 הרכב שלי', callback_data:'my_vehicle'}] ] } }) }}"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0011-0011-0011-000000000011",
+      "name": "Code: Check Claim Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const claimResult = $input.first().json;\nconst ctx = $('On Parent Call').first().json;\nconst status = claimResult.$response?.statusCode || 200;\nconst success = status >= 200 && status < 300;\nreturn [{ json: { ...ctx, claimSuccess: success } }];"
+      }
+    },
+    {
+      "id": "b1c2d3e4-7031-7031-7031-000000007031",
+      "name": "Note 7031",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -150
+      ],
+      "parameters": {
+        "content": "## 🔑 Invite Claim\n\n`/start <token>` → `POST /bot-invite/claim`. Success → welcome + driver menu. Failure → invalid-token message.\n\n**Routes:** `unknown_with_token`",
+        "height": 120,
+        "width": 900,
+        "color": 7
+      }
+    }
+  ],
+  "connections": {
+    "HTTP: Claim Invite Token": {
+      "main": [
+        [
+          {
+            "node": "Code: Check Claim Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Claim OK?": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Driver Menu After Claim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Send Invalid Token Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Check Claim Result": {
+      "main": [
+        [
+          {
+            "node": "Switch: Claim OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Parent Call": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Claim Invite Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
