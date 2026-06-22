@@ -6,7 +6,7 @@ sub-workflow per feature** (n8n Execute Sub-workflow). This document explains th
 architecture and each flow.
 
 - **Router:** `shepherd-telegram-bot.json` (id `shepherdtelegrambot01`) - the only
-  workflow with the Telegram Trigger; it must be **activated** in the n8n UI.
+  workflow with the Telegram Trigger; the compose entrypoint activates it on boot.
 - **Sub-workflows:** `sub-*.json` (12 files) - one per case, each starting with an
   Execute Workflow Trigger.
 - **Trigger:** Telegram webhook (on the router only).
@@ -54,15 +54,24 @@ SUB  (sub-<feature>)
 `menu_driver`, `menu_admin`, `access_denied` are single-node sends kept inline in
 the router. All 13 files auto-import via the container entrypoint
 (`n8n import:workflow --separate --input=/workflows`).
-- **Credentials required (create in n8n UI):**
-  - `Shepherd Telegram Bot` (Telegram API) - referenced as credential id `1`
-  - `Shepherd DB` (Postgres) - referenced as credential id `2`
-  - `Shepherd AWS` (AWS) - referenced as credential id `3`; used by the accident
-    `S3 Upload *` nodes to sign the PUT with SigV4. Without it the uploads 403.
-- **Environment variables (set on the n8n container):**
+- **Credentials** (provisioned with fixed ids so the imported workflows resolve
+  without manual re-attaching, e.g. `n8n import:credentials` sourced from the
+  container env):
+  - `shepherdtgcred` - `Shepherd Telegram Bot` (Telegram API), used by the trigger.
+  - `shepherddbcred` - `Shepherd DB` (Postgres), points at the local `postgres`
+    service; used by the `bot_sessions` nodes.
+  - `shepherdawscred` - `Shepherd AWS` (AWS), used by the accident `S3 Upload *`
+    nodes (SigV4). **Deferred** until AWS keys are set; accident media uploads 403
+    without it. Everything else works.
+- **Environment variables (set on the n8n container, via `docker-compose`):**
   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `FLEET_API_URL`,
-  `INTERNAL_SERVICE_TOKEN`, `S3_BUCKET`, `AWS_ACCESS_KEY_ID`,
-  `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`.
+  `INTERNAL_SERVICE_TOKEN`, `S3_BUCKET`, `AWS_*`, plus
+  `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` (required - the workflow reads `$env`/
+  `process.env` in nodes; n8n blocks this by default) and
+  `GENERIC_TIMEZONE`/`TZ=Asia/Jerusalem`.
+- **Activation:** the compose entrypoint re-activates the router after each import
+  (`n8n update:workflow --active=true --id=shepherdtelegrambot01`), since import
+  deactivates workflows. Sub-workflows run on demand and stay inactive.
 
 ---
 
@@ -402,4 +411,5 @@ by Route Decision to `cmd_maint_overdue` / `cmd_maint_log`.
 The flows and routing were generated/repaired programmatically. If you change
 the Main Router or Active Flow Routes outputs, keep the `rules` array and the
 `connections` array index-aligned (the original off-by-one bug came from editing
-one without the other). After importing into n8n, re-attach the two credentials.
+one without the other). Credentials resolve automatically via the fixed ids
+(`shepherdtgcred` / `shepherddbcred` / `shepherdawscred`).

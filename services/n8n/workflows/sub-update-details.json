@@ -33,7 +33,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -132,7 +132,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -189,7 +189,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }

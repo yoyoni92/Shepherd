@@ -18,7 +18,7 @@
       },
       "credentials": {
         "telegramApi": {
-          "id": "1",
+          "id": "shepherdtgcred",
           "name": "Shepherd Telegram Bot"
         }
       }
@@ -102,7 +102,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }

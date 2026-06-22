@@ -51,7 +51,7 @@
       },
       "credentials": {
         "aws": {
-          "id": "3",
+          "id": "shepherdawscred",
           "name": "Shepherd AWS"
         }
       }
@@ -121,7 +121,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -144,7 +144,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -167,7 +167,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -224,7 +224,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -325,7 +325,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -366,7 +366,7 @@
       },
       "credentials": {
         "aws": {
-          "id": "3",
+          "id": "shepherdawscred",
           "name": "Shepherd AWS"
         }
       }
@@ -472,7 +472,7 @@
       },
       "credentials": {
         "aws": {
-          "id": "3",
+          "id": "shepherdawscred",
           "name": "Shepherd AWS"
         }
       }
@@ -676,7 +676,7 @@
       },
       "credentials": {
         "aws": {
-          "id": "3",
+          "id": "shepherdawscred",
           "name": "Shepherd AWS"
         }
       }
@@ -857,7 +857,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -940,7 +940,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }
@@ -1015,7 +1015,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "2",
+          "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
       }

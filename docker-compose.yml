@@ -214,6 +214,13 @@ services:
       DB_POSTGRESDB_USER: ${POSTGRES_USER:-shepherd}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-shepherd}
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-me-32chars}
+      # Instance timezone (Schedule/Cron nodes + Date helpers) and OS clock.
+      GENERIC_TIMEZONE: Asia/Jerusalem
+      TZ: Asia/Jerusalem
+      # Allow workflow Code/expression nodes to read container env ($env.* and
+      # process.env.*) - the bot reads TELEGRAM_BOT_TOKEN, FLEET_API_URL,
+      # INTERNAL_SERVICE_TOKEN, S3_BUCKET this way. n8n blocks this by default.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       N8N_HOST: 0.0.0.0
       # Telegram webhooks require HTTPS. The localtunnel sidecar (below) exposes n8n at
       # https://<subdomain>.loca.lt and n8n auto-registers the bot webhook against this.
@@ -233,10 +240,12 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./services/n8n/workflows:/workflows:ro
-    # --separate imports every *.json in the directory (router + all sub-workflows),
-    # which a single --input glob cannot do.
+    # --separate imports every *.json in the directory (router + all sub-workflows).
+    # import deactivates workflows, so re-activate the router (the only one with a
+    # Telegram Trigger) before start; sub-workflows run on demand via Execute and
+    # don't need to be active. This runs before `n8n start`, so it persists.
     entrypoint: >
-      sh -c "n8n import:workflow --separate --input=/workflows 2>/dev/null || true && n8n start"
+      sh -c "n8n import:workflow --separate --input=/workflows 2>/dev/null || true && n8n update:workflow --active=true --id=shepherdtelegrambot01 2>/dev/null || true && n8n start"
     depends_on:
       fleet-api:
         condition: service_healthy
