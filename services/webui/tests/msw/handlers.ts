@@ -43,6 +43,23 @@ const KPI_DAILY = [
   { snapshot_date: '2026-06-18', total_km_7d: 1000, avg_km_per_driver_7d: 250, avg_days_between_maintenance: 45, maintenance_due_count: 4, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 700, top_customer_vehicle_count: 2, computed_ts: '2026-06-18T03:00:00Z' },
 ]
 
+const ACCIDENTS = [
+  {
+    accident_id: 'a1', vehicle_id: 'v1', driver_id: 'd1',
+    datetime: '2026-06-10T09:30:00', location: 'תל אביב', description: 'פגיעה קלה',
+    another_driver_licensing_plate: null, another_driver_phone_number: null, another_driver_id_number: null,
+    attachments: [
+      { attachment_id: 'att1', category: 'photo_our_vehicle', file_url: 's3://shepherd-accidents/a1/photo.jpg', uploaded_ts: '2026-06-10T10:00:00' },
+    ],
+  },
+  {
+    accident_id: 'a2', vehicle_id: 'v2', driver_id: null,
+    datetime: '2026-05-20T14:00:00', location: null, description: null,
+    another_driver_licensing_plate: '77-777-77', another_driver_phone_number: '054-111-2222', another_driver_id_number: '123456789',
+    attachments: [],
+  },
+]
+
 const CONFIG = [
   { config_key: 'license_expiring_days', config_value: 30, description: 'days ahead to warn on רישוי' },
   { config_key: 'insurance_expiring_days', config_value: 30, description: 'days ahead to warn on insurance' },
@@ -74,6 +91,13 @@ export const handlers = [
     return HttpResponse.json({ driver_id: params.id, full_name: 'n', phone_number: 'p', status: 'active', ...body })
   }),
   http.delete(`${FLEET}/drivers/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  // Accidents
+  http.get(`${FLEET}/accidents`, () => HttpResponse.json(ACCIDENTS)),
+  http.post(`${FLEET}/accidents`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ accident_id: 'a99', ...body }, { status: 201 })
+  }),
 
   // Events / reports
   http.get(`${FLEET}/events`, () => HttpResponse.json(EVENTS)),

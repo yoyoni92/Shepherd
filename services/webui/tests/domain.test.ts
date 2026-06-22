@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { initials, avatarColor, daysTo, fmtDate, sortItems } from '@/lib/domain'
+import { initials, avatarColor, daysTo, fmtDate, fmtDateTime, sortItems } from '@/lib/domain'
 
 const TODAY = new Date('2026-06-19T00:00:00')
 
@@ -36,6 +36,15 @@ describe('daysTo', () => {
 describe('fmtDate', () => {
   it('formats ISO dates as DD/MM/YYYY', () => {
     expect(fmtDate('2026-09-02')).toBe('02/09/2026')
+  })
+})
+
+describe('fmtDateTime', () => {
+  it('formats ISO datetime without timezone as DD/MM/YYYY HH:MM', () => {
+    expect(fmtDateTime('2026-06-21T09:30:00')).toBe('21/06/2026 09:30')
+  })
+  it('zero-pads single-digit hours and minutes', () => {
+    expect(fmtDateTime('2026-01-05T08:05:00')).toBe('05/01/2026 08:05')
   })
 })
 
