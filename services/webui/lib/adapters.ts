@@ -77,8 +77,8 @@ export function toUiAccident(
   return {
     id: a.accident_id,
     vehicleId: a.vehicle_id,
-    vehiclePlate: v?.plate ?? '—',
-    vehicleMake: v?.make ?? '—',
+    vehiclePlate: v?.plate ?? '-',
+    vehicleMake: v?.make ?? '-',
     vehicleModel: v?.model ?? '',
     driverId: a.driver_id ?? null,
     driverName: d?.name ?? null,
