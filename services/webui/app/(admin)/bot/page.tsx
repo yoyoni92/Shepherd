@@ -107,7 +107,7 @@ function BotUsersSection() {
           <table className="w-full text-[13px]" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                {['שם נהג', 'תפקיד', 'Telegram ID', 'תאריך הצטרפות', 'פעולות'].map((h) => (
+                {['שם נהג', 'תפקיד', 'טלפון', 'Telegram ID', 'תאריך הצטרפות', 'פעולות'].map((h) => (
                   <th
                     key={h}
                     className="text-right text-[11px] font-bold text-faint"
@@ -130,6 +130,9 @@ function BotUsersSection() {
                     <td style={{ padding: '10px 16px' }}>{u.driver_name ?? '—'}</td>
                     <td style={{ padding: '10px 16px' }}>
                       <RoleBadge role={u.role} />
+                    </td>
+                    <td className="ltr" style={{ padding: '10px 16px', color: 'var(--muted)' }}>
+                      {u.phone_number ?? '—'}
                     </td>
                     <td className="ltr" style={{ padding: '10px 16px', color: 'var(--muted)' }}>
                       {u.telegram_chat_id}

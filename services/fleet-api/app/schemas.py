@@ -409,6 +409,7 @@ class BotUserRead(BaseModel):
     user_id: UUID
     telegram_chat_id: int
     role: str
+    phone_number: str | None = None
     driver_id: UUID | None = None
     driver_name: str | None = None
     created_at: datetime

@@ -553,13 +553,22 @@ def create_bot_invite(
     session: Session, driver_id: UUID | None, token: str, role: str = "driver",
     phone_number: str | None = None,
 ) -> BotInviteToken:
-    from datetime import datetime, timezone
-    # Only a driver can have a prior token to invalidate; admin invites have no driver.
+    from sqlalchemy import delete as sa_delete
+    # Supersede prior unused invites by deleting them (not soft-expiring) so the table
+    # stays clean. Dedupe by driver for driver invites, by phone for standalone ones.
     if driver_id is not None:
         session.execute(
-            update(BotInviteToken)
-            .where(BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None))
-            .values(expires_at=datetime.now(timezone.utc))
+            sa_delete(BotInviteToken).where(
+                BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None)
+            )
+        )
+    elif phone_number is not None:
+        session.execute(
+            sa_delete(BotInviteToken).where(
+                BotInviteToken.driver_id.is_(None),
+                BotInviteToken.phone_number == phone_number,
+                BotInviteToken.used_at.is_(None),
+            )
         )
     invite = BotInviteToken(token=token, driver_id=driver_id, role=role, phone_number=phone_number)
     session.add(invite)
@@ -586,7 +595,7 @@ def claim_bot_invite(
     if existing is not None:
         session.delete(existing)
         session.flush()
-    user = BotUser(telegram_chat_id=telegram_chat_id, role=invite.role, driver_id=invite.driver_id)
+    user = BotUser(telegram_chat_id=telegram_chat_id, role=invite.role, driver_id=invite.driver_id, phone_number=invite.phone_number)
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -607,11 +616,11 @@ def list_pending_bot_invites(session: Session) -> list[BotInviteToken]:
 
 
 def revoke_bot_invite(session: Session, token: str) -> str:
+    # Hard-delete the row (used or not) - the created bot user is a separate table,
+    # so removing the invite leaves access intact and keeps this table clean.
     invite = session.get(BotInviteToken, token)
     if invite is None:
         return "not_found"
-    if invite.used_at is not None:
-        return "already_used"
     session.delete(invite)
     session.commit()
     return "ok"

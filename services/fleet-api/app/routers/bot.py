@@ -118,8 +118,6 @@ def revoke_invite(token: str, session: Db, caller: Caller) -> None:
     result = repo.revoke_bot_invite(session, token)
     if result == "not_found":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
-    if result == "already_used":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token already used")
 
 
 @router.get(
@@ -136,6 +134,7 @@ def list_users(session: Db, caller: Caller, role: str | None = None) -> list[Bot
             user_id=u.id,
             telegram_chat_id=u.telegram_chat_id,
             role=u.role.value,
+            phone_number=u.phone_number or (u.driver.phone_number if u.driver else None),
             driver_id=u.driver_id,
             driver_name=u.driver.full_name if u.driver else None,
             created_at=u.created_at,
@@ -158,6 +157,7 @@ def update_user_role(user_id: UUID, body: UserRolePatch, session: Db, caller: Ca
         user_id=user.id,
         telegram_chat_id=user.telegram_chat_id,
         role=user.role.value,
+        phone_number=user.phone_number or (user.driver.phone_number if user.driver else None),
         driver_id=user.driver_id,
         driver_name=user.driver.full_name if user.driver else None,
         created_at=user.created_at,

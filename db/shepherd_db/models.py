@@ -656,6 +656,7 @@ class BotUser(Base):
     )
     telegram_chat_id = mapped_column(BigInteger, nullable=False, unique=True)
     role = mapped_column(user_role_type, nullable=False, server_default="driver")
+    phone_number = mapped_column(Text, nullable=True)
     driver_id = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("drivers.driver_id"),

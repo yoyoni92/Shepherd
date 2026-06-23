@@ -152,6 +152,7 @@ export const BotUserReadSchema = z.object({
   user_id: z.string(),
   telegram_chat_id: z.number(),
   role: z.enum(['admin', 'driver']),
+  phone_number: z.string().nullish(),
   driver_id: z.string().nullish(),
   driver_name: z.string().nullish(),
   created_at: z.string(),
