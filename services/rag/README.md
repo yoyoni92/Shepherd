@@ -3,7 +3,9 @@
 Semantic Q&A grounded in vehicle-profile docs synced from Postgres.
 Prompt-engineering surface #3.
 
-Stack: FastAPI, ChromaDB, `paraphrase-multilingual-MiniLM-L12-v2`, LangChain, Llama.cpp.
+Stack: FastAPI, ChromaDB, `paraphrase-multilingual-MiniLM-L12-v2` (local embeddings),
+LangChain. Generation is Anthropic Claude at runtime; Llama.cpp is used only by the
+offline eval `--live` path (see below).
 
 ## Setup
 
@@ -17,12 +19,14 @@ poetry install
 | Var | Description |
 |-----|-------------|
 | `DATABASE_URL` | Read-only Postgres URL (uses `rag_readonly` role) |
-| `LLAMA_MODEL_PATH` | Absolute path to a GGUF model file |
+| `ANTHROPIC_API_KEY` | Anthropic key - generation at runtime |
+| `ANTHROPIC_MODEL` | Generation model (default: `claude-sonnet-4-6`) |
+| `LLAMA_MODEL_PATH` | Only for `eval.run --live`: absolute path to a GGUF model file |
 
 ## Run
 
 ```bash
-uvicorn app.main:app --port 8003
+uvicorn app.main:app --port 8000   # compose publishes this on host port 8004
 ```
 
 ## Test
