@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7007-7007-7007-000000007007",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -156,7 +156,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

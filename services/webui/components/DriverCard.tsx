@@ -10,17 +10,19 @@ import { createBotInvite } from '@/lib/api/fleet'
 
 const DASH = '—'
 
-function TelegramPanel({ driverId, botUsers }: { driverId: string; botUsers: BotUserRead[] }) {
+function TelegramPanel({ driverId, phone, botUsers }: { driverId: string; phone: string; botUsers: BotUserRead[] }) {
   const connected = botUsers.find((u) => u.driver_id === driverId)
   const [open, setOpen] = useState(false)
   const [deepLink, setDeepLink] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const hasPhone = !!phone && phone !== DASH
 
   const handleCreate = async () => {
     setLoading(true)
     try {
-      const res = await createBotInvite({ driverId, role: 'driver' })
+      // Phone is mandatory for claim-time identity verification; use the driver's number.
+      const res = await createBotInvite({ driverId, role: 'driver', phoneNumber: phone })
       setDeepLink(res.deep_link)
     } finally {
       setLoading(false)
@@ -62,7 +64,13 @@ function TelegramPanel({ driverId, botUsers }: { driverId: string; botUsers: Bot
 
           {!connected && (
             <>
-              <Button variant="secondary" size="sm" onClick={handleCreate} disabled={loading}>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-faint">אימות מול טלפון:</span>
+                <span className="text-[12px] font-semibold ltr" style={{ color: hasPhone ? 'var(--muted)' : '#f87171' }}>
+                  {hasPhone ? phone : 'חסר מספר טלפון'}
+                </span>
+              </div>
+              <Button variant="secondary" size="sm" onClick={handleCreate} disabled={loading || !hasPhone}>
                 {loading ? 'יוצר...' : '🔗 צור קישור הזמנה'}
               </Button>
               {deepLink && (
@@ -163,7 +171,7 @@ export function DriverCard({
         </Button>
       </div>
 
-      <TelegramPanel driverId={d.id} botUsers={botUsers} />
+      <TelegramPanel driverId={d.id} phone={d.phone} botUsers={botUsers} />
     </Card>
   )
 }

@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7001-7001-7001-000000007001",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -42,7 +42,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ driver_id: $json.whoami.driver_id }) }}",
         "options": {
           "response": {
             "response": {
@@ -50,7 +49,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ driver_id: $json.whoami.driver_id }) }}"
       }
     },
     {
@@ -76,7 +77,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -84,7 +84,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -123,7 +125,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -131,7 +132,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -161,7 +164,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ driver_id: $json.whoami.driver_id }) }}",
         "options": {
           "response": {
             "response": {
@@ -169,7 +171,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ driver_id: $json.whoami.driver_id }) }}"
       }
     },
     {
@@ -340,7 +344,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

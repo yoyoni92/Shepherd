@@ -238,9 +238,13 @@ function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
       setErr('יש לבחור נהג עבור הזמנת נהג')
       return
     }
+    if (!phoneNumber.trim()) {
+      setErr('יש להזין מספר טלפון לאימות זהות')
+      return
+    }
     setBusy(true)
     try {
-      const res = await createInvite({ driverId: driverId || undefined, role, phoneNumber: phoneNumber.trim() || undefined })
+      const res = await createInvite({ driverId: driverId || undefined, role, phoneNumber: phoneNumber.trim() })
       setLink(res.deep_link)
     } catch {
       setErr('יצירת ההזמנה נכשלה')
@@ -320,7 +324,7 @@ function AddBotUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 </select>
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-[12px] font-semibold text-faint">מספר טלפון (אופציונלי - לאימות זהות)</label>
+                <label className="text-[12px] font-semibold text-faint">מספר טלפון (חובה - לאימות זהות)</label>
                 <input
                   type="tel"
                   value={phoneNumber}

@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7014-7014-7014-000000007014",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -27,8 +27,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: UpdateDetails SetField').first().json.chatId, JSON.stringify($('Code: UpdateDetails SetField').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: UpdateDetails SetField').first().json.chatId, JSON.stringify($('Code: UpdateDetails SetField').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -36,7 +36,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-6007-6007-6007-000000006007",
@@ -69,7 +70,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ [$('Code: UpdateDetails Validate').first().json.column]: $('Code: UpdateDetails Validate').first().json.value }) }}",
         "options": {
           "response": {
             "response": {
@@ -77,7 +77,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ [$('Code: UpdateDetails Validate').first().json.column]: $('Code: UpdateDetails Validate').first().json.value }) }}"
       }
     },
     {
@@ -103,7 +105,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDetails Validate').first().json.chatId, text: $('Code: UpdateDetails Validate').first().json.errorMsg, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -111,7 +112,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDetails Validate').first().json.chatId, text: $('Code: UpdateDetails Validate').first().json.errorMsg, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -126,8 +129,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: UpdateDetails Validate').first().json.chatId]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: UpdateDetails Validate').first().json.chatId] }}"
         }
       },
       "credentials": {
@@ -135,7 +138,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1015-1015-1015-000000001015",
@@ -160,7 +164,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '✏️ עדכון פרטים\\n\\nבחר/י שדה לעדכון:', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📅 תוקף רישיון', callback_data:'ud_license_valid'}],[{text:'🪪 מספר רישיון', callback_data:'ud_license_number'}],[{text:'📱 טלפון', callback_data:'ud_phone'}]] } }) }}",
         "options": {
           "response": {
             "response": {
@@ -168,7 +171,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '✏️ עדכון פרטים\\n\\nבחר/י שדה לעדכון:', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📅 תוקף רישיון', callback_data:'ud_license_valid'}],[{text:'🪪 מספר רישיון', callback_data:'ud_license_number'}],[{text:'📱 טלפון', callback_data:'ud_phone'}]] } }) }}"
       }
     },
     {
@@ -183,8 +188,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({flow:'update_details', step:'awaiting_field'})]) }}"
+        "options": {
+          "queryReplacement": "={{ [$json.chatId, JSON.stringify({flow:'update_details', step:'awaiting_field'})] }}"
         }
       },
       "credentials": {
@@ -192,7 +197,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1020-1020-1020-000000001020",
@@ -261,7 +267,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDetails Validate').first().json.chatId, text: '✅ הפרטים עודכנו בהצלחה.', parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -269,7 +274,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDetails Validate').first().json.chatId, text: '✅ הפרטים עודכנו בהצלחה.', parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -308,7 +315,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDetails SetField').first().json.chatId, text: $('Code: UpdateDetails SetField').first().json.prompt, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -316,7 +322,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDetails SetField').first().json.chatId, text: $('Code: UpdateDetails SetField').first().json.prompt, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -544,7 +552,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

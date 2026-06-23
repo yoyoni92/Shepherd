@@ -52,10 +52,18 @@ def create_invite(body: BotInviteCreate, session: Db, caller: Caller) -> BotInvi
     # Driver invites must name a driver; admin invites may be standalone (no driver).
     if body.role == "driver" and body.driver_id is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="driver_id required for a driver invite")
-    if body.driver_id is not None and repo.get_driver(session, body.driver_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+    driver = None
+    if body.driver_id is not None:
+        driver = repo.get_driver(session, body.driver_id)
+        if driver is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+    # Phone is mandatory for identity verification at claim time. Driver invites
+    # default to the driver's stored phone; otherwise the caller must supply one.
+    phone_number = body.phone_number or (driver.phone_number if driver else None)
+    if not phone_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="phone_number required")
     token_str = str(uuid.uuid4())
-    invite = repo.create_bot_invite(session, body.driver_id, token_str, body.role, body.phone_number)
+    invite = repo.create_bot_invite(session, body.driver_id, token_str, body.role, phone_number)
     bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "ShepherdBot")
     return BotInviteResponse(
         token=invite.token,

@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7011-7011-7011-000000007011",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -38,7 +38,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '🔧 דיווח תקלה\\n\\nתאר/י את התקלה ברכב (טקסט חופשי):', parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -46,7 +45,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '🔧 דיווח תקלה\\n\\nתאר/י את התקלה ברכב (טקסט חופשי):', parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -109,8 +110,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({flow:'vehicle_issue', step:'awaiting_description'})]) }}"
+        "options": {
+          "queryReplacement": "={{ [$json.chatId, JSON.stringify({flow:'vehicle_issue', step:'awaiting_description'})] }}"
         }
       },
       "credentials": {
@@ -118,7 +119,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1011-1011-1011-000000001011",
@@ -151,7 +153,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ vehicle_id: $json.vehicleId, event_type:'warning', severity:'warning', message: 'תקלה מהנהג: ' + $json.message, source_type:'telegram' }) }}",
         "options": {
           "response": {
             "response": {
@@ -159,7 +160,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vehicle_id: $json.vehicleId, event_type:'warning', severity:'warning', message: 'תקלה מהנהג: ' + $json.message, source_type:'telegram' }) }}"
       }
     },
     {
@@ -185,7 +188,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Prepare Issue Event').first().json.chatId, text: '✅ התקלה נרשמה. תודה!', parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -193,7 +195,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Prepare Issue Event').first().json.chatId, text: '✅ התקלה נרשמה. תודה!', parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -208,8 +212,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Prepare Issue Event').first().json.chatId]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Prepare Issue Event').first().json.chatId] }}"
         }
       },
       "credentials": {
@@ -217,7 +221,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "b1c2d3e4-7012-7012-7012-000000007012",
@@ -385,7 +390,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

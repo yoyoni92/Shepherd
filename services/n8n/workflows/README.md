@@ -49,7 +49,7 @@ SUB  (sub-<feature>)
 | fleet_summary | Shepherd · Fleet Summary | cmd_admin_summary | `sub-fleet-summary.json` |
 | maintenance | Shepherd · Maintenance | cmd_admin_maintenance, overdue, log+3 | `sub-maintenance.json` |
 | update_driver | Shepherd · Update Driver | cmd_admin_update_driver + 3 | `sub-update-driver.json` |
-| invite_claim | Shepherd · Invite Claim | unknown_with_token | `sub-invite-claim.json` |
+| invite_claim | Shepherd · Invite Claim | claim_request_phone, claim_with_phone | `sub-invite-claim.json` |
 
 `menu_driver`, `menu_admin`, `access_denied` are single-node sends kept inline in
 the router. All 13 files auto-import via the container entrypoint
@@ -69,9 +69,10 @@ the router. All 13 files auto-import via the container entrypoint
   `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` (required - the workflow reads `$env`/
   `process.env` in nodes; n8n blocks this by default) and
   `GENERIC_TIMEZONE`/`TZ=Asia/Jerusalem`.
-- **Activation:** the compose entrypoint re-activates the router after each import
-  (`n8n update:workflow --active=true --id=shepherdtelegrambot01`), since import
-  deactivates workflows. Sub-workflows run on demand and stay inactive.
+- **Activation/publish:** import deactivates workflows, and this n8n version
+  requires Execute-referenced sub-workflows to be **published** too. The compose
+  entrypoint publishes every sub first, then the router
+  (`n8n publish:workflow --id=<id>` per workflow), before `n8n start`.
 
 ---
 
@@ -86,7 +87,7 @@ Direct call to the Bot API because the built-in Telegram node cannot send
 - **method:** `POST`
 - **url:** `https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage`
 - **header:** `Content-Type: application/json`
-- **body:** `={{ JSON.stringify({ chat_id, text, parse_mode:'HTML', reply_markup }) }}`
+- **jsonBody** (with `specifyBody: json`): `={{ JSON.stringify({ chat_id, text, parse_mode:'HTML', reply_markup }) }}`
 - **options:** `neverError: true` so a Telegram 4xx doesn't abort the run.
 
 ### Pattern B - Call the Fleet API, GET (`httpRequest`)
@@ -96,8 +97,10 @@ Direct call to the Bot API because the built-in Telegram node cannot send
 - **options:** `neverError: true`, `responseFormat: json`.
 
 ### Pattern C - Call the Fleet API, POST (`httpRequest`)
-Same headers as B plus `Content-Type: application/json`, `sendBody: true`,
-`contentType: json`, and a `body` expression building the JSON payload.
+Same headers as B plus `sendBody: true`, `contentType: json`, **`specifyBody:
+json`**, and a **`jsonBody`** expression building the JSON payload. (n8n
+httpRequest v4 ignores a plain `body` field when contentType is json - it needs
+`specifyBody: json` + `jsonBody`, else it sends an empty body.)
 
 ### Data-access policy (important)
 The workflow reaches the database **directly for one table only: `bot_sessions`**
@@ -117,7 +120,10 @@ keyed by `chat_id`.
 - **Patch one field:** `UPDATE bot_sessions SET state = jsonb_set(state,'{step}','"..."') WHERE chat_id=$1`
 - **Merge:** `UPDATE bot_sessions SET state = state || $2::jsonb WHERE chat_id=$1`
 - **Clear:** `DELETE FROM bot_sessions WHERE chat_id=$1`
-- **params:** passed via `additionalFields.queryParams` as a JSON-stringified array.
+- **params:** passed via `options.queryReplacement` as a single expression that
+  resolves to an **array** (e.g. `={{ [$json.chatId] }}`); the Postgres v2.5 node
+  binds `$1,$2,...` from it. Nodes set `alwaysOutputData: true` so a 0-row read
+  still passes an item downstream (otherwise the chain dead-ends).
 
 ### Pattern E - Cross-node data access (`code`)
 Because Postgres/HTTP nodes overwrite `$json`, downstream nodes re-read the
@@ -142,7 +148,7 @@ Lives in `shepherd-telegram-bot.json`.
 | **HTTP: GET whoami** | httpRequest (B) | `GET /whoami?chat_id=` - resolves the chat to a bot user. `neverError` so a 404 (unknown user) doesn't abort. |
 | **Code: Merge whoami** | code | Merges the normalized fields with the whoami result. `whoami=null` when status≠200, marking an unknown user. |
 | **Postgres: Read Session** | postgres (D) | Reads `bot_sessions.state` for this chat (drives active-flow routing). |
-| **Code: Route Decision** | code | Computes `{feature, route}`: unknown→`invite_claim`/`access_denied`; active session→`flowToFeature[flow]` + the resumed step; callback→feature+`cmd_*` via lookup; default→`menu_driver`/`menu_admin`. |
+| **Code: Route Decision** | code | Computes `{feature, route}`: unknown→`invite_claim` (phone-verified) / `access_denied`; active session→`flowToFeature[flow]` + the resumed step; callback→feature+`cmd_*` via lookup; default→`menu_driver`/`menu_admin`. |
 | **Switch: Feature** | switch (15 outputs) | Routes on `feature`. Inline sends for `menu_driver`/`menu_admin`/`access_denied`; every other feature → an **Execute Sub-workflow** node (see the Sub-workflow map above). |
 
 The fine-grained `route` (e.g. `cmd_clock_in`, `accident_video`,
@@ -153,14 +159,29 @@ The fine-grained `route` (e.g. `cmd_clock_in`, `accident_video`,
 
 ## Access control
 
-### Invite claim (`/start <token>`)
+### Invite claim (`/start <token>`) - 2-step, phone-verified
+
+Every invite carries a `phone_number` (mandatory). The claim is verified against a
+**Telegram-shared contact**, so a token alone is not enough. `Switch: Step` (on
+`route`) drives the two steps:
+
+**Step 1 - `claim_request_phone`** (router routes `/start <token>` here):
 | Node | Type | Detail |
 |---|---|---|
-| HTTP: Claim Invite Token | httpRequest (C) | `POST /bot-invite/claim {token, telegram_chat_id}`. 200 creates a `users` row; 400 = invalid/expired. |
-| Code: Check Claim Result | code | Reads the status into a boolean. |
-| Switch: Claim OK? | switch | Branch on success. |
-| HTTP: Send Driver Menu After Claim | httpRequest (A) | Welcome + driver menu. |
-| HTTP: Send Invalid Token Msg | httpRequest (A) | `❌ הקישור אינו תקף או שפג תוקפו.` |
+| Postgres: Save Claim Session | postgres (D) | Stores `{flow:'invite_claim', token}` in `bot_sessions`. |
+| HTTP: Send Phone Request | httpRequest (A) | Asks to share phone via a `request_contact` reply-keyboard button. |
+
+**Step 2 - `claim_with_phone`** (router routes a shared contact here when a claim
+session exists; `Normalize` only accepts a contact whose `user_id === sender`):
+| Node | Type | Detail |
+|---|---|---|
+| HTTP: Claim Invite Token | httpRequest (C) | `POST /bot-invite/claim {token (from session), telegram_chat_id, phone_number}`. 200 → `users` row (role from invite); 403 = phone mismatch; 400 = invalid/expired. |
+| Code: Check Claim Result | code | `claimSuccess = !!user_id`; carries `claimRole` + `failReason`. |
+| Switch: Claim OK? | switch | success → IF role / fail → message. |
+| IF: Claim Is Admin | if | Routes to the matching welcome menu. |
+| HTTP: Send Admin/Driver Menu After Claim | httpRequest (A) | Role-correct welcome + menu. |
+| HTTP: Send Invalid Token Msg | httpRequest (A) | `phone_mismatch` → "phone doesn't match"; else "link invalid/expired". |
+| Postgres: Clear Claim Session | postgres (D) | Clears the pending session (success or fail). |
 
 ### Locked / access denied
 | Node | Type | Detail |

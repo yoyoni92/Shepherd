@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7004-7004-7004-000000007004",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -115,8 +115,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_driver_license_photo\"') || jsonb_build_object('attachments', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3))), updated_at = NOW() WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Handle Insurance Photo').first().json.chatId, $('Code: Handle Insurance Photo').first().json.category, $('Code: Build S3 Key Insurance').first().json.fileUrl]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Handle Insurance Photo').first().json.chatId, $('Code: Handle Insurance Photo').first().json.category, $('Code: Build S3 Key Insurance').first().json.fileUrl] }}"
         }
       },
       "credentials": {
@@ -124,7 +124,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0110-0110-0110-000000000110",
@@ -138,8 +139,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_insurance_photo\"'), updated_at = NOW() WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$json.chatId]) }}"
+        "options": {
+          "queryReplacement": "={{ [$json.chatId] }}"
         }
       },
       "credentials": {
@@ -147,7 +148,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0105-0105-0105-000000000105",
@@ -161,8 +163,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_vehicle_clear\"') || jsonb_build_object('attachments', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3))), updated_at = NOW() WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Handle Accident Video').first().json.chatId, $('Code: Handle Accident Video').first().json.category, $('Code: Build S3 Key Video').first().json.fileUrl]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Handle Accident Video').first().json.chatId, $('Code: Handle Accident Video').first().json.category, $('Code: Build S3 Key Video').first().json.fileUrl] }}"
         }
       },
       "credentials": {
@@ -170,7 +172,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0131-0131-0131-000000000131",
@@ -218,8 +221,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE bot_sessions SET state = state || $2::jsonb, updated_at = NOW() WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({step:'awaiting_video'})]) }}"
+        "options": {
+          "queryReplacement": "={{ [$json.chatId, JSON.stringify({step:'awaiting_video'})] }}"
         }
       },
       "credentials": {
@@ -227,7 +230,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0153-0153-0153-000000000153",
@@ -278,7 +282,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '✅ דיווח התאונה הושלם.\\nהמנהלים קיבלו עדכון.', parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '✅ דיווח התאונה הושלם.\\nהמנהלים קיבלו עדכון.', parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -304,7 +309,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Accident Video').first().json.chatId, text: '✅ הסרטון התקבל.\\n\\n🚗 כעת פנה/י את הכביש בצורה בטוחה\\n   והזז/י את הרכב לצד.\\n\\nכשהכביש פנוי:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ הכביש פנוי', callback_data:'accident_road_clear'}]] } }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Handle Accident Video').first().json.chatId, text: '✅ הסרטון התקבל.\\n\\n🚗 כעת פנה/י את הכביש בצורה בטוחה\\n   והזז/י את הרכב לצד.\\n\\nכשהכביש פנוי:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ הכביש פנוי', callback_data:'accident_road_clear'}]] } }) }}"
       }
     },
     {
@@ -319,8 +325,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$json.chatId]) }}"
+        "options": {
+          "queryReplacement": "={{ [$json.chatId] }}"
         }
       },
       "credentials": {
@@ -328,7 +334,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0134-0134-0134-000000000134",
@@ -394,7 +401,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '📸 צלם/י את מסמך הביטוח של הצד השני', parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '📸 צלם/י את מסמך הביטוח של הצד השני', parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -433,7 +441,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Car License Photo').first().json.chatId, text: '📞 צור/י קשר עם המנהל שלך עכשיו\\n   ופעל/י לפי הנחיותיו.\\n\\nכשסיימת לדבר:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ דיברתי עם המנהל', callback_data:'accident_manager_called'}]] } }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Handle Car License Photo').first().json.chatId, text: '📞 צור/י קשר עם המנהל שלך עכשיו\\n   ופעל/י לפי הנחיותיו.\\n\\nכשסיימת לדבר:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ דיברתי עם המנהל', callback_data:'accident_manager_called'}]] } }) }}"
       }
     },
     {
@@ -589,7 +598,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Start Accident Flow').first().json.chatId, text: '🚨 דיווח תאונה\\n\\nקודם כל - תירגע/י. 🫁\\nשתה/י מים, נשום/י עמוק.\\n\\n📍 עצור/י במקום בטוח בצד הדרך.\\n🚫 אל תזיז/י את הרכב עדיין!\\n\\nכשאת/ה במקום בטוח ועצרת, לחץ/י להמשך:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ אני במקום בטוח ועצרתי', callback_data:'accident_safe'}]] } }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Start Accident Flow').first().json.chatId, text: '🚨 דיווח תאונה\\n\\nקודם כל - תירגע/י. 🫁\\nשתה/י מים, נשום/י עמוק.\\n\\n📍 עצור/י במקום בטוח בצד הדרך.\\n🚫 אל תזיז/י את הרכב עדיין!\\n\\nכשאת/ה במקום בטוח ועצרת, לחץ/י להמשך:', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'✅ אני במקום בטוח ועצרתי', callback_data:'accident_safe'}]] } }) }}"
       }
     },
     {
@@ -636,7 +646,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Driver License Photo').first().json.chatId, text: '📸 צלם/י את רישיון הרכב של הצד השני', parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Handle Driver License Photo').first().json.chatId, text: '📸 צלם/י את רישיון הרכב של הצד השני', parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -712,7 +723,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify($('Code: Prepare Accident POST').first().json.accidentPayload) }}",
         "options": {
           "response": {
             "response": {
@@ -720,7 +730,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Code: Prepare Accident POST').first().json.accidentPayload) }}"
       }
     },
     {
@@ -794,7 +806,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '📹 כעת צלם/י סרטון של האירוע.\\n\\nבסרטון:\\n- הסבר/י מה קרה בתאונה\\n- הראה/י את אזור התאונה\\n- הראה/י את כל הרכבים המעורבים\\n- הראה/י את הנזק לרכב שלך\\n\\nשלח/י את הסרטון כאן:', parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '📹 כעת צלם/י סרטון של האירוע.\\n\\nבסרטון:\\n- הסבר/י מה קרה בתאונה\\n- הראה/י את אזור התאונה\\n- הראה/י את כל הרכבים המעורבים\\n- הראה/י את הנזק לרכב שלך\\n\\nשלח/י את הסרטון כאן:', parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -851,8 +864,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE bot_sessions SET state = jsonb_set(state, '{step}', '\"awaiting_car_license_photo\"') || jsonb_build_object('attachments', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3))), updated_at = NOW() WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Handle Driver License Photo').first().json.chatId, $('Code: Handle Driver License Photo').first().json.category, $('Code: Build S3 Key Driver License').first().json.fileUrl]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Handle Driver License Photo').first().json.chatId, $('Code: Handle Driver License Photo').first().json.category, $('Code: Build S3 Key Driver License').first().json.fileUrl] }}"
         }
       },
       "credentials": {
@@ -860,7 +873,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0143-0143-0143-000000000143",
@@ -906,7 +920,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify($json.notification) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.notification) }}"
       }
     },
     {
@@ -934,8 +949,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE bot_sessions SET state = jsonb_set( jsonb_set(state, '{step}', '\"awaiting_manager_call\"'), '{attachments}', COALESCE(state->'attachments', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('category', $2, 'file_url', $3)) ), updated_at = NOW() WHERE chat_id = $1 RETURNING state",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Handle Car License Photo').first().json.chatId, $('Code: Handle Car License Photo').first().json.category, $('Code: Build S3 Key Car License').first().json.fileUrl]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Handle Car License Photo').first().json.chatId, $('Code: Handle Car License Photo').first().json.category, $('Code: Build S3 Key Car License').first().json.fileUrl] }}"
         }
       },
       "credentials": {
@@ -943,7 +958,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-0122-0122-0122-000000000122",
@@ -981,7 +997,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Handle Insurance Photo').first().json.chatId, text: '📸 צלם/י את רישיון הנהיגה של הצד השני', parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Handle Insurance Photo').first().json.chatId, text: '📸 צלם/י את רישיון הנהיגה של הצד השני', parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -1009,8 +1026,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state = $2::jsonb, updated_at = NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$json.chatId, JSON.stringify({flow:'accident', step:'awaiting_safe', vehicleId: $json.vehicleId, accidentDatetime: $json.accidentDatetime, attachments:[]})]) }}"
+        "options": {
+          "queryReplacement": "={{ [$json.chatId, JSON.stringify({flow:'accident', step:'awaiting_safe', vehicleId: $json.vehicleId, accidentDatetime: $json.accidentDatetime, attachments:[]})] }}"
         }
       },
       "credentials": {
@@ -1018,7 +1035,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "b1c2d3e4-7005-7005-7005-000000007005",
@@ -1696,7 +1714,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

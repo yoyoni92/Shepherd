@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7024-7024-7024-000000007024",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -75,8 +75,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: MaintLog Validate KM').first().json.chatId]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: MaintLog Validate KM').first().json.chatId] }}"
         }
       },
       "credentials": {
@@ -84,7 +84,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1061-1061-1061-000000001061",
@@ -109,7 +110,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: MaintLog Validate KM').first().json.chatId, text: '✅ אירוע התחזוקה נרשם.', parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -117,7 +117,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: MaintLog Validate KM').first().json.chatId, text: '✅ אירוע התחזוקה נרשם.', parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -174,7 +176,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -182,7 +183,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.text, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -208,7 +211,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: MaintLog Validate KM').first().json.chatId, text: $('Code: MaintLog Validate KM').first().json.errorMsg, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -216,7 +218,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: MaintLog Validate KM').first().json.chatId, text: $('Code: MaintLog Validate KM').first().json.errorMsg, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -255,7 +259,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '🔧 תחזוקה', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📋 תחזוקות באיחור', callback_data:'maint_overdue'}],[{text:'➕ רשום אירוע תחזוקה', callback_data:'maint_log'}]] } }) }}",
         "options": {
           "response": {
             "response": {
@@ -263,7 +266,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '🔧 תחזוקה', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📋 תחזוקות באיחור', callback_data:'maint_overdue'}],[{text:'➕ רשום אירוע תחזוקה', callback_data:'maint_log'}]] } }) }}"
       }
     },
     {
@@ -289,7 +294,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Build Maint Vehicle Keyboard').first().json.chatId, text: 'בחר/י רכב:', parse_mode:'HTML', reply_markup: $('Code: Build Maint Vehicle Keyboard').first().json.keyboard }) }}",
         "options": {
           "response": {
             "response": {
@@ -297,7 +301,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Build Maint Vehicle Keyboard').first().json.chatId, text: 'בחר/י רכב:', parse_mode:'HTML', reply_markup: $('Code: Build Maint Vehicle Keyboard').first().json.keyboard }) }}"
       }
     },
     {
@@ -323,7 +329,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Build Maint Type Keyboard').first().json.chatId, text: 'בחר/י סוג תחזוקה:', parse_mode:'HTML', reply_markup: $('Code: Build Maint Type Keyboard').first().json.keyboard }) }}",
         "options": {
           "response": {
             "response": {
@@ -331,7 +336,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Build Maint Type Keyboard').first().json.chatId, text: 'בחר/י סוג תחזוקה:', parse_mode:'HTML', reply_markup: $('Code: Build Maint Type Keyboard').first().json.keyboard }) }}"
       }
     },
     {
@@ -378,7 +385,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ vehicle_id: $json.vehicleId, service_date: $json.serviceDate, maintenance_type: $json.maintType, km_at_service: $json.km }) }}",
         "options": {
           "response": {
             "response": {
@@ -386,7 +392,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vehicle_id: $json.vehicleId, service_date: $json.serviceDate, maintenance_type: $json.maintType, km_at_service: $json.km }) }}"
       }
     },
     {
@@ -412,7 +420,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: MaintLog SetType').first().json.chatId, text: 'הזן/י ק\"מ נוכחי במד:', parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -420,7 +427,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: MaintLog SetType').first().json.chatId, text: 'הזן/י ק\"מ נוכחי במד:', parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -448,8 +457,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Build Maint Type Keyboard').first().json.chatId, JSON.stringify($('Code: Build Maint Type Keyboard').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Build Maint Type Keyboard').first().json.chatId, JSON.stringify($('Code: Build Maint Type Keyboard').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -457,7 +466,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1043-1043-1043-000000001043",
@@ -484,8 +494,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Build Maint Vehicle Keyboard').first().json.chatId, JSON.stringify($('Code: Build Maint Vehicle Keyboard').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Build Maint Vehicle Keyboard').first().json.chatId, JSON.stringify($('Code: Build Maint Vehicle Keyboard').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -493,7 +503,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1050-1050-1050-000000001050",
@@ -542,8 +553,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: MaintLog SetType').first().json.chatId, JSON.stringify($('Code: MaintLog SetType').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: MaintLog SetType').first().json.chatId, JSON.stringify($('Code: MaintLog SetType').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -551,7 +562,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-6011-6011-6011-000000006011",
@@ -1004,7 +1016,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

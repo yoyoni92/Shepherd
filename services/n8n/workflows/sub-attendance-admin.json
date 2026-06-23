@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7020-7020-7020-000000007020",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -51,7 +51,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.attendanceText, parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.attendanceText, parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -141,7 +142,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7030-7030-7030-000000007030",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -38,7 +38,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '❌ הקישור אינו תקף או שפג תוקפו.\\nפנה/י למנהל לקבלת קישור חדש.', parse_mode: 'HTML' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: ($json.failReason === 'phone_mismatch') ? '❌ מספר הטלפון ששיתפת אינו תואם להזמנה.\\nפנה/י למנהל.' : '❌ הקישור אינו תקף או שפג תוקפו.\\nפנה/י למנהל לקבלת קישור חדש.', parse_mode: 'HTML' }) }}"
       }
     },
     {
@@ -47,8 +48,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        300,
-        0
+        340,
+        120
       ],
       "parameters": {
         "method": "POST",
@@ -72,7 +73,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ token: $json.startToken, telegram_chat_id: String($json.chatId) }) }}",
         "options": {
           "response": {
             "response": {
@@ -80,7 +80,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ token: $('On Parent Call').first().json.sessionState.token, telegram_chat_id: $('On Parent Call').first().json.chatId, phone_number: $('On Parent Call').first().json.contactPhone }) }}"
       }
     },
     {
@@ -170,7 +172,8 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $json.chatId, text: '🎉 ברוך הבא למערכת Shepard!\\n\\n🚗 ניהול נהג - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [ [{text:'⏱ כניסה לעבודה', callback_data:'clock_in'},{text:'🚪 יציאה מעבודה', callback_data:'clock_out'}], [{text:'🔧 דיווח תקלה', callback_data:'vehicle_issue'},{text:'🚨 דיווח תאונה', callback_data:'accident_start'}], [{text:'✏️ עדכון פרטים', callback_data:'update_details'},{text:'📊 דוח נוכחות', callback_data:'attendance_csv'}], [{text:'🚗 הרכב שלי', callback_data:'my_vehicle'}] ] } }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: '🎉 ברוך הבא למערכת Shepard!\\n\\n🚗 ניהול נהג - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [ [{text:'⏱ כניסה לעבודה', callback_data:'clock_in'},{text:'🚪 יציאה מעבודה', callback_data:'clock_out'}], [{text:'🔧 דיווח תקלה', callback_data:'vehicle_issue'},{text:'🚨 דיווח תאונה', callback_data:'accident_start'}], [{text:'✏️ עדכון פרטים', callback_data:'update_details'},{text:'📊 דוח נוכחות', callback_data:'attendance_csv'}], [{text:'🚗 הרכב שלי', callback_data:'my_vehicle'}] ] } }) }}"
       }
     },
     {
@@ -179,11 +182,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        540,
-        0
+        560,
+        120
       ],
       "parameters": {
-        "jsCode": "const claimResult = $input.first().json;\nconst ctx = $('On Parent Call').first().json;\nconst status = claimResult.$response?.statusCode || 200;\nconst success = status >= 200 && status < 300;\nreturn [{ json: { ...ctx, claimSuccess: success } }];"
+        "jsCode": "const claimResult = $input.first().json || {};\nconst ctx = $('On Parent Call').first().json;\nconst claimSuccess = !!claimResult.user_id && !claimResult.detail;\nconst claimRole = claimResult.role || 'driver';\nconst failReason = claimResult.detail || 'invalid';\nreturn [{ json: { ...ctx, claimSuccess, claimRole, failReason } }];"
       }
     },
     {
@@ -201,32 +204,265 @@
         "width": 900,
         "color": 7
       }
+    },
+    {
+      "id": "c1d2e3f4-9001-9001-9001-000000009001",
+      "name": "HTTP: Send Admin Menu After Claim",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: '🎉 ברוך הבא למערכת Shepard!\\n\\n⚙️ פאנל ניהול - Shepard\\n━━━━━━━━━━━━━━━━', parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{text:'👥 נוכחות היום', callback_data:'admin_attendance'},{text:'📢 שידור הודעה', callback_data:'admin_broadcast'}],[{text:'🚗 סיכום צי', callback_data:'admin_summary'},{text:'✏️ עדכון נהג', callback_data:'admin_update_driver'}],[{text:'🔧 תחזוקה', callback_data:'admin_maintenance'}] ] } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "c1d2e3f4-9002-9002-9002-000000009002",
+      "name": "IF: Claim Is Admin",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        820,
+        60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.claimRole }}",
+              "rightValue": "admin",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d1e2f3a4-7001-7001-7001-000000007001",
+      "name": "Switch: Step",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "claim_request_phone",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "0",
+              "renameOutput": true,
+              "outputKeyName": "claim_request_phone"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "claim_with_phone",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "1",
+              "renameOutput": true,
+              "outputKeyName": "claim_with_phone"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d1e2f3a4-sion-sion-sion-sionsionsion",
+      "name": "Postgres: Save Claim Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        340,
+        -120
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "shepherddbcred",
+          "name": "Shepherd DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state = $2::jsonb, updated_at = NOW()",
+        "options": {
+          "queryReplacement": "={{ [$('On Parent Call').first().json.chatId, JSON.stringify({flow:'invite_claim', token: $('On Parent Call').first().json.startToken})] }}"
+        }
+      }
+    },
+    {
+      "id": "d1e2f3a4-uest-uest-uest-uestuestuest",
+      "name": "HTTP: Send Phone Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        -120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('On Parent Call').first().json.chatId, text: '👋 ברוך/ה הבא/ה למערכת Shepard!\\n\\nכדי לאמת את זהותך, שתף/י את מספר הטלפון שלך בלחיצה על הכפתור למטה 👇', reply_markup: { keyboard: [[{ text: '📱 שיתוף מספר הטלפון שלי', request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "d1e2f3a4-sion-sion-sion-sionsionsion",
+      "name": "Postgres: Clear Claim Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1480,
+        40
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "shepherddbcred",
+          "name": "Shepherd DB"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
+        "options": {
+          "queryReplacement": "={{ [$('On Parent Call').first().json.chatId] }}"
+        }
+      }
     }
   ],
   "connections": {
-    "HTTP: Claim Invite Token": {
+    "On Parent Call": {
       "main": [
         [
           {
-            "node": "Code: Check Claim Result",
+            "node": "Switch: Step",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Switch: Claim OK?": {
+    "Switch: Step": {
       "main": [
         [
           {
-            "node": "HTTP: Send Driver Menu After Claim",
+            "node": "Postgres: Save Claim Session",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "HTTP: Send Invalid Token Msg",
+            "node": "HTTP: Claim Invite Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres: Save Claim Session": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Phone Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Claim Invite Token": {
+      "main": [
+        [
+          {
+            "node": "Code: Check Claim Result",
             "type": "main",
             "index": 0
           }
@@ -244,11 +480,69 @@
         ]
       ]
     },
-    "On Parent Call": {
+    "Switch: Claim OK?": {
       "main": [
         [
           {
-            "node": "HTTP: Claim Invite Token",
+            "node": "IF: Claim Is Admin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Send Invalid Token Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Claim Is Admin": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Admin Menu After Claim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Send Driver Menu After Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send Admin Menu After Claim": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Clear Claim Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send Driver Menu After Claim": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Clear Claim Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send Invalid Token Msg": {
+      "main": [
+        [
+          {
+            "node": "Postgres: Clear Claim Session",
             "type": "main",
             "index": 0
           }
@@ -256,7 +550,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },

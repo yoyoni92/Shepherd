@@ -6,7 +6,7 @@
       "id": "b1c2d3e4-7027-7027-7027-000000007027",
       "name": "On Parent Call",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         0,
         0
@@ -27,8 +27,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: UpdateDriver SetDriver').first().json.chatId, JSON.stringify($('Code: UpdateDriver SetDriver').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: UpdateDriver SetDriver').first().json.chatId, JSON.stringify($('Code: UpdateDriver SetDriver').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -36,7 +36,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1033-1033-1033-000000001033",
@@ -50,8 +51,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: UpdateDriver SetField').first().json.chatId, JSON.stringify($('Code: UpdateDriver SetField').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: UpdateDriver SetField').first().json.chatId, JSON.stringify($('Code: UpdateDriver SetField').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -59,7 +60,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1039-1039-1039-000000001039",
@@ -84,7 +86,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver Validate').first().json.chatId, text: '✅ פרטי הנהג עודכנו בהצלחה.', parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -92,7 +93,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver Validate').first().json.chatId, text: '✅ פרטי הנהג עודכנו בהצלחה.', parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -107,8 +110,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "DELETE FROM bot_sessions WHERE chat_id = $1",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: UpdateDriver Validate').first().json.chatId]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: UpdateDriver Validate').first().json.chatId] }}"
         }
       },
       "credentials": {
@@ -116,7 +119,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-1026-1026-1026-000000001026",
@@ -167,7 +171,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver SetField').first().json.chatId, text: $('Code: UpdateDriver SetField').first().json.prompt, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -175,7 +178,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver SetField').first().json.chatId, text: $('Code: UpdateDriver SetField').first().json.prompt, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -221,8 +226,8 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (chat_id) DO UPDATE SET state=$2::jsonb, updated_at=NOW()",
-        "additionalFields": {
-          "queryParams": "={{ JSON.stringify([$('Code: Build Drivers Keyboard').first().json.chatId, JSON.stringify($('Code: Build Drivers Keyboard').first().json.newState)]) }}"
+        "options": {
+          "queryReplacement": "={{ [$('Code: Build Drivers Keyboard').first().json.chatId, JSON.stringify($('Code: Build Drivers Keyboard').first().json.newState)] }}"
         }
       },
       "credentials": {
@@ -230,7 +235,8 @@
           "id": "shepherddbcred",
           "name": "Shepherd DB"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "a1b2c3d4-6008-6008-6008-000000006008",
@@ -263,7 +269,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ [$('Code: UpdateDriver Validate').first().json.column]: $('Code: UpdateDriver Validate').first().json.value }) }}",
         "options": {
           "response": {
             "response": {
@@ -271,7 +276,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ [$('Code: UpdateDriver Validate').first().json.column]: $('Code: UpdateDriver Validate').first().json.value }) }}"
       }
     },
     {
@@ -310,7 +317,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver Validate').first().json.chatId, text: $('Code: UpdateDriver Validate').first().json.errorMsg, parse_mode:'HTML' }) }}",
         "options": {
           "response": {
             "response": {
@@ -318,7 +324,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver Validate').first().json.chatId, text: $('Code: UpdateDriver Validate').first().json.errorMsg, parse_mode:'HTML' }) }}"
       }
     },
     {
@@ -344,7 +352,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: Build Drivers Keyboard').first().json.chatId, text: 'בחר/י נהג לעדכון:', parse_mode:'HTML', reply_markup: $('Code: Build Drivers Keyboard').first().json.keyboard }) }}",
         "options": {
           "response": {
             "response": {
@@ -352,7 +359,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: Build Drivers Keyboard').first().json.chatId, text: 'בחר/י נהג לעדכון:', parse_mode:'HTML', reply_markup: $('Code: Build Drivers Keyboard').first().json.keyboard }) }}"
       }
     },
     {
@@ -391,7 +400,6 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver SetDriver').first().json.chatId, text: 'בחר/י שדה לעדכון:', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📅 תוקף רישיון', callback_data:'ud2_field_license_valid'}],[{text:'🪪 מספר רישיון', callback_data:'ud2_field_license_number'}],[{text:'📱 טלפון', callback_data:'ud2_field_phone'}]] } }) }}",
         "options": {
           "response": {
             "response": {
@@ -399,7 +407,9 @@
               "responseFormat": "json"
             }
           }
-        }
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Code: UpdateDriver SetDriver').first().json.chatId, text: 'בחר/י שדה לעדכון:', parse_mode:'HTML', reply_markup: { inline_keyboard: [[{text:'📅 תוקף רישיון', callback_data:'ud2_field_license_valid'}],[{text:'🪪 מספר רישיון', callback_data:'ud2_field_license_number'}],[{text:'📱 טלפון', callback_data:'ud2_field_phone'}]] } }) }}"
       }
     },
     {
@@ -736,7 +746,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
