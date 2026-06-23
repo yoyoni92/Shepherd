@@ -16,7 +16,7 @@ poetry install
 | `BEDROCK_MODEL_ID` | Claude model ID in Bedrock (e.g. `anthropic.claude-3-5-sonnet-20241022-v2:0`) |
 | `BEDROCK_REGION` | AWS region (default: `us-east-1`) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS credentials |
-| `S3_BUCKET` | S3 bucket containing documents (default: `shepherd-fleet`) |
+| `S3_BUCKET` | S3 bucket containing documents (default: `shepherd-docs`) |
 | `FLEET_API_URL` | Internal Fleet API URL (default: `http://fleet-api:8000`) |
 | `INTERNAL_SERVICE_TOKEN` | Auth token for Fleet API |
 | `EXTRACTOR_PROVIDER` | `bedrock` (default) or `gemini` |

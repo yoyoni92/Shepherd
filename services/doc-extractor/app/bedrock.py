@@ -21,7 +21,7 @@ def _model_id() -> str:
 
 def _s3_download(s3_key: str) -> tuple[bytes, str]:
     """Return (raw_bytes, media_type). Infers media type from key extension."""
-    bucket = os.environ.get("S3_BUCKET", "shepherd-fleet")
+    bucket = os.environ.get("S3_BUCKET", "shepherd-docs")
     region = os.environ.get("BEDROCK_REGION", "us-east-1")
     s3 = boto3.client("s3", region_name=region)
     obj = s3.get_object(Bucket=bucket, Key=s3_key)

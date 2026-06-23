@@ -14,7 +14,7 @@ from app.prompt import build_prompt, FIELD_KEYS
 
 
 def _s3_download(s3_key: str) -> bytes:
-    bucket = os.environ.get("S3_BUCKET", "shepherd-fleet")
+    bucket = os.environ.get("S3_BUCKET", "shepherd-docs")
     s3 = boto3.client("s3")
     return s3.get_object(Bucket=bucket, Key=s3_key)["Body"].read()
 
