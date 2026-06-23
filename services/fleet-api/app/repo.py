@@ -607,13 +607,12 @@ def list_pending_bot_invites(session: Session) -> list[BotInviteToken]:
 
 
 def revoke_bot_invite(session: Session, token: str) -> str:
-    from datetime import datetime, timezone
     invite = session.get(BotInviteToken, token)
     if invite is None:
         return "not_found"
     if invite.used_at is not None:
         return "already_used"
-    invite.expires_at = datetime.now(timezone.utc)
+    session.delete(invite)
     session.commit()
     return "ok"
 
