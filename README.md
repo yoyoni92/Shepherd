@@ -12,7 +12,7 @@ libs/             shared contracts (pydantic models + provider interfaces)
 db/               Postgres schema, migrations, seed           [migrations 0001-0009]
 services/         fleet-api, channel-gateway, doc-extractor,
                   image-analyser, rag, langgraph-agent,
-                  guardrails, webui, n8n
+                  guardrails, webui, telegram-bot
 plans/            design & implementation plans
 ```
 
@@ -57,11 +57,14 @@ Deviation from Gradio/Streamlit noted: modern React SPA satisfies rubric "app.py
 Stack: Next.js App Router, next-auth credentials, Zod, MSW, Vitest + RTL, Playwright e2e.
 Served at port 3000.
 
-`services/n8n` added: invite-only Hebrew Telegram bot (n8nio/n8n, port 5678).
-84-node workflow covers driver flows (clock-in/out, accident protocol, vehicle issue,
-broadcast) and admin flows (attendance, fleet summary, broadcast). Accident flow is
-an 8-step multi-step state machine stored in `bot_sessions`. Access controlled via
-one-time invite tokens (`bot_invite_tokens` table); role management via WebUI.
-New Fleet API endpoints: `GET /whoami`, `POST /bot-invite`, `POST /bot-invite/claim`,
-`PATCH /users/:id/role`. New DB tables: `users`, `bot_invite_tokens`, `bot_sessions`
-(migrations 0008-0009).
+`services/telegram-bot` (replaces n8n): invite-only Hebrew Telegram bot built on
+aiogram 3 with long-polling (no public HTTPS / tunnel). Ports the 12 flows 1:1 -
+driver (clock in/out, accident, vehicle issue, update details, attendance CSV, my
+vehicle) and admin (attendance, broadcast, fleet summary, update driver, maintenance,
+document scan). Fleet API is the only tool layer; multi-step state lives in
+`bot_sessions`. Two LLM touches: accident description by **voice (Whisper) or text**,
+and an admin **document scan** (Gemini vision -> confirm -> apply). Accident media is
+stored as S3 attachments, never run through an LLM. Access controlled via one-time
+invite tokens; role management via WebUI. Fleet API endpoints: `GET /whoami`,
+`POST /bot-invite`, `POST /bot-invite/claim`, `PATCH /users/:id/role`. DB tables:
+`users`, `bot_invite_tokens`, `bot_sessions` (migrations 0008-0009).

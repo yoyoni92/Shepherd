@@ -1,0 +1,39 @@
+"""Telegram command menu (the blue ☰ button) - per-role command lists.
+
+Set per-chat after a user is authorized so a driver sees driver actions and an admin
+sees admin actions. Command words match `router.CALLBACK_MAP` keys, so tapping one
+routes to the same feature as the equivalent inline button.
+"""
+
+from __future__ import annotations
+
+from aiogram.types import BotCommand, BotCommandScopeChat
+
+DRIVER_COMMANDS = [
+    ("menu", "תפריט"),
+    ("clock_in", "כניסה לעבודה"),
+    ("clock_out", "יציאה מעבודה"),
+    ("vehicle_issue", "דיווח תקלה"),
+    ("accident_start", "דיווח תאונה"),
+    ("update_details", "עדכון פרטים"),
+    ("attendance_csv", "דוח נוכחות"),
+    ("my_vehicle", "הרכב שלי"),
+]
+ADMIN_COMMANDS = [
+    ("menu", "תפריט"),
+    ("admin_attendance", "נוכחות היום"),
+    ("admin_broadcast", "שידור הודעה"),
+    ("admin_summary", "סיכום צי"),
+    ("admin_update_driver", "עדכון נהג"),
+    ("admin_maintenance", "תחזוקה"),
+    ("doc_scan", "סריקת מסמך"),
+]
+
+
+async def apply(bot, chat_id: int, role: str | None) -> None:
+    """Set the chat's command menu to the role-appropriate list (idempotent)."""
+    cmds = ADMIN_COMMANDS if role == "admin" else DRIVER_COMMANDS
+    await bot.set_my_commands(
+        [BotCommand(command=c, description=d) for c, d in cmds],
+        scope=BotCommandScopeChat(chat_id=chat_id),
+    )

@@ -5,10 +5,16 @@
 A Hebrew-language interactive Telegram bot for Shepherd fleet management.
 Drivers and admins interact via inline-keyboard menus. All text is in Hebrew.
 
-**Architecture decision:** n8n owns Telegram directly via `telegramTrigger` +
-direct `api.telegram.org` calls with `reply_markup`. The existing Channel
-Gateway continues serving the webapp channel and cron notifications; it is
-not extended for this feature.
+**Architecture decision:** a dedicated `services/telegram-bot` (aiogram 3,
+long-polling) owns Telegram directly - no public HTTPS / tunnel needed. Fleet
+API is its only tool layer; multi-step flow state lives in `bot_sessions`. The
+existing Channel Gateway continues serving the webapp channel and cron
+notifications; it is not extended for this feature.
+
+> History: this was first built as an n8n workflow (`services/n8n`), then
+> rewritten 1:1 as the native aiogram service. The flow specs, Hebrew copy, DB
+> schema, and Fleet API contracts below are unchanged; only Phases 3 and 6
+> (delivery + env) describe the aiogram service rather than n8n.
 
 ---
 
@@ -136,7 +142,7 @@ or
 
 Logic: look up `users` by `telegram_chat_id`. Return role + driver_id or 404.
 
-n8n calls this on every incoming Telegram update before routing any flow.
+The bot calls this on every incoming Telegram update before routing any flow.
 
 ### 2.2 - `POST /bot-invite` (generate invite token)
 
@@ -163,7 +169,7 @@ Logic:
 3. Insert into `bot_invite_tokens`.
 4. Return the deep link for the admin to share.
 
-### 2.3 - `POST /bot-invite/claim` (called by n8n)
+### 2.3 - `POST /bot-invite/claim` (called by the bot)
 
 When a driver sends `/start <token>`:
 
@@ -197,27 +203,37 @@ cannot demote themselves.
 
 ---
 
-## Phase 3 - n8n Workflow
+## Phase 3 - Bot Service (aiogram)
 
-One workflow: **`shepherd-telegram-bot`**
+A single long-polling worker (`services/telegram-bot`, `python -m app.main`).
+Every update is flattened to a `Ctx`, then routed by pure functions.
 
 ### Entry point
 
 ```
-telegramTrigger
-  -> HTTP Request: GET /whoami?chat_id={{$json.message.chat.id}}
-  -> Switch node: role (admin | driver | unknown)
+update -> normalize -> GET /whoami?chat_id=<chat.id> -> read bot_sessions
+       -> route_decision(ctx) -> (feature, route) -> FEATURES[feature](ctx, route)
 ```
+
+`route_decision` precedence: unknown user -> invite-claim / access-denied; a
+slash command (the ☰ menu) preempts an in-progress flow; an active session
+resumes its step via `active_route`; a menu callback starts a feature;
+otherwise show the role menu. `app/router.py` holds this logic; `app/flows/*`
+holds one handler per feature. Role is gated in the bot (`FEATURE_ROLES`) and
+re-enforced by Fleet API.
 
 ### Unknown user (no `users` row)
 
 Two sub-cases:
 
-**A - `/start <token>` message:** token is present in the text.
+**A - `/start <token>` message:** token is present in the text. The bot asks the
+driver to share their Telegram contact (phone), then claims with the phone for
+identity verification.
 ```
-n8n -> POST /bot-invite/claim {token, chat_id}
-  -> 200: create users row, send welcome message
-  -> 400: send rejection
+bot -> request contact share -> POST /bot-invite/claim {token, chat_id, phone_number}
+  -> 200: users row created, send welcome message
+  -> 403: phone mismatch    -> rejection
+  -> 400: invalid/expired   -> rejection
 ```
 
 Welcome message (200):
@@ -494,15 +510,21 @@ List by vehicle, sorted by most overdue.
 
 ---
 
-## Phase 6 - n8n Environment Variables
+## Phase 6 - Bot Environment Variables
 
 ```env
-FLEET_API_URL=http://fleet-api:8000
 TELEGRAM_BOT_TOKEN=<token>
-S3_BUCKET=shepherd-accidents
+TELEGRAM_BOT_USERNAME=ShepherdBot
+FLEET_API_URL=http://fleet-api:8000
+INTERNAL_SERVICE_TOKEN=change-me
+DATABASE_URL=postgresql+psycopg://shepherd:shepherd@postgres:5432/shepherd
+S3_BUCKET_ACCIDENTS=shepherd-accidents
+S3_BUCKET_DOCS=shepherd-docs
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=...
+AWS_DEFAULT_REGION=us-east-1
+OPENAI_API_KEY=...   # Whisper STT (accident voice description)
+GEMINI_API_KEY=...   # Gemini vision (admin document scan)
 ```
 
 ---
@@ -562,8 +584,8 @@ driver and replaces the row.
    `bot_sessions`, enum extension.
 2. **Fleet API** (Phase 2) - `/whoami`, `/bot-invite`, `/bot-invite/claim`,
    `PATCH /users/:id/role`.
-3. **n8n base workflow** - telegramTrigger -> whoami -> role switch ->
-   token claim on `/start` -> locked message for unknown users without token.
+3. **Bot routing core** - normalize -> whoami -> route_decision -> role menu;
+   phone-verified token claim on `/start`; locked message for unknown users.
 4. **Driver flows** in order: clock-in/out, view vehicle, update details,
    monthly CSV, vehicle issue, accident.
 5. **Admin flows** in order: attendance, fleet summary, broadcast, update
@@ -575,13 +597,18 @@ driver and replaces the row.
 
 ## Open Questions
 
-- [ ] Which `drivers` column links a driver to their vehicle? (`vehicle_id`
-  FK on `drivers`?) - confirm before Flow 4.2 and 4.6.
-- [ ] Is there a dedicated S3 bucket for accidents, or do we reuse the
-  existing media bucket?
-- [ ] Pagination strategy for large driver lists in admin flows (>10 drivers).
-- [ ] Should clock-in be blocked if the driver has no coupled vehicle, or is
-  attendance independent of vehicle assignment?
+- [x] Which `drivers` column links a driver to their vehicle? - The bot doesn't
+  read a column; `fleet.driver_vehicle()` calls `GET /vehicles` with a driver
+  caller-context and Fleet API's ownership filter returns the coupled vehicle.
+- [x] Is there a dedicated S3 bucket for accidents? - Yes: `shepherd-accidents`
+  (`S3_BUCKET_ACCIDENTS`) for accident media; scanned documents go to
+  `shepherd-docs` (`S3_BUCKET_DOCS`).
+- [x] Pagination strategy for large driver lists in admin flows (>10 drivers)?
+  - `keyboards.pick_list` caps at 50 entries, one per row, **no pagination**.
+  Upgrade to paged keyboards if a fleet exceeds that.
+- [x] Should clock-in be blocked if the driver has no coupled vehicle? -
+  No; attendance is independent of vehicle assignment. The reporting window is
+  enforced server-side (`result: "blocked"`).
 - [x] How are admin users first created? - Via the WebUI directly. The
   bot users table (Phase 7.2) allows promoting any registered driver to
   admin without requiring DB access.

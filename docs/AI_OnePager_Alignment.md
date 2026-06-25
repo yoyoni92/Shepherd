@@ -17,15 +17,15 @@ one-pager names) · ❌ missing (promised, not present/wired)
 | | KPI dashboard | yes | webui `/dashboard` + fleet-api `/kpi` | ✅ |
 | | RAG action chat | yes | webui `/chat` → langgraph agent (rag+fleet tools) | ✅ |
 | | Ollama-grounded assistant | yes | webui `/assistant` → ollama-assistant → ollama `llama3` | ✅ |
-| | Telegram bot + phone auth | yes | n8n flows + channel-gateway, `channel_identities` | ✅ |
-| **2 n8n pipeline** | Webhook intake | yes | n8n Telegram webhook | ✅ |
-| | **Guardrails input** in flow | yes | service exists, **not called by n8n** | ❌ |
-| | **Doc-type classifier** in flow | yes (image-analyser) | service exists, **not called by n8n** | ❌ |
-| | **Information Extractor (Bedrock)** in flow | yes | service exists; n8n only **uploads to S3**, never extracts | ❌ |
-| | **AI Agent** in flow | yes | langgraph exists, **not called by n8n** | ❌ |
-| | LLM Chain (record update / summary) | yes | partial: subs write to fleet-api directly | 🟡 |
-| | **Guardrails output** in flow | yes | service exists, **not called by n8n** | ❌ |
-| | Router / team routing | yes | n8n router + 13 sub-workflows | ✅ |
+| | Telegram bot + phone auth | yes | `telegram-bot` (aiogram) + channel-gateway, `channel_identities` | ✅ |
+| **2 Bot pipeline** | Update intake | yes | aiogram long-polling (no webhook/tunnel) | ✅ |
+| | **Guardrails input** in flow | yes | service exists, **not called by the bot** | ❌ |
+| | **Doc-type classifier** in flow | yes (image-analyser) | bot uses a guided type picker instead; classifier **not called** | ❌ |
+| | **Information Extractor (vision)** in flow | yes | bot calls **Gemini directly** (`app/vision.py`) for the admin doc scan | ✅ |
+| | **AI Agent** in flow | yes | langgraph exists, **not called by the bot** | ❌ |
+| | LLM Chain (record update / summary) | yes | bot writes to fleet-api directly; Whisper transcribes accident voice | 🟡 |
+| | **Guardrails output** in flow | yes | service exists, **not called by the bot** | ❌ |
+| | Router / team routing | yes | `app/router.py` route_decision + per-feature handlers | ✅ |
 | **3 EC2 services** | RAG: LangChain | yes | `langchain` / `langchain_anthropic` | ✅ |
 | | RAG: ChromaDB | yes | `chromadb` (Ephemeral - not persisted) | 🟡 |
 | | RAG: generation engine | **Llama.cpp** | **Anthropic Claude** at runtime (Llama.cpp only in `eval --live`) | 🟡 |
@@ -51,20 +51,22 @@ These are unambiguous gaps where the service exists but isn't connected, or a
 promised artifact is absent. Closing them does **not** change any technology
 choice.
 
-### G1. Wire the AI pipeline into n8n  ❌ (biggest gap)
-Today n8n calls only `fleet-api`, Telegram, and S3. The one-pager's Layer-2 chain
-`Guardrails-in → classifier → extractor → agent → Guardrails-out` is absent. The
-license/insurance docs are uploaded to S3 by the bot but never sent for
-extraction or classification.
+### G1. Wire the remaining AI surfaces into the bot  ❌ (biggest gap)
+n8n is retired; the bot is now `services/telegram-bot` (aiogram), calling
+`fleet-api`, Telegram, and S3. It already runs two LLM touches inline -
+**Whisper** (accident voice -> description) and **Gemini** (admin document scan,
+`app/vision.py`). The one-pager's Layer-2 chain
+`Guardrails-in → classifier → agent → Guardrails-out` is still absent.
 
-Add HTTP Request nodes in the intake flow:
-- `POST {guardrails}/check/input` after the webhook (gate on `pass`).
-- `POST {image-analyser}/analyse` with the S3 key → branch on `doc_type`.
-- `POST {doc-extractor}/extract` for license/insurance docs.
+To close it, add Fleet-style client calls in the bot's dispatch path:
+- `POST {guardrails}/check/input` before acting on free text (gate on `pass`).
+- `POST {image-analyser}/analyse` with the S3 key → branch on `doc_type`
+  (currently the doc scan uses a guided type picker instead of a classifier).
 - `POST {langgraph-agent}/agent/run` for free-text action requests.
 - `POST {guardrails}/check/output` before replying to the user.
 
-Requires adding these service URLs to the n8n container env in `docker-compose.yml`.
+Requires adding these service URLs to the `telegram-bot` container env in
+`docker-compose.yml`.
 
 ### G2. Dockerize image-analyser + add to compose  ❌
 No `Dockerfile`, not in `docker-compose.yml`. For the EC2-services rubric (25%) it
@@ -106,8 +108,8 @@ code) or **update the one-pager** (change the doc).
 
 ## 3. Recommended path to "all dots connected"
 
-1. **Build the pure gaps** (G1-G3): wire n8n pipeline, dockerize + deploy
-   image-analyser, train + commit the model. (G4 optional.)
+1. **Build the pure gaps** (G1-G3): wire the remaining AI surfaces into the bot,
+   dockerize + deploy image-analyser, train + commit the model. (G4 optional.)
 2. **Decide D1-D4.** Default recommendation: keep the code, update the one-pager
    so its stack matches reality - except D3 (NeMo), which is the only one worth a
    second look if guardrail *library* is graded.

@@ -205,71 +205,28 @@ services:
       retries: 5
       start_period: 30s
 
-  n8n:
-    image: n8nio/n8n:latest
+  # Invite-only Hebrew Telegram bot (replaces the n8n workflow). aiogram long-polling,
+  # so no public HTTPS / tunnel is needed. Fleet API is its only tool layer.
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: services/telegram-bot/Dockerfile
     environment:
-      DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-shepherd}
-      DB_POSTGRESDB_USER: ${POSTGRES_USER:-shepherd}
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-shepherd}
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-me-32chars}
-      # Instance timezone (Schedule/Cron nodes + Date helpers) and OS clock.
-      GENERIC_TIMEZONE: Asia/Jerusalem
-      TZ: Asia/Jerusalem
-      # Allow workflow Code/expression nodes to read container env ($env.* and
-      # process.env.*) - the bot reads TELEGRAM_BOT_TOKEN, FLEET_API_URL,
-      # INTERNAL_SERVICE_TOKEN, S3_BUCKET this way. n8n blocks this by default.
-      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-      N8N_HOST: 0.0.0.0
-      # Telegram webhooks require HTTPS. The localtunnel sidecar (below) exposes n8n at
-      # https://<subdomain>.loca.lt and n8n auto-registers the bot webhook against this.
-      WEBHOOK_URL: https://${N8N_TUNNEL_SUBDOMAIN:-shepherd-dev-bot}.loca.lt/
-      FLEET_API_URL: http://fleet-api:8000
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
-      # The workflow's S3 upload nodes read $env.S3_BUCKET; point it at the accidents bucket.
-      S3_BUCKET: ${S3_BUCKET_ACCIDENTS:-shepherd-accidents}
+      FLEET_API_URL: http://fleet-api:8000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
       S3_BUCKET_ACCIDENTS: ${S3_BUCKET_ACCIDENTS:-shepherd-accidents}
+      S3_BUCKET_DOCS: ${S3_BUCKET:-shepherd-docs}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
-    ports:
-      - "5678:5678"
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./services/n8n/workflows:/workflows:ro
-    # --separate imports every *.json (router + subs); import deactivates them.
-    # This n8n version publishes per-workflow (publish:workflow --id), and the
-    # router can only publish once its referenced sub-workflows are published -
-    # so publish all subs first, then the router, before `n8n start` registers
-    # the Telegram webhook. ($$ escapes $ for the container shell.)
-    entrypoint: >
-      sh -c "n8n import:workflow --separate --input=/workflows 2>/dev/null || true;
-      for id in subinviteclaim subclock subaccident subattendancecsv submyvehicle subvehicleissue subupdatedetails subbroadcast subattendanceadmin subfleetsummary submaintenance subupdatedriver shepherdtelegrambot01;
-      do n8n publish:workflow --id=$$id 2>/dev/null || true; done;
-      n8n start"
+      # LLM touches: Whisper (accident voice -> description), Gemini (admin doc scan).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       fleet-api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://localhost:5678/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # Dev-only public HTTPS tunnel so Telegram can reach the n8n webhook (loca.lt, no TLS
-  # setup). The subdomain must be globally unique; change N8N_TUNNEL_SUBDOMAIN to claim
-  # your own. Not for production - swap for Cloudflare Tunnel / Caddy on a real deploy.
-  localtunnel:
-    image: node:lts-alpine
-    command: npx -y localtunnel --port 5678 --local-host n8n --subdomain ${N8N_TUNNEL_SUBDOMAIN:-shepherd-dev-bot}
-    restart: unless-stopped
-    depends_on:
-      n8n:
         condition: service_healthy
 
   ollama:
@@ -313,4 +270,3 @@ services:
 volumes:
   pgdata:
   ollama_data:
-  n8n_data:

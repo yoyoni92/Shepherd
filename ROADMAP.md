@@ -16,7 +16,7 @@
 
 ### Phase 3 - UX + Operations
 - `services/webui` - Next.js 15 admin console (dashboard, Fleet Chat, Upload, Review Queue, Bot Management)
-- `services/n8n` - invite-only Hebrew Telegram bot, 84-node workflow, driver + admin flows
+- `services/telegram-bot` - invite-only Hebrew Telegram bot (aiogram 3, long-polling), driver + admin flows (replaces n8n)
 
 ---
 
@@ -54,7 +54,7 @@ Run the existing `eval/` harness on every CI push against a golden fixture set; 
 
 ### Image Analyser
 
-`services/image-analyser` skeleton exists. Wire it into the accident flow in n8n as a vision step after photo upload.
+`services/image-analyser` skeleton exists. Wire it into the bot's accident flow as a vision step after photo upload.
 
 ### RAG - Incremental Index Updates
 
