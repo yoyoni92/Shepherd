@@ -155,27 +155,21 @@ export const BotUserReadSchema = z.object({
   phone_number: z.string().nullish(),
   driver_id: z.string().nullish(),
   driver_name: z.string().nullish(),
+  expires_at: z.string().nullish(),
   created_at: z.string(),
 })
 export type BotUserRead = z.infer<typeof BotUserReadSchema>
 
-export const BotInviteReadSchema = z.object({
-  token: z.string(),
+export const BotAuthorizationReadSchema = z.object({
+  id: z.string(),
+  phone_number: z.string(),
+  role: z.enum(['admin', 'driver']),
   driver_id: z.string().nullish(),
   driver_name: z.string().nullish(),
-  role: z.enum(['admin', 'driver']),
-  phone_number: z.string().nullish(),
-  expires_at: z.string(),
+  expires_at: z.string().nullish(),
   created_at: z.string(),
 })
-export type BotInviteRead = z.infer<typeof BotInviteReadSchema>
-
-export const BotInviteResponseSchema = z.object({
-  token: z.string(),
-  deep_link: z.string(),
-  expires_at: z.string(),
-})
-export type BotInviteResponse = z.infer<typeof BotInviteResponseSchema>
+export type BotAuthorizationRead = z.infer<typeof BotAuthorizationReadSchema>
 
 // ───────────────────────── UI view models ─────────────────────────
 // Component-facing shapes. Fields the backend does not provide are nullable

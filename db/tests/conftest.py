@@ -23,14 +23,14 @@ def pg_engine():
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_schema(pg_engine):
-    from alembic import command
-    from alembic.config import Config
+    # Schema is built from the models (no migrations); bootstrap.sql's pg_cron
+    # scheduling is guarded, so it's a no-op on this plain test container.
+    import sys
 
-    ini_path = os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
-    cfg = Config(os.path.abspath(ini_path))
-    url = pg_engine.url.render_as_string(hide_password=False)
-    cfg.set_main_option("sqlalchemy.url", url)
-    command.upgrade(cfg, "head")
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from create_schema import build
+
+    build(pg_engine)
 
 
 @pytest.fixture

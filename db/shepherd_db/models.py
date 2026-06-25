@@ -132,82 +132,82 @@ class UserRoleEnum(str, enum.Enum):
 allowed_driver_type = SAEnum(
     AllowedDriverEnum,
     name="allowed_driver_enum",
-    create_type=False,
+    create_type=True,
 )
 driver_status_type = SAEnum(
     DriverStatusEnum,
     name="driver_status_enum",
-    create_type=False,
+    create_type=True,
 )
 customer_status_type = SAEnum(
     CustomerStatusEnum,
     name="customer_status_enum",
-    create_type=False,
+    create_type=True,
 )
 km_update_source_type = SAEnum(
     KmUpdateSourceEnum,
     name="km_update_source_enum",
-    create_type=False,
+    create_type=True,
 )
 accident_attachment_category_type = SAEnum(
     AccidentAttachmentCategoryEnum,
     name="accident_attachment_category_enum",
-    create_type=False,
+    create_type=True,
 )
 ticket_type_type = SAEnum(
     TicketTypeEnum,
     name="ticket_type_enum",
-    create_type=False,
+    create_type=True,
 )
 report_status_type = SAEnum(
     ReportStatusEnum,
     name="report_status_enum",
-    create_type=False,
+    create_type=True,
 )
 event_type_type = SAEnum(
     EventTypeEnum,
     name="event_type_enum",
-    create_type=False,
+    create_type=True,
 )
 event_severity_type = SAEnum(
     EventSeverityEnum,
     name="event_severity_enum",
-    create_type=False,
+    create_type=True,
 )
 event_source_type_type = SAEnum(
     EventSourceTypeEnum,
     name="event_source_type_enum",
-    create_type=False,
+    create_type=True,
 )
 event_status_type = SAEnum(
     EventStatusEnum,
     name="event_status_enum",
-    create_type=False,
+    create_type=True,
 )
 channel_type = SAEnum(
     ChannelEnum,
     name="channel_enum",
-    create_type=False,
+    create_type=True,
 )
 channel_status_type = SAEnum(
     ChannelStatusEnum,
     name="channel_status_enum",
-    create_type=False,
+    create_type=True,
 )
 attendance_status_type = SAEnum(
     AttendanceStatusEnum,
     name="attendance_status_enum",
-    create_type=False,
+    create_type=True,
 )
 vehicle_type_type = SAEnum(
     VehicleTypeEnum,
     name="vehicle_type_enum",
-    create_type=False,
+    create_type=True,
 )
 user_role_type = SAEnum(
     UserRoleEnum,
     name="user_role_enum",
-    create_type=False,
+    create_type=True,
 )
 
 
@@ -620,28 +620,33 @@ class ChannelIdentity(Base):
     __table_args__ = (UniqueConstraint("channel", "external_id"),)
 
 
-class BotInviteToken(Base):
-    __tablename__ = "bot_invite_tokens"
+class BotAuthorization(Base):
+    """Phone -> role pre-authorization for bot enrollment (admins + temporary grants).
 
-    token = mapped_column(Text, primary_key=True)
+    Active drivers don't need a row here - they match directly off the drivers table.
+    `expires_at` set = temporary; NULL = permanent. Expired rows are swept by pg_cron.
+    """
+
+    __tablename__ = "bot_authorizations"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    phone_number = mapped_column(Text, nullable=False)
+    role = mapped_column(user_role_type, nullable=False, server_default="driver")
     driver_id = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("drivers.driver_id"),
         nullable=True,
     )
-    role = mapped_column(user_role_type, nullable=False, server_default="driver")
+    expires_at = mapped_column(DateTime(timezone=True), nullable=True)
     created_at = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
     )
-    expires_at = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("now() + INTERVAL '7 days'"),
-    )
-    used_at = mapped_column(DateTime(timezone=True), nullable=True)
-    phone_number = mapped_column(Text, nullable=True)
 
     driver = relationship("Driver", foreign_keys=[driver_id])
 
@@ -662,6 +667,7 @@ class BotUser(Base):
         ForeignKey("drivers.driver_id"),
         nullable=True,
     )
+    expires_at = mapped_column(DateTime(timezone=True), nullable=True)
     created_at = mapped_column(
         DateTime(timezone=True),
         nullable=False,

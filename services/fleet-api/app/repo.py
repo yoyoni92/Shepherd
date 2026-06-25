@@ -10,7 +10,7 @@ from shepherd_db.models import (
     Accident,
     AccidentAttachment,
     AttendanceRecord,
-    BotInviteToken,
+    BotAuthorization,
     BotUser,
     Event,
     KmUpdate,
@@ -515,7 +515,7 @@ def list_kpi_daily(session: Session, limit: int = 2) -> list[KpiDaily]:
 
 
 # ---------------------------------------------------------------------------
-# Bot users and invite tokens
+# Bot users, enrollment, and authorizations
 # ---------------------------------------------------------------------------
 
 def get_bot_user_by_chat_id(session: Session, chat_id: int) -> BotUser | None:
@@ -549,79 +549,86 @@ def _normalize_phone(p: str) -> str:
     return digits
 
 
-def create_bot_invite(
-    session: Session, driver_id: UUID | None, token: str, role: str = "driver",
-    phone_number: str | None = None,
-) -> BotInviteToken:
-    from sqlalchemy import delete as sa_delete
-    # Supersede prior unused invites by deleting them (not soft-expiring) so the table
-    # stays clean. Dedupe by driver for driver invites, by phone for standalone ones.
-    if driver_id is not None:
-        session.execute(
-            sa_delete(BotInviteToken).where(
-                BotInviteToken.driver_id == driver_id, BotInviteToken.used_at.is_(None)
-            )
-        )
-    elif phone_number is not None:
-        session.execute(
-            sa_delete(BotInviteToken).where(
-                BotInviteToken.driver_id.is_(None),
-                BotInviteToken.phone_number == phone_number,
-                BotInviteToken.used_at.is_(None),
-            )
-        )
-    invite = BotInviteToken(token=token, driver_id=driver_id, role=role, phone_number=phone_number)
-    session.add(invite)
-    session.commit()
-    session.refresh(invite)
-    return invite
+def find_enrollment_by_phone(session: Session, phone: str):
+    """(role, driver_id, expires_at) for a phone, or None.
 
-
-def claim_bot_invite(
-    session: Session, token: str, telegram_chat_id: int, phone_number: str | None = None,
-) -> BotUser | None | str:
+    An active driver wins (permanent driver role); otherwise a non-expired
+    bot_authorization. Phones are normalized both sides; fleets are small so a scan
+    is fine. ponytail: O(n) scan, add a normalized index if a fleet ever gets large.
+    """
     from datetime import datetime, timezone
+
+    target = _normalize_phone(phone)
+    for d in session.execute(select(Driver).where(Driver.status == "active")).scalars():
+        if _normalize_phone(d.phone_number) == target:
+            return ("driver", d.driver_id, None)
     now = datetime.now(timezone.utc)
-    invite = session.get(BotInviteToken, token)
-    if invite is None or invite.used_at is not None or invite.expires_at < now:
+    for a in session.execute(
+        select(BotAuthorization).where(
+            (BotAuthorization.expires_at.is_(None)) | (BotAuthorization.expires_at > now)
+        )
+    ).scalars():
+        if _normalize_phone(a.phone_number) == target:
+            role = a.role.value if hasattr(a.role, "value") else a.role
+            return (role, a.driver_id, a.expires_at)
+    return None
+
+
+def enroll_bot_user(session: Session, telegram_chat_id: int, phone_number: str) -> BotUser | None:
+    """Match the phone to a role and upsert the bot user. None when not authorized."""
+    match = find_enrollment_by_phone(session, phone_number)
+    if match is None:
         return None
-    if invite.phone_number:
-        if not phone_number or _normalize_phone(invite.phone_number) != _normalize_phone(phone_number):
-            return "phone_mismatch"
-    invite.used_at = now
+    role, driver_id, expires_at = match
     existing = session.execute(
         select(BotUser).where(BotUser.telegram_chat_id == telegram_chat_id)
     ).scalar_one_or_none()
     if existing is not None:
         session.delete(existing)
         session.flush()
-    user = BotUser(telegram_chat_id=telegram_chat_id, role=invite.role, driver_id=invite.driver_id, phone_number=invite.phone_number)
+    user = BotUser(
+        telegram_chat_id=telegram_chat_id, role=role, driver_id=driver_id,
+        phone_number=phone_number, expires_at=expires_at,
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
     return user
 
 
-def list_pending_bot_invites(session: Session) -> list[BotInviteToken]:
+def create_bot_authorization(
+    session: Session, phone_number: str, role: str = "driver",
+    driver_id: UUID | None = None, expires_at=None,
+) -> BotAuthorization:
+    from sqlalchemy import delete as sa_delete
+    # One authorization per phone - supersede any prior so the table stays clean.
+    session.execute(sa_delete(BotAuthorization).where(BotAuthorization.phone_number == phone_number))
+    auth = BotAuthorization(
+        phone_number=phone_number, role=role, driver_id=driver_id, expires_at=expires_at
+    )
+    session.add(auth)
+    session.commit()
+    session.refresh(auth)
+    return auth
+
+
+def list_bot_authorizations(session: Session) -> list[BotAuthorization]:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     return list(
         session.execute(
-            select(BotInviteToken).where(
-                BotInviteToken.used_at.is_(None),
-                BotInviteToken.expires_at > now,
+            select(BotAuthorization).where(
+                (BotAuthorization.expires_at.is_(None)) | (BotAuthorization.expires_at > now)
             )
         ).scalars()
     )
 
 
-def revoke_bot_invite(session: Session, token: str) -> str:
-    # Hard-delete the row (used or not) - the created bot user is a separate table,
-    # so removing the invite leaves access intact and keeps this table clean.
-    invite = session.get(BotInviteToken, token)
-    if invite is None:
+def delete_bot_authorization(session: Session, auth_id: UUID) -> str:
+    auth = session.get(BotAuthorization, auth_id)
+    if auth is None:
         return "not_found"
-    session.delete(invite)
+    session.delete(auth)
     session.commit()
     return "ok"
 

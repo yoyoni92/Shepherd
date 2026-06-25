@@ -6,32 +6,18 @@ import { daysTo, fmtDate } from '@/lib/domain'
 import { Avatar } from '@/components/Avatar'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { createBotInvite } from '@/lib/api/fleet'
 
 const DASH = '—'
+const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'ShepherdBot'
 
-function TelegramPanel({ driverId, phone, botUsers }: { driverId: string; phone: string; botUsers: BotUserRead[] }) {
-  const connected = botUsers.find((u) => u.driver_id === driverId)
+function TelegramPanel({ driverId, botUsers }: { driverId: string; botUsers: BotUserRead[] }) {
+  const enrolled = botUsers.find((u) => u.driver_id === driverId)
   const [open, setOpen] = useState(false)
-  const [deepLink, setDeepLink] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
-  const hasPhone = !!phone && phone !== DASH
-
-  const handleCreate = async () => {
-    setLoading(true)
-    try {
-      // Phone is mandatory for claim-time identity verification; use the driver's number.
-      const res = await createBotInvite({ driverId, role: 'driver', phoneNumber: phone })
-      setDeepLink(res.deep_link)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const link = `https://t.me/${BOT_USERNAME}`
 
   const handleCopy = () => {
-    if (!deepLink) return
-    navigator.clipboard.writeText(deepLink).then(() => {
+    navigator.clipboard.writeText(link).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
@@ -51,47 +37,40 @@ function TelegramPanel({ driverId, phone, botUsers }: { driverId: string; phone:
         <div className="mt-2.5 flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <span className="text-[12px] text-faint">סטטוס:</span>
-            {connected ? (
+            {enrolled ? (
               <span className="text-[12px] font-semibold" style={{ color: '#34d399' }}>
                 מחובר ✓
               </span>
             ) : (
               <span className="text-[12px] font-semibold" style={{ color: '#64748b' }}>
-                לא מחובר
+                טרם הצטרף
               </span>
             )}
           </div>
 
-          {!connected && (
+          {!enrolled && (
             <>
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] text-faint">אימות מול טלפון:</span>
-                <span className="text-[12px] font-semibold ltr" style={{ color: hasPhone ? 'var(--muted)' : '#f87171' }}>
-                  {hasPhone ? phone : 'חסר מספר טלפון'}
-                </span>
+              <p className="text-[11px] text-faint leading-snug">
+                נהג פעיל מקבל הרשאה אוטומטית. שתף/י את קישור הבוט; בכניסה הראשונה הנהג ישתף את
+                מספר הטלפון ויזוהה לפי הרכב.
+              </p>
+              <div className="flex items-center gap-1 min-w-0">
+                <input
+                  readOnly
+                  value={link}
+                  className="flex-1 text-[11px] ltr rounded-md border border-line bg-transparent px-2 py-1 outline-none truncate"
+                  style={{ color: 'var(--muted)' }}
+                />
+                <button
+                  onClick={handleCopy}
+                  title="העתק"
+                  className="flex items-center gap-1 text-[12px] font-semibold rounded-md cursor-pointer border-0 bg-transparent shrink-0"
+                  style={{ color: copied ? '#34d399' : '#60a5fa', padding: '4px 8px' }}
+                >
+                  {copied ? <Check size={13} /> : <Copy size={13} />}
+                  {copied ? 'הועתק' : 'העתק'}
+                </button>
               </div>
-              <Button variant="secondary" size="sm" onClick={handleCreate} disabled={loading || !hasPhone}>
-                {loading ? 'יוצר...' : '🔗 צור קישור הזמנה'}
-              </Button>
-              {deepLink && (
-                <div className="flex items-center gap-1 min-w-0">
-                  <input
-                    readOnly
-                    value={deepLink}
-                    className="flex-1 text-[11px] ltr rounded-md border border-line bg-transparent px-2 py-1 outline-none truncate"
-                    style={{ color: 'var(--muted)' }}
-                  />
-                  <button
-                    onClick={handleCopy}
-                    title="העתק"
-                    className="flex items-center gap-1 text-[12px] font-semibold rounded-md cursor-pointer border-0 bg-transparent shrink-0"
-                    style={{ color: copied ? '#34d399' : '#60a5fa', padding: '4px 8px' }}
-                  >
-                    {copied ? <Check size={13} /> : <Copy size={13} />}
-                    {copied ? 'הועתק' : 'העתק'}
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
@@ -171,7 +150,7 @@ export function DriverCard({
         </Button>
       </div>
 
-      <TelegramPanel driverId={d.id} phone={d.phone} botUsers={botUsers} />
+      <TelegramPanel driverId={d.id} botUsers={botUsers} />
     </Card>
   )
 }

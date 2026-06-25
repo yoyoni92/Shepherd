@@ -54,11 +54,12 @@ class FleetClient:
         r = await self._request("GET", "/whoami", params={"chat_id": chat_id})
         return r.json() if r.status_code == 200 else None
 
-    async def claim_invite(self, token: str, chat_id: int, phone_number: str) -> httpx.Response:
+    async def enroll(self, chat_id: int, phone_number: str) -> httpx.Response:
+        """Enroll by phone match (active driver or authorization). 200 -> granted; 404 -> not authorized."""
         return await self._request(
             "POST",
-            "/bot-invite/claim",
-            json_body={"token": token, "telegram_chat_id": chat_id, "phone_number": phone_number},
+            "/bot-enroll",
+            json_body={"telegram_chat_id": chat_id, "phone_number": phone_number},
         )
 
     # --- Generic verbs (caller defaults to admin) ---

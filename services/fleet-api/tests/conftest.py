@@ -24,15 +24,20 @@ def pg_engine():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def apply_migrations(pg_engine):
-    from alembic import command
-    from alembic.config import Config
+def apply_schema(pg_engine):
+    # Schema is built from the models (migrations were removed); bootstrap.sql's
+    # pg_cron scheduling is guarded, so it's a no-op on this plain test container.
+    import sys
 
     db_dir = Path(__file__).parents[3] / "db"
-    cfg = Config(str(db_dir / "alembic.ini"))
-    cfg.set_main_option("script_location", str(db_dir / "migrations"))
-    cfg.set_main_option("sqlalchemy.url", pg_engine.url.render_as_string(hide_password=False))
-    command.upgrade(cfg, "head")
+    sys.path.insert(0, str(db_dir))
+    from create_schema import build
+
+    build(pg_engine)
+    # The KPI endpoint reads the latest snapshot without seeding one; backfill a row
+    # (the old 0003 migration did this at upgrade time).
+    with pg_engine.begin() as conn:
+        conn.exec_driver_sql("SELECT refresh_kpi_daily()")
 
 
 @pytest.fixture

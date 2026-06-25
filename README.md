@@ -9,7 +9,7 @@ Design & build plans: [`../plans/`](../plans/README.md) (design) and
 
 ```
 libs/             shared contracts (pydantic models + provider interfaces)
-db/               Postgres schema, migrations, seed           [migrations 0001-0009]
+db/               Postgres schema (models = source of truth) + bootstrap.sql + seed
 services/         fleet-api, channel-gateway, doc-extractor,
                   image-analyser, rag, langgraph-agent,
                   guardrails, webui, telegram-bot
@@ -57,14 +57,17 @@ Deviation from Gradio/Streamlit noted: modern React SPA satisfies rubric "app.py
 Stack: Next.js App Router, next-auth credentials, Zod, MSW, Vitest + RTL, Playwright e2e.
 Served at port 3000.
 
-`services/telegram-bot` (replaces n8n): invite-only Hebrew Telegram bot built on
+`services/telegram-bot` (replaces n8n): phone-enrolled Hebrew Telegram bot built on
 aiogram 3 with long-polling (no public HTTPS / tunnel). Ports the 12 flows 1:1 -
 driver (clock in/out, accident, vehicle issue, update details, attendance CSV, my
 vehicle) and admin (attendance, broadcast, fleet summary, update driver, maintenance,
 document scan). Fleet API is the only tool layer; multi-step state lives in
 `bot_sessions`. Two LLM touches: accident description by **voice (Whisper) or text**,
 and an admin **document scan** (Gemini vision -> confirm -> apply). Accident media is
-stored as S3 attachments, never run through an LLM. Access controlled via one-time
-invite tokens; role management via WebUI. Fleet API endpoints: `GET /whoami`,
-`POST /bot-invite`, `POST /bot-invite/claim`, `PATCH /users/:id/role`. DB tables:
-`users`, `bot_invite_tokens`, `bot_sessions` (migrations 0008-0009).
+stored as S3 attachments, never run through an LLM. **Access (no invites):** an active
+driver auto-gets the driver role; admins + temporary (time-limited) roles come from
+`bot_authorizations`. The user shares their phone once on first contact and is matched
+by `POST /bot-enroll`; expired roles are swept by pg_cron. Role management via WebUI.
+Fleet API endpoints: `GET /whoami`, `POST /bot-enroll`, `POST/GET/DELETE
+/bot-authorizations`, `PATCH /users/:id/role`. DB tables: `users`,
+`bot_authorizations`, `bot_sessions`.

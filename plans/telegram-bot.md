@@ -15,6 +15,16 @@ notifications; it is not extended for this feature.
 > rewritten 1:1 as the native aiogram service. The flow specs, Hebrew copy, DB
 > schema, and Fleet API contracts below are unchanged; only Phases 3 and 6
 > (delivery + env) describe the aiogram service rather than n8n.
+>
+> **Access superseded (2026-06):** the invite-token flow (`bot_invite_tokens`,
+> `/bot-invite*`, deep links - Phases 1.1, 2.2-2.3, 3 token claim, 7.1/7.3 below)
+> was replaced by **phone-match auto-enrollment**. An active driver auto-gets the
+> driver role; admins + temporary (time-limited) roles live in a new
+> `bot_authorizations` table. The user shares their phone once and Fleet API's
+> `POST /bot-enroll` matches it; `whoami` denies expired/deactivated access and a
+> pg_cron job sweeps expired rows. Migrations were also dropped - `db/models.py`
+> is the schema source (`create_all` + `bootstrap.sql`). See the service README
+> and the bot-page authorizations panel for the current behaviour.
 
 ---
 

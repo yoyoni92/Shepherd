@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.flows.access import access_denied, invite_claim, menu
+from app.flows.access import access_denied, enroll, menu
 from app.flows.accident import accident
 from app.flows.attendance_admin import attendance_admin
 from app.flows.attendance_csv import attendance_csv
@@ -19,7 +19,7 @@ from app.flows.vehicle_issue import vehicle_issue
 FEATURES = {
     "menu": menu,
     "access_denied": access_denied,
-    "invite_claim": invite_claim,
+    "enroll": enroll,
     "clock": clock,
     "vehicle_issue": vehicle_issue,
     "my_vehicle": my_vehicle,

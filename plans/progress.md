@@ -14,6 +14,13 @@
   `services/telegram-bot` (aiogram 3, long-polling)**. n8n and its localtunnel
   sidecar were removed from `docker-compose.yml`; `services/n8n/workflows/*`
   were deleted. DB schema and Fleet API contracts were unchanged by the rewrite.
+- **Access reworked (2026-06):** invite tokens replaced by **phone-match
+  auto-enrollment** - active drivers auto-get the driver role; admins + temporary
+  (time-limited) roles in a new `bot_authorizations` table; `POST /bot-enroll`
+  matches the shared phone; expired/deactivated access denied at `whoami` and
+  swept by pg_cron. Alembic removed - `db/models.py` is the schema source
+  (`create_all` + `bootstrap.sql`); WebUI invite UI replaced by an authorizations
+  panel + plain bot link.
 
 ## Tasks
 

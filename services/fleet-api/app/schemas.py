@@ -362,7 +362,7 @@ class ClockResponse(BaseModel):
     window_end: str | None = None
 
 
-# --- Bot users and invites ---
+# --- Bot users, enrollment, and authorizations ---
 
 class BotWhoamiResponse(BaseModel):
     role: str
@@ -371,37 +371,33 @@ class BotWhoamiResponse(BaseModel):
     user_id: UUID
 
 
-class BotInviteCreate(BaseModel):
-    driver_id: UUID | None = None
-    role: str = "driver"
-    phone_number: str | None = None
-
-
-class BotInviteResponse(BaseModel):
-    token: str
-    deep_link: str
-    expires_at: datetime
-
-
-class BotInviteClaimRequest(BaseModel):
-    token: str
+class BotEnrollRequest(BaseModel):
     telegram_chat_id: int
-    phone_number: str | None = None
+    phone_number: str
 
 
-class BotInviteClaimResponse(BaseModel):
-    driver_id: UUID | None = None
+class BotEnrollResponse(BaseModel):
     role: str
-    user_id: UUID
-
-
-class BotInviteRead(BaseModel):
-    token: str
     driver_id: UUID | None = None
     driver_name: str | None = None
+    user_id: UUID
+    expires_at: datetime | None = None
+
+
+class BotAuthorizationCreate(BaseModel):
+    phone_number: str
     role: str = "driver"
-    phone_number: str | None = None
-    expires_at: datetime
+    driver_id: UUID | None = None
+    expires_at: datetime | None = None
+
+
+class BotAuthorizationRead(BaseModel):
+    id: UUID
+    phone_number: str
+    role: str
+    driver_id: UUID | None = None
+    driver_name: str | None = None
+    expires_at: datetime | None = None
     created_at: datetime
 
 
@@ -412,6 +408,7 @@ class BotUserRead(BaseModel):
     phone_number: str | None = None
     driver_id: UUID | None = None
     driver_name: str | None = None
+    expires_at: datetime | None = None
     created_at: datetime
 
 

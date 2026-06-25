@@ -10,8 +10,7 @@ import {
   AttendanceRecordReadSchema,
   MaintenanceTypeReadSchema,
   BotUserReadSchema,
-  BotInviteReadSchema,
-  BotInviteResponseSchema,
+  BotAuthorizationReadSchema,
   AccidentReadSchema,
   type VehicleRead,
   type MaintenanceTypeCreate,
@@ -23,8 +22,7 @@ import {
   type EventRead,
   type ReportRead,
   type BotUserRead,
-  type BotInviteRead,
-  type BotInviteResponse,
+  type BotAuthorizationRead,
   type AccidentCreate,
 } from './schemas'
 
@@ -129,22 +127,28 @@ export const updateConfig = (key: string, value: unknown) =>
 export const getBotUsers = (): Promise<BotUserRead[]> => get('/users', z.array(BotUserReadSchema))
 export const updateBotUserRole = (userId: string, role: 'admin' | 'driver'): Promise<BotUserRead> =>
   send('PATCH', `/users/${userId}/role`, { role }, BotUserReadSchema)
-export const getBotInvites = (): Promise<BotInviteRead[]> => get('/bot-invite', z.array(BotInviteReadSchema))
-export const createBotInvite = (
-  opts: { driverId?: string; role?: 'admin' | 'driver'; phoneNumber?: string },
-): Promise<BotInviteResponse> =>
+export const getBotAuthorizations = (): Promise<BotAuthorizationRead[]> =>
+  get('/bot-authorizations', z.array(BotAuthorizationReadSchema))
+export const createBotAuthorization = (
+  opts: { phoneNumber: string; role?: 'admin' | 'driver'; driverId?: string; expiresAt?: string },
+): Promise<BotAuthorizationRead> =>
   send(
     'POST',
-    '/bot-invite',
-    { driver_id: opts.driverId ?? null, role: opts.role ?? 'driver', phone_number: opts.phoneNumber ?? null },
-    BotInviteResponseSchema,
+    '/bot-authorizations',
+    {
+      phone_number: opts.phoneNumber,
+      role: opts.role ?? 'driver',
+      driver_id: opts.driverId ?? null,
+      expires_at: opts.expiresAt ?? null,
+    },
+    BotAuthorizationReadSchema,
   )
-export const revokeBotInvite = (token: string): Promise<void> =>
-  send('DELETE', `/bot-invite/${token}`, undefined)
+export const deleteBotAuthorization = (id: string): Promise<void> =>
+  send('DELETE', `/bot-authorizations/${id}`, undefined)
 
 // Accidents
 export const fetchAccidents = () => get('/accidents', z.array(AccidentReadSchema))
 export const createAccident = (a: AccidentCreate): Promise<{ accident_id: string }> =>
   send('POST', '/accidents', a, z.object({ accident_id: z.string() }))
 
-export type { VehicleRead, DriverRead, EventRead, ReportRead, BotUserRead, BotInviteRead, BotInviteResponse }
+export type { VehicleRead, DriverRead, EventRead, ReportRead, BotUserRead, BotAuthorizationRead }

@@ -23,21 +23,34 @@ def last_body(route) -> dict:
 # --- Router gating ---
 
 
-async def test_unknown_start_requests_phone(store, bot, fleet, mock_api):
-    mock_api.get(f"{FLEET}/whoami").mock(
-        return_value=httpx.Response(404, json={"detail": "unknown"})
-    )
-    await dispatch(
-        {"chat_id": 1, "sender_id": 1, "is_start": True, "start_token": "tok"}, bot, fleet
-    )
-    assert store[1] == {"flow": "invite_claim", "token": "tok"}
+async def test_unknown_user_asked_for_phone(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
+    await dispatch({"chat_id": 1, "sender_id": 1, "text": "שלום"}, bot, fleet)
     assert texts.CLAIM_REQUEST_PHONE in sent_texts(bot)
 
 
-async def test_unknown_text_denied(store, bot, fleet, mock_api):
+async def test_enroll_success_driver(store, bot, fleet, mock_api):
     mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
-    await dispatch({"chat_id": 2, "sender_id": 2, "text": "שלום"}, bot, fleet)
-    assert sent_texts(bot) == [texts.ACCESS_DENIED]
+    route = mock_api.post(f"{FLEET}/bot-enroll").mock(
+        return_value=httpx.Response(200, json={"role": "driver", "driver_id": "d1", "user_id": "u1"})
+    )
+    await dispatch(
+        {"chat_id": 2, "sender_id": 2, "contact_phone": "0501234567", "contact_user_id": 2}, bot, fleet
+    )
+    assert last_body(route) == {"telegram_chat_id": 2, "phone_number": "0501234567"}
+    assert texts.WELCOME_DRIVER in sent_texts(bot)
+    bot.set_my_commands.assert_awaited()
+
+
+async def test_enroll_not_authorized(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
+    mock_api.post(f"{FLEET}/bot-enroll").mock(
+        return_value=httpx.Response(404, json={"detail": "not_authorized"})
+    )
+    await dispatch(
+        {"chat_id": 3, "sender_id": 3, "contact_phone": "0500000000", "contact_user_id": 3}, bot, fleet
+    )
+    assert texts.NOT_AUTHORIZED in sent_texts(bot)
 
 
 async def test_driver_gets_driver_menu(store, bot, fleet, mock_api):

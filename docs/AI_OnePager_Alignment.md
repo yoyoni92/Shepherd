@@ -17,7 +17,7 @@ one-pager names) · ❌ missing (promised, not present/wired)
 | | KPI dashboard | yes | webui `/dashboard` + fleet-api `/kpi` | ✅ |
 | | RAG action chat | yes | webui `/chat` → langgraph agent (rag+fleet tools) | ✅ |
 | | Ollama-grounded assistant | yes | webui `/assistant` → ollama-assistant → ollama `llama3` | ✅ |
-| | Telegram bot + phone auth | yes | `telegram-bot` (aiogram) + channel-gateway, `channel_identities` | ✅ |
+| | Telegram bot + phone auth | yes | `telegram-bot` (aiogram); phone-match auto-enrollment (active driver / `bot_authorizations`), no invites | ✅ |
 | **2 Bot pipeline** | Update intake | yes | aiogram long-polling (no webhook/tunnel) | ✅ |
 | | **Guardrails input** in flow | yes | service exists, **not called by the bot** | ❌ |
 | | **Doc-type classifier** in flow | yes (image-analyser) | bot uses a guided type picker instead; classifier **not called** | ❌ |

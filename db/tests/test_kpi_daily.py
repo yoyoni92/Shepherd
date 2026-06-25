@@ -4,7 +4,7 @@ Seeds a deterministic fleet, runs the function, and asserts today's kpi_daily ro
 Runs against the real Postgres test container; system_config is empty so the docs
 window falls back to the function's 30-day default.
 """
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
@@ -15,7 +15,9 @@ def _scalar(conn, sql, **params):
 
 def test_refresh_kpi_daily_row_math(conn):
     now = datetime.now(timezone.utc)
-    today = date.today()
+    # Use the DB's current_date (UTC container), not the host's local date - the
+    # function keys snapshots on current_date, which can differ from a non-UTC host.
+    today = _scalar(conn, "SELECT current_date")
 
     customer_id = _scalar(
         conn,

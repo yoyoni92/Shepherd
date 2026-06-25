@@ -148,15 +148,11 @@ def active_route(ctx: Ctx) -> str | None:
 
 def route_decision(ctx: Ctx) -> tuple[str, str | None]:
     if ctx.whoami is None:
-        if ctx.is_start and ctx.start_token:
-            return ("invite_claim", "claim_request_phone")
-        if (
-            ctx.flow == "invite_claim"
-            and ctx.contact_phone
-            and ctx.contact_user_id == ctx.sender_id
-        ):
-            return ("invite_claim", "claim_with_phone")
-        return ("access_denied", None)
+        # No invites: any unknown user is asked to share their phone, then enrolled
+        # by matching it to an active driver / authorization.
+        if ctx.contact_phone and ctx.contact_user_id == ctx.sender_id:
+            return ("enroll", "enroll_with_phone")
+        return ("enroll", "request_phone")
 
     # A slash command (the ☰ menu) behaves like a menu button: it can start a feature
     # or reopen the menu, taking precedence over an in-progress flow's text step.

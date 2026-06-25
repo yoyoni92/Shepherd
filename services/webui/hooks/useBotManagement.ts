@@ -3,14 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getBotUsers,
   updateBotUserRole,
-  getBotInvites,
-  createBotInvite,
-  revokeBotInvite,
+  getBotAuthorizations,
+  createBotAuthorization,
+  deleteBotAuthorization,
 } from '@/lib/api/fleet'
-import type { BotUserRead, BotInviteRead, BotInviteResponse } from '@/lib/api/schemas'
+import type { BotUserRead, BotAuthorizationRead } from '@/lib/api/schemas'
 
 const USERS_KEY = ['bot-users']
-const INVITES_KEY = ['bot-invites']
+const AUTHZ_KEY = ['bot-authorizations']
 
 export function useBotUsers() {
   const qc = useQueryClient()
@@ -31,33 +31,34 @@ export function useBotUsers() {
   }
 }
 
-export function useBotInvites() {
+export function useBotAuthorizations() {
   const qc = useQueryClient()
-  const query = useQuery({ queryKey: INVITES_KEY, queryFn: getBotInvites })
+  const query = useQuery({ queryKey: AUTHZ_KEY, queryFn: getBotAuthorizations })
 
-  const createInvite = useMutation({
-    mutationFn: (opts: { driverId?: string; role?: 'admin' | 'driver'; phoneNumber?: string }) => createBotInvite(opts),
-    onSuccess: () => qc.invalidateQueries({ queryKey: INVITES_KEY }),
+  const createAuthorization = useMutation({
+    mutationFn: (opts: { phoneNumber: string; role?: 'admin' | 'driver'; driverId?: string; expiresAt?: string }) =>
+      createBotAuthorization(opts),
+    onSuccess: () => qc.invalidateQueries({ queryKey: AUTHZ_KEY }),
   })
 
-  const revokeInvite = useMutation({
-    mutationFn: (token: string) => revokeBotInvite(token),
-    onMutate: async (token) => {
-      await qc.cancelQueries({ queryKey: INVITES_KEY })
-      const prev = qc.getQueryData<BotInviteRead[]>(INVITES_KEY)
-      qc.setQueryData<BotInviteRead[]>(INVITES_KEY, (old) => old?.filter((i) => i.token !== token))
+  const revokeAuthorization = useMutation({
+    mutationFn: (id: string) => deleteBotAuthorization(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: AUTHZ_KEY })
+      const prev = qc.getQueryData<BotAuthorizationRead[]>(AUTHZ_KEY)
+      qc.setQueryData<BotAuthorizationRead[]>(AUTHZ_KEY, (old) => old?.filter((a) => a.id !== id))
       return { prev }
     },
-    onError: (_e, _token, ctx) => qc.setQueryData(INVITES_KEY, ctx?.prev),
-    onSettled: () => qc.invalidateQueries({ queryKey: INVITES_KEY }),
+    onError: (_e, _id, ctx) => qc.setQueryData(AUTHZ_KEY, ctx?.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: AUTHZ_KEY }),
   })
 
-  const invites: BotInviteRead[] = query.data ?? []
+  const authorizations: BotAuthorizationRead[] = query.data ?? []
 
   return {
-    invites,
+    authorizations,
     loading: query.isLoading,
-    createInvite: createInvite.mutateAsync,
-    revokeInvite: revokeInvite.mutate,
+    createAuthorization: createAuthorization.mutateAsync,
+    revokeAuthorization: revokeAuthorization.mutate,
   }
 }

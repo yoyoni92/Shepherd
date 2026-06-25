@@ -1,27 +1,10 @@
-"""kpi_daily rollup table + refresh_kpi_daily() + pg_cron schedule
+-- Non-model SQL applied by db-init after create_schema.py.
+-- Holds the pg_cron functions + schedules that SQLAlchemy models can't express.
+-- pg_cron bits are guarded on extension availability so this runs unchanged on a
+-- plain Postgres image (e.g. the test container) that lacks pg_cron.
 
-Revision ID: 0003
-Revises: 0002
-Create Date: 2026-06-19
-
-The dashboard reads the latest rows of kpi_daily in O(1) and derives trend arrows.
-refresh_kpi_daily() recomputes today's snapshot; pg_cron runs it nightly. The cron
-scheduling is guarded on extension availability so the migration still runs on a
-plain Postgres image (e.g. the test container) that lacks pg_cron.
-"""
-from typing import Sequence, Union
-
-import sqlalchemy as sa
-from alembic import op
-from sqlalchemy.dialects import postgresql
-
-revision: str = "0003"
-down_revision: Union[str, None] = "0002"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-REFRESH_FN = """
+-- Daily KPI rollup (formerly migration 0003). The dashboard reads the latest
+-- kpi_daily rows in O(1); this recomputes today's snapshot.
 CREATE OR REPLACE FUNCTION refresh_kpi_daily() RETURNS void AS $fn$
 DECLARE
   v_window_start timestamptz := (current_date - interval '7 days');
@@ -36,7 +19,6 @@ BEGIN
     top_customer_vehicle_count, computed_ts
   )
   WITH vkm AS (
-    -- per-vehicle km in the last 7d: max(km) in window - last km at/before window start, floored >= 0
     SELECT v.vehicle_id, v.customer_id,
       GREATEST(
         COALESCE((SELECT max(k.km) FROM km_updates k
@@ -100,58 +82,21 @@ BEGIN
     computed_ts = EXCLUDED.computed_ts;
 END;
 $fn$ LANGUAGE plpgsql;
-"""
 
-SCHEDULE = """
+-- Revoke expired temporary bot access (authorizations + enrolled users).
+CREATE OR REPLACE FUNCTION cleanup_expired_bot_access() RETURNS void AS $fn$
+BEGIN
+  DELETE FROM bot_authorizations WHERE expires_at IS NOT NULL AND expires_at < now();
+  DELETE FROM users WHERE expires_at IS NOT NULL AND expires_at < now();
+END;
+$fn$ LANGUAGE plpgsql;
+
 DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron') THEN
     CREATE EXTENSION IF NOT EXISTS pg_cron;
     PERFORM cron.schedule('kpi-daily', '0 3 * * *', 'SELECT refresh_kpi_daily()');
+    PERFORM cron.schedule('bot-access-cleanup', '*/5 * * * *', 'SELECT cleanup_expired_bot_access()');
   END IF;
 END
 $do$;
-"""
-
-
-def upgrade() -> None:
-    op.create_table(
-        "kpi_daily",
-        sa.Column("snapshot_date", sa.Date(), primary_key=True),
-        sa.Column("total_km_7d", sa.Integer(), nullable=True),
-        sa.Column("avg_km_per_driver_7d", sa.Numeric(), nullable=True),
-        sa.Column("avg_days_between_maintenance", sa.Numeric(), nullable=True),
-        sa.Column("maintenance_due_count", sa.Integer(), nullable=True),
-        sa.Column("docs_expiring_count", sa.Integer(), nullable=True),
-        sa.Column(
-            "top_customer_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("customers.customer_id"),
-            nullable=True,
-        ),
-        sa.Column("top_customer_km", sa.Integer(), nullable=True),
-        sa.Column("top_customer_vehicle_count", sa.Integer(), nullable=True),
-        sa.Column("computed_ts", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-    )
-    op.execute(REFRESH_FN)
-    op.execute(SCHEDULE)
-    # Backfill today's row so the dashboard has data immediately.
-    op.execute("SELECT refresh_kpi_daily();")
-
-
-def downgrade() -> None:
-    # Nested IFs: cron.job must only be referenced once pg_cron is actually installed,
-    # otherwise the planner fails resolving the relation on a plain Postgres image.
-    op.execute("""
-    DO $do$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-        IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'kpi-daily') THEN
-          PERFORM cron.unschedule('kpi-daily');
-        END IF;
-      END IF;
-    END
-    $do$;
-    """)
-    op.execute("DROP FUNCTION IF EXISTS refresh_kpi_daily();")
-    op.drop_table("kpi_daily")
