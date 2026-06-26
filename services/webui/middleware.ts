@@ -9,10 +9,6 @@ export const config = {
     '/drivers/:path*',
     '/missions/:path*',
     '/attendance/:path*',
-    '/chat/:path*',
-    '/assistant/:path*',
-    '/upload/:path*',
     '/config/:path*',
-    '/review/:path*',
   ],
 }

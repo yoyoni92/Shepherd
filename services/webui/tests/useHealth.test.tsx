@@ -7,8 +7,8 @@ import { QueryClientWrapper } from './helpers'
 describe('useHealth', () => {
   it('fetches per-service status from the aggregator', async () => {
     const { result } = renderHook(() => useHealth(), { wrapper: QueryClientWrapper })
-    await waitFor(() => expect(result.current.services.length).toBe(5))
-    expect(result.current.services.find((s) => s.key === 'rag')?.status).toBe('down')
-    expect(summarizeHealth(result.current.services)).toBe('degraded') // rag down, rest up
+    await waitFor(() => expect(result.current.services.length).toBe(1))
+    expect(result.current.services.find((s) => s.key === 'fleet')?.status).toBe('up')
+    expect(summarizeHealth(result.current.services)).toBe('ok')
   })
 })

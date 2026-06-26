@@ -26,7 +26,6 @@ CONFIG = [
     ("license_expiring_days", 30, "Days before license expiry to trigger alert"),
     ("insurance_expiring_days", 30, "Days before insurance expiry to trigger alert"),
     ("maintenance_km_buffer", 500, "km before next_maintenance_km to fire maintenance_due"),
-    ("allowed_languages", ["he", "en"], "Accepted languages for guardrails"),
     ("extractor_provider", "bedrock", "Document extraction provider"),
     ("image_confidence_min", 0.60, "Minimum Bedrock confidence score"),
 ]

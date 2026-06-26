@@ -16,4 +16,4 @@ jobs:
       - run: pipx install poetry
       - run: poetry install
       - run: poetry run pytest -q
-  # Per-service jobs (fleet-api, channel-gateway, ...) added as each is built.
+  # Per-service jobs (fleet-api, telegram-bot, webui) added as each is built.

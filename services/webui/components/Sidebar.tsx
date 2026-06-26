@@ -12,7 +12,6 @@ import {
   CalendarCheck,
   Wrench,
   Settings,
-  MessageSquare,
   Activity,
   LogOut,
   Bot,
@@ -42,7 +41,6 @@ const NAV: NavItem[] = [
   { href: '/maintenance-types', label: 'סוגי טיפול', Icon: Wrench },
   { href: '/config', label: 'הגדרות', Icon: Settings },
   { href: '/health', label: 'מצב מערכת', Icon: Activity, statusDot: true },
-  { href: '/chat', label: 'צ׳אט ועוזר', Icon: MessageSquare },
 ]
 
 const HEALTH_DOT: Record<Overall, string> = { ok: '#34d399', degraded: '#fbbf24', down: '#f87171' }

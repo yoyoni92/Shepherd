@@ -7,16 +7,15 @@
 - `db/` Postgres schema, migrations 0001-0009, seed data
 - `services/fleet-api` - REST API, SQLAlchemy ORM, 85 tests
 
-### Phase 2 - AI Services
-- `services/channel-gateway` - Telegram + webapp inbound, S3 media, n8n forwarding
-- `services/doc-extractor` - Bedrock + Gemini vision extractors, reconcile-by-plate
-- `services/rag` - multilingual embeddings, Chroma vector index, LangChain/Claude generator
-- `services/langgraph-agent` - LangGraph planner -> tool-exec -> synthesiser, Fleet API + RAG tools
-- `services/guardrails` - auth + language pre-checks, topic + grounding rails
+### Phase 2 - AI Services (removed)
+An earlier doc-ingest pipeline (channel-gateway, doc-extractor) and chat/RAG stack
+(rag, langgraph-agent, guardrails, ollama-assistant) were built and later removed -
+the bot's native Gemini doc scan superseded the pipeline, and a fresh
+Google-Drive-files RAG is planned to replace the chat/RAG stack.
 
 ### Phase 3 - UX + Operations
-- `services/webui` - Next.js 15 admin console (dashboard, Fleet Chat, Upload, Review Queue, Bot Management)
-- `services/telegram-bot` - invite-only Hebrew Telegram bot (aiogram 3, long-polling), driver + admin flows (replaces n8n)
+- `services/webui` - Next.js 15 admin console (dashboard, entity CRUD, Config, Bot Management, health)
+- `services/telegram-bot` - phone-enrolled Hebrew Telegram bot (aiogram 3, long-polling), driver + admin flows
 
 ---
 
@@ -28,7 +27,7 @@
 complete GitHub Actions pipeline that covers every package: **lint (ruff) -> typecheck (mypy) ->
 test (pytest) -> build Docker image -> push to Docker Hub**.
 
-**Why**: All 11 services plus `libs/` share one Poetry/ruff/mypy/pytest toolchain, yet CI only
+**Why**: All services plus `libs/` share one Poetry/ruff/mypy/pytest toolchain, yet CI only
 exercises `libs/`. The `Makefile` already exposes `lint`, `typecheck`, and `test` targets, so CI
 should run them uniformly to catch regressions before merge and publish images automatically.
 
@@ -80,32 +79,6 @@ with docstring-driven API reference for the whole monorepo.
 
 ---
 
-### Observability - Langfuse
-
-**What**: Integrate [Langfuse](https://langfuse.com) as the LLM observability layer across all AI services.
-
-**Why**: The project has four independent AI surfaces (rag, langgraph-agent, guardrails, doc-extractor) each logging prompts locally (V1-V5 prompt logs). Langfuse replaces ad-hoc logging with a unified trace/span model, eval scores, and a cost dashboard - all without changing inference code.
-
-**Scope**:
-
-| Service | What to instrument |
-|---------|--------------------|
-| `langgraph-agent` | Trace per `/agent/run` call; spans for planner, each tool, synthesiser |
-| `rag` | Span per `/query`; log retrieved chunks + rerank scores as observations |
-| `guardrails` | Spans for input-check + output-check; score pass/fail + detected language |
-| `doc-extractor` | Span per extraction; log provider (Bedrock/Gemini), plate, confidence |
-
-**Approach**:
-1. Add `langfuse` to each affected service's `pyproject.toml`.
-2. Use `langfuse.decorators.observe` on the function boundaries above - zero boilerplate.
-3. Pass `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` via `.env` (self-hosted or cloud).
-4. Add Langfuse container to `docker-compose.yml` for local dev (Postgres backend already present).
-5. Wire evals: thumbs-up/down from WebUI Fleet Chat -> `langfuse.score()`.
-
-**Outcome**: single pane of glass for latency, cost, prompt regressions, and user satisfaction scores across all AI surfaces.
-
----
-
 ### Mobile App - Driver + Admin on Mobile
 
 **What**: One installable iOS/Android app with **two role-aware surfaces** built on the
@@ -124,7 +97,7 @@ richer surface over the same backend.
 
 | Surface / Layer | What |
 |-----------------|------|
-| Admin surface | The existing console - dashboard, vehicles, drivers, customers, events, accidents, maintenance, upload/review, bot management, chat/assistant, config - reused unchanged |
+| Admin surface | The existing console - dashboard, vehicles, drivers, customers, events, accidents, maintenance, bot management, config - reused unchanged |
 | Driver surface | The bot's driver activities as native screens in the WebUI design system: clock in/out, report vehicle issue, accident wizard (photos/video), update my details, monthly attendance, my vehicle - all via the same Fleet API endpoints the bot calls |
 | Role + auth | Drivers authenticate by phone (Fleet `/bot-enroll` + `/whoami`, mirroring the bot); admins via `next-auth` credentials. Role decides which surface (and nav) is shown. Secure token storage (Keychain / Keystore) |
 | Responsive pass | Adapt the desktop-first `Shell` (sidebar + topbar) to mobile - drawer / bottom-nav, touch targets, mobile breakpoints - and design the driver surface mobile-first |
@@ -155,17 +128,10 @@ public stores)? Driver session lifetime / re-auth policy on mobile (the bot has 
 
 Run the existing `eval/` harness on every CI push against a golden fixture set; gate merges on pass rate >= 95%.
 
-### Image Analyser
+### Drive-files RAG
 
-`services/image-analyser` skeleton exists. Wire it into the bot's accident flow as a vision step after photo upload.
-
-### RAG - Incremental Index Updates
-
-Currently the Chroma index is rebuilt from scratch. Add a diff-based update triggered by Fleet API vehicle-profile change events.
-
-### WhatsApp Channel
-
-Channel-gateway has a WhatsApp seam (stub). Implement the provider and wire Twilio/WhatsApp Business credentials.
+Build a retrieval-augmented chat over the team's Google Drive files, with a new webui chat
+tab (reusing `ChatSurface`) and a fresh vector/ingestion pipeline. To be designed separately.
 
 ### Bot Action Location Capture (admin-only)
 

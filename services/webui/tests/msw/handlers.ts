@@ -1,9 +1,6 @@
 import { http, HttpResponse } from 'msw'
 
 const FLEET = process.env.NEXT_PUBLIC_FLEET_BASE ?? process.env.NEXT_PUBLIC_FLEET_API_URL ?? 'http://localhost:8000'
-const AGENT = process.env.NEXT_PUBLIC_AGENT_URL ?? 'http://localhost:8003'
-const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8001'
-const ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_URL ?? 'http://localhost:8006'
 
 // Real fleet-api shapes (services/fleet-api/app/schemas.py).
 const VEHICLES = [
@@ -150,28 +147,8 @@ export const handlers = [
   // System health aggregator (same-origin Next route)
   http.get('*/api/health', () =>
     HttpResponse.json({
-      services: [
-        { key: 'fleet', status: 'up', latencyMs: 12 },
-        { key: 'agent', status: 'up', latencyMs: 40 },
-        { key: 'rag', status: 'down', latencyMs: null },
-        { key: 'gateway', status: 'up', latencyMs: 18 },
-        { key: 'assistant', status: 'up', latencyMs: 25 },
-      ],
+      services: [{ key: 'fleet', status: 'up', latencyMs: 12 }],
       checkedAt: '2026-06-20T10:00:00Z',
     }),
   ),
-
-  // Agent (real contract)
-  http.post(`${AGENT}/agent/run`, () =>
-    HttpResponse.json({
-      answer: 'רכב 12-345-67: הביטוח בתוקף עד 02/09/2026.',
-      tools_used: ['fleet_api', 'rag'],
-      reasoning_steps: [],
-      citations: ['vehicle-profile-12-345-67'],
-    }),
-  ),
-  // Gateway (real contract)
-  http.post(`${GATEWAY}/webapp/ingest`, () => HttpResponse.json({ ok: true })),
-  // Ollama assistant
-  http.post(`${ASSISTANT}/chat`, () => HttpResponse.json({ content: 'מחליפים שמן כל 10-15 אלף ק״מ.' })),
 ]

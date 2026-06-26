@@ -10,10 +10,6 @@ export interface ServiceHealth {
 
 export const SERVICE_LABELS: Record<string, string> = {
   fleet: 'Fleet API',
-  agent: 'סוכן AI · LangGraph',
-  rag: 'מנוע RAG',
-  gateway: 'שער ערוצים',
-  assistant: 'עוזר Ollama',
 }
 
 export type Overall = 'ok' | 'degraded' | 'down'

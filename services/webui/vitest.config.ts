@@ -9,12 +9,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     exclude: ['e2e/**', 'node_modules/**'],
-    // Client bases point straight at the mocked hosts (the Next proxies are bypassed in unit tests).
+    // Client base points straight at the mocked host (the Next proxy is bypassed in unit tests).
     env: {
       NEXT_PUBLIC_FLEET_BASE: 'http://localhost:8000',
-      NEXT_PUBLIC_AGENT_BASE: 'http://localhost:8003',
-      NEXT_PUBLIC_GATEWAY_BASE: 'http://localhost:8001',
-      NEXT_PUBLIC_ASSISTANT_BASE: 'http://localhost:8006',
     },
     coverage: {
       provider: 'v8',

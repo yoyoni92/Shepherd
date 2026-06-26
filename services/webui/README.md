@@ -53,19 +53,15 @@ Pure logic lives in `lib/` (`kpis`, `domain`, `attendance`, `alerts`) and is uni
 
 ## Backend integration & gaps
 
-The UI is wired to the **real** services (`fleet-api`, `langgraph-agent`, `ollama-assistant`,
-`channel-gateway`). Full mapping + the list of missing endpoints/fields lives in
-[`API_ALIGNMENT.md`](./API_ALIGNMENT.md). Highlights:
+The UI is wired to the **real** `fleet-api`. Highlights:
 
 - **Auth proxy:** every Fleet API call goes through `app/api/fleet/[...path]/route.ts`, which injects
   `X-Internal-Token` + `X-Caller-Context: {role:admin}` server-side (the token never reaches the
   browser). Browser base URL is `/api/fleet`.
-- **Generic service proxy:** `agent`/`rag`/`gateway`/`assistant` are reached via the same-origin
-  `app/api/proxy/[svc]/[...path]` (server-only `AGENT_URL`/`RAG_URL`/`GATEWAY_URL`/`ASSISTANT_URL`);
-  no service hostname reaches the browser.
-- **System health:** `app/api/health` pings every service's `/health` server-side (3s timeout) and
-  returns per-service up/down + latency; the `/health` page renders status dots and the sidebar shows a
-  live overall dot.
+- **Generic service proxy:** `app/api/proxy/[svc]/[...path]` forwards to server-only private services;
+  none are registered today (reserved for the planned Drive-files RAG).
+- **System health:** `app/api/health` pings Fleet API's `/health` server-side (3s timeout) and returns
+  up/down + latency; the `/health` page renders status dots and the sidebar shows a live overall dot.
 - **KPIs:** `GET /kpi/daily?limit=2` reads the nightly `kpi_daily` rollup; `lib/kpis.ts`
   `deriveKpiTiles` maps the latest 2 rows to six tiles + trend arrows. Alerts/recent come from `/events`.
 - **Adapters:** `lib/adapters.ts` maps `VehicleRead`/`DriverRead` → card view models grounded to real
@@ -76,13 +72,6 @@ The UI is wired to the **real** services (`fleet-api`, `langgraph-agent`, `ollam
 - **Attendance** (gap B2 closed): drivers double as employees; `GET /attendance/{month}` +
   `PATCH /attendance/{driver_id}/{date}`. The webui builds the weekday skeleton (`lib/attendance.ts`)
   and overlays stored records; edits PATCH with optimistic update + Zod time validation.
-
-## DB-blind assistant
-
-`hooks/useAssistant.ts` only calls `NEXT_PUBLIC_ASSISTANT_URL/chat`. ESLint rule
-(`no-restricted-imports` in `.eslintrc.json`) prevents importing any fleet/agent/gateway
-client into that file. The `useAssistant.test.tsx` also asserts no Fleet API or RAG
-requests are made at the network level via MSW.
 
 ## Environment variables
 

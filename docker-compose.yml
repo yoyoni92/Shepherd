@@ -61,120 +61,6 @@ services:
       retries: 5
       start_period: 15s
 
-  channel-gateway:
-    build:
-      context: .
-      dockerfile: services/channel-gateway/Dockerfile
-    environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/ingest}
-      S3_BUCKET: ${S3_BUCKET:-shepherd-docs}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
-    ports:
-      - "8001:8000"
-    depends_on:
-      db-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-  doc-extractor:
-    build:
-      context: .
-      dockerfile: services/doc-extractor/Dockerfile
-    environment:
-      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
-      BEDROCK_REGION: ${BEDROCK_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_BUCKET: ${S3_BUCKET:-shepherd-docs}
-      FLEET_API_URL: http://fleet-api:8000
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
-      EXTRACTOR_PROVIDER: ${EXTRACTOR_PROVIDER:-bedrock}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-    ports:
-      - "8002:8002"
-    depends_on:
-      fleet-api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-  rag:
-    build:
-      context: .
-      dockerfile: services/rag/Dockerfile
-    environment:
-      DATABASE_URL: postgresql+psycopg://rag_readonly:rag_readonly@postgres:5432/${POSTGRES_DB:-shepherd}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
-    ports:
-      - "8004:8000"
-    depends_on:
-      db-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  langgraph-agent:
-    build:
-      context: .
-      dockerfile: services/langgraph-agent/Dockerfile
-    environment:
-      FLEET_API_URL: http://fleet-api:8000
-      RAG_URL: ${RAG_URL:-http://rag:8000}
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-    ports:
-      - "8003:8000"
-    depends_on:
-      fleet-api:
-        condition: service_healthy
-      rag:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-  guardrails:
-    build:
-      context: .
-      dockerfile: services/guardrails/Dockerfile
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://shepherd:shepherd@postgres:5432/shepherd}
-      GUARDRAILS_API_KEY: ${GUARDRAILS_API_KEY:-}
-      GUARDRAILS_LLM: ${GUARDRAILS_LLM:-openai/gpt-4o-mini}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-    ports:
-      - "8005:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   webui:
     build:
       context: ./services/webui
@@ -191,14 +77,9 @@ services:
       NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fleetops.io}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-shepherd}
-      # Server-only: the Fleet proxy injects the internal token; the generic proxy + health
-      # aggregator reach the private services. None of these are exposed to the browser.
+      # Server-only: the Fleet proxy injects the internal token. Not exposed to the browser.
       FLEET_API_URL: http://fleet-api:8000
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
-      AGENT_URL: http://langgraph-agent:8000
-      RAG_URL: http://rag:8000
-      GATEWAY_URL: http://channel-gateway:8000
-      ASSISTANT_URL: http://ollama-assistant:8000
     ports:
       - "3000:3000"
     depends_on:
@@ -233,44 +114,5 @@ services:
       fleet-api:
         condition: service_healthy
 
-  ollama:
-    build:
-      context: ./services/ollama
-      args:
-        OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    healthcheck:
-      # the ollama image ships no curl/wget — use the bundled CLI (hits the local server)
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  ollama-assistant:
-    build:
-      context: .
-      dockerfile: services/ollama-assistant/Dockerfile
-    environment:
-      OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
-      SYSTEM_PROMPT_PATH: /prompts/ollama_system.txt
-      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-60}
-    ports:
-      - "8006:8000"
-    depends_on:
-      ollama:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
 volumes:
   pgdata:
-  ollama_data:

@@ -20,7 +20,7 @@ def test_seed_counts(pg_engine):
             ("vehicle_care", 1),
             ("reports", 1),
             ("events", 1),
-            ("system_config", 6),
+            ("system_config", 5),
             ("channel_identities", 1),
         ]:
             count = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()

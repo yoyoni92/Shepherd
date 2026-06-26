@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-// Server-only base URLs for the private services (never exposed to the browser).
-// Unlike the Fleet proxy, these need no internal token / caller context.
-const BASES: Record<string, string | undefined> = {
-  agent: process.env.AGENT_URL,
-  rag: process.env.RAG_URL,
-  gateway: process.env.GATEWAY_URL,
-  assistant: process.env.ASSISTANT_URL,
-}
+// Server-only base URLs for private services (never exposed to the browser). Unlike the
+// Fleet proxy, these need no internal token / caller context. Empty for now; the Drive-files
+// RAG service will register its entry here.
+const BASES: Record<string, string | undefined> = {}
 
 async function forward(req: NextRequest, svc: string, path: string[]) {
   const session = await getServerSession(authOptions)

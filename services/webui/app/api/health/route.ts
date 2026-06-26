@@ -6,10 +6,6 @@ import type { ServiceHealth } from '@/lib/health'
 // Server-only base URLs; every service exposes GET /health. fleet-api's /health is unauthenticated.
 const SERVICES: { key: string; url: string | undefined }[] = [
   { key: 'fleet', url: process.env.FLEET_API_URL ?? process.env.NEXT_PUBLIC_FLEET_API_URL },
-  { key: 'agent', url: process.env.AGENT_URL },
-  { key: 'rag', url: process.env.RAG_URL },
-  { key: 'gateway', url: process.env.GATEWAY_URL },
-  { key: 'assistant', url: process.env.ASSISTANT_URL },
 ]
 
 // ponytail: fixed 3s probe timeout — bump if a service is legitimately slow to answer /health

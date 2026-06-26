@@ -11,7 +11,6 @@ EXPECTED_CONFIG = [
     ("license_expiring_days",   30,           int),
     ("insurance_expiring_days", 30,           int),
     ("maintenance_km_buffer",   500,          int),
-    ("allowed_languages",       ["he", "en"], list),
     ("extractor_provider",      "bedrock",    str),
     ("image_confidence_min",    0.60,         float),
 ]
