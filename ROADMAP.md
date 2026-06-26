@@ -22,6 +22,64 @@
 
 ## Up Next
 
+### CI/CD - Full Lifecycle Pipeline
+
+**What**: Replace the stub `.github/workflows/ci.yml` (today it only runs `libs/` tests) with a
+complete GitHub Actions pipeline that covers every package: **lint (ruff) -> typecheck (mypy) ->
+test (pytest) -> build Docker image -> push to Docker Hub**.
+
+**Why**: All 11 services plus `libs/` share one Poetry/ruff/mypy/pytest toolchain, yet CI only
+exercises `libs/`. The `Makefile` already exposes `lint`, `typecheck`, and `test` targets, so CI
+should run them uniformly to catch regressions before merge and publish images automatically.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Matrix | One job per package (`libs/` + each `services/*`), path-filtered so only changed packages run |
+| Quality gates | Reuse Makefile targets: `make lint`, `make typecheck`, `make test` per package |
+| Build + push | On merge to `main`, build each service's `Dockerfile` and push to the Docker Hub global registry, tagged `org/shepherd-<service>:<git-sha>` and `:latest` |
+| Secrets | `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` as repo secrets |
+
+**Approach**:
+1. Path-filtered matrix discovers changed packages.
+2. Each matrix leg runs `make lint typecheck test` against its package.
+3. A build-and-push stage gated on `main` uses `docker/build-push-action` to publish images.
+
+**Outcome**: every push is lint-, type-, and test-checked; every merge to `main` publishes fresh
+service images to the Docker Hub global registry.
+
+---
+
+### MkDocs - Unified Monorepo Documentation Site
+
+**What**: A single browsable docs site built with **MkDocs + Material theme**, using
+**mkdocstrings[python]** to auto-generate API reference from docstrings across `libs/` and every
+service, alongside the existing narrative docs (`docs/`, service READMEs, `plans/`).
+
+**Why**: Documentation is scattered across the root README, per-service READMEs, `docs/`, and
+`plans/`. mkdocstrings turns the Python packages' docstrings into live API reference, and Material
+gives one navigable, searchable home for everything in the monorepo.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Site config | `mkdocs.yml` + a `docs/` nav structure spanning guides and API reference |
+| Auto API ref | mkdocstrings `[python]` handler pointing at each package's `app/` / `libs/` modules |
+| Theme | Material (search, dark mode), aligned to the project's existing dark, Hebrew-aware aesthetic where reasonable |
+| Publish | CI job that builds the site and deploys to GitHub Pages on merge to `main` |
+
+**Approach**:
+1. Add `mkdocs`, `mkdocs-material`, `mkdocstrings[python]` as a docs dependency group.
+2. Author `mkdocs.yml` with auto-reference pages per package.
+3. Run `mkdocs gh-deploy` from the CI pipeline (above) on merge to `main`.
+
+**Outcome**: one published docs site, auto-refreshed on every merge, combining hand-written guides
+with docstring-driven API reference for the whole monorepo.
+
+---
+
 ### Observability - Langfuse
 
 **What**: Integrate [Langfuse](https://langfuse.com) as the LLM observability layer across all AI services.
