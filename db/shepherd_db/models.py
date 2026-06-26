@@ -72,6 +72,7 @@ class EventTypeEnum(str, enum.Enum):
     insurance_expiring = "insurance_expiring"
     ticket_received = "ticket_received"
     accident_logged = "accident_logged"
+    vehicle_issue = "vehicle_issue"  # driver-reported fault via the Telegram bot
 
 
 class EventSeverityEnum(str, enum.Enum):
@@ -85,6 +86,7 @@ class EventSourceTypeEnum(str, enum.Enum):
     scheduler = "scheduler"
     accidents = "accidents"
     reports = "reports"
+    telegram = "telegram"  # bot-originated events (e.g. driver fault reports)
 
 
 class EventStatusEnum(str, enum.Enum):

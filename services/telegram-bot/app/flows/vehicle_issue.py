@@ -21,15 +21,18 @@ async def vehicle_issue(ctx: Ctx, route: str | None) -> None:
         if vehicle is None:
             await send(ctx, texts.NO_VEHICLE)
             return
-        await ctx.fleet.post(
+        resp = await ctx.fleet.post(
             "/events",
             {
                 "vehicle_id": vehicle["vehicle_id"],
-                "event_type": "warning",
+                "event_type": "vehicle_issue",
                 "severity": "warning",
                 "message": f"תקלה מהנהג: {ctx.text}",
                 "source_type": "telegram",
             },
         )
+        if resp.status_code not in (200, 201):
+            await send(ctx, texts.VEHICLE_ISSUE_FAILED)
+            return
         await send(ctx, texts.VEHICLE_ISSUE_DONE)
         await send_dice(ctx)

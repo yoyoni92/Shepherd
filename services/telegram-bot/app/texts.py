@@ -3,8 +3,17 @@
 ACCESS_DENIED = "הגישה למערכת מוגבלת. 🔒"
 
 # Enrollment (no invites - match the shared phone to a driver/authorization)
-CLAIM_REQUEST_PHONE = "כדי להשלים את ההצטרפות, שתף/י את מספר הטלפון שלך 👇"
+CLAIM_REQUEST_PHONE = (
+    "כדי להשלים את ההצטרפות, לחצ/י על הכפתור «📱 שיתוף מספר הטלפון» שמופיע למטה.\n"
+    "⬇️⬇️⬇️"
+)
 CLAIM_SHARE_BUTTON = "📱 שיתוף מספר הטלפון"
+# Shown when a driver types their number instead of tapping the share button. The
+# number must be shared via the button so Telegram verifies it belongs to this account.
+CLAIM_USE_BUTTON = (
+    "⚠️ אין להקליד את המספר.\n"
+    "כדי להצטרף יש ללחוץ על הכפתור «📱 שיתוף מספר הטלפון» שמופיע למטה 👇"
+)
 NOT_AUTHORIZED = (
     "❌ מספר הטלפון שלך לא מורשה לגישה למערכת.\n"
     "פנה/י למנהל כדי שיוסיף אותך כנהג פעיל."
@@ -48,6 +57,7 @@ CLOCK_BLOCKED = "⛔ דיווח נוכחות אפשרי רק בין {start} ל-{
 # Vehicle issue
 VEHICLE_ISSUE_PROMPT = "🔧 תאר/י את התקלה ברכב"
 VEHICLE_ISSUE_DONE = "✅ התקלה נרשמה."
+VEHICLE_ISSUE_FAILED = "⚠️ רישום התקלה נכשל. נסה/י שוב מאוחר יותר."
 NO_VEHICLE = "לא נמצא רכב המשויך אליך."
 
 # Accident
@@ -88,6 +98,12 @@ UPDATE_DRIVER_SCAN_PROMPT = "📎 שלח/י צילום או קובץ של ריש
 ATTENDANCE_TODAY_TITLE = "👥 נוכחות היום"
 ATTENDANCE_EMPTY = "אין רישומי נוכחות להיום."
 FLEET_SUMMARY_TITLE = "🚗 סיכום צי"
+HEB_MONTHS = [
+    "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
+    "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
+]
+ATTENDANCE_CSV_CAPTION = "נוכחות חודש {month}"
+ATTENDANCE_CSV_FILENAME = "נוכחות {month} {year}.csv"
 
 # My vehicle
 MY_VEHICLE_TITLE = "🚗 הרכב שלי"

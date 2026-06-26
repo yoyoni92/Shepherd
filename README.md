@@ -13,6 +13,7 @@ db/               Postgres schema (models = source of truth) + bootstrap.sql + s
 services/         fleet-api, channel-gateway, doc-extractor,
                   image-analyser, rag, langgraph-agent,
                   guardrails, webui, telegram-bot
+tests/e2e/        cross-system integration tests (telegram-bot vs live stack)
 plans/            design & implementation plans
 ```
 
@@ -20,6 +21,8 @@ plans/            design & implementation plans
 
 - Python **3.12** (services), managed with **Poetry**. WebUI: **Node.js 22** + npm.
 - Per package: `poetry env use python3.12 && poetry install && poetry run pytest`.
+- Cross-system integration tests: `make up` then `make e2e` (drives the telegram-bot
+  against the live Fleet API + Postgres; see [`tests/e2e/`](tests/e2e/README.md)).
 
 ## Status
 

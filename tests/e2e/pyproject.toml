@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "shepherd-e2e"
+version = "0.1.0"
+description = "Cross-system integration tests: drive the telegram-bot against the live compose stack (Fleet API + Postgres)."
+authors = ["Shepherd Team <team@shepherd.local>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+# The bot under test, installed editable so `import app` + its tests/sim harness resolve.
+telegram-bot = { path = "../../services/telegram-bot", develop = true }
+pytest = "^8.3"
+pytest-asyncio = "^0.24"
+psycopg = { extras = ["binary"], version = "^3.1" }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

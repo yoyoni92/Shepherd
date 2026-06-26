@@ -23,10 +23,17 @@ def last_body(route) -> dict:
 # --- Router gating ---
 
 
-async def test_unknown_user_asked_for_phone(store, bot, fleet, mock_api):
+async def test_unknown_start_asked_for_phone(store, bot, fleet, mock_api):
     mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
-    await dispatch({"chat_id": 1, "sender_id": 1, "text": "שלום"}, bot, fleet)
+    await dispatch({"chat_id": 1, "sender_id": 1, "is_start": True, "start_token": None}, bot, fleet)
     assert texts.CLAIM_REQUEST_PHONE in sent_texts(bot)
+
+
+async def test_unknown_typed_number_nudged_to_button(store, bot, fleet, mock_api):
+    # Driver typed their number instead of tapping the share button -> nudge, not loop.
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
+    await dispatch({"chat_id": 1, "sender_id": 1, "text": "0528588058"}, bot, fleet)
+    assert texts.CLAIM_USE_BUTTON in sent_texts(bot)
 
 
 async def test_enroll_success_driver(store, bot, fleet, mock_api):

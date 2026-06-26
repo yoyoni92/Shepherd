@@ -65,6 +65,13 @@ poetry env use python3.12 && poetry install
 poetry run pytest
 ```
 
+Two test layers (both mock Fleet API with respx and stub storage / Whisper / Gemini):
+
+- `tests/test_flows.py` - unit tests that call `router.dispatch()` directly with a faked bot.
+- `tests/test_e2e.py` + `tests/sim.py` - black-box e2e: real aiogram `Update`s (one user per
+  role) fed through the real dispatcher with the **Telegram Bot API mocked at the session
+  boundary**, so the suite acts like Telegram itself and covers every bot activity.
+
 Config (see repo `.env.example`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`,
 `FLEET_API_URL`, `INTERNAL_SERVICE_TOKEN`, `DATABASE_URL`, `OPENAI_API_KEY`,
 `GEMINI_API_KEY`. Media is uploaded via Fleet API, so the bot needs no storage creds.

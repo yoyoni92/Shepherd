@@ -35,12 +35,14 @@ def build_csv(rows: list[dict]) -> bytes:
 
 
 async def attendance_csv(ctx: Ctx, route: str | None) -> None:
-    month = datetime.now(_IL).strftime("%Y-%m")
+    now = datetime.now(_IL)
+    month = now.strftime("%Y-%m")
     resp = await ctx.fleet.get(f"/attendance/{month}", params={"driver_id": ctx.driver_id})
     rows = resp.json() if resp.status_code == 200 else []
     if not rows:
         await send(ctx, texts.ATTENDANCE_EMPTY)
         return
-    await send_document(
-        ctx, f"attendance_{month}.csv", build_csv(rows), caption=texts.ATTENDANCE_TODAY_TITLE
-    )
+    month_name = texts.HEB_MONTHS[now.month - 1]
+    caption = texts.ATTENDANCE_CSV_CAPTION.format(month=month_name)
+    filename = texts.ATTENDANCE_CSV_FILENAME.format(month=month_name, year=now.year)
+    await send_document(ctx, filename, build_csv(rows), caption=caption)

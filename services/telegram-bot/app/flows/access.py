@@ -26,7 +26,11 @@ async def enroll(ctx: Ctx, route: str | None) -> None:
     session state, so there's nothing to stash between the two steps.
     """
     if route == "request_phone":
-        await send(ctx, texts.CLAIM_REQUEST_PHONE, reply_markup=keyboards.request_contact())
+        # A driver who typed text (not the initial /start) is trying to send the number
+        # manually - nudge them to the button instead of repeating the same prompt.
+        typed = ctx.text and not ctx.is_start
+        msg = texts.CLAIM_USE_BUTTON if typed else texts.CLAIM_REQUEST_PHONE
+        await send(ctx, msg, reply_markup=keyboards.request_contact())
         return
 
     if route == "enroll_with_phone":
