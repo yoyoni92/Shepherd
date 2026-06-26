@@ -2,8 +2,8 @@
 
 Steps: safe -> description (voice via Whisper, or text) -> road clear -> 3 document
 photos -> area video(s) loop -> POST /accidents -> manager call -> notify admins.
-All media is stored as S3 attachments; none is run through an LLM (only the voice
-description is transcribed).
+All media is stored as attachments (Fleet API -> Drive); none is run through an LLM
+(only the voice description is transcribed).
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app import keyboards, s3, sessions, stt, texts
+from app import keyboards, sessions, storage, stt, texts
 from app.context import Ctx
 from app.tg import download, send
 
@@ -21,7 +21,7 @@ _IL = ZoneInfo("Asia/Jerusalem")
 async def _store_photo(ctx: Ctx, category: str) -> None:
     data = await download(ctx, ctx.photo_id)
     key = f"accidents/{ctx.chat_id}/{category}.jpg"
-    url = await s3.upload(key, data, "image/jpeg")
+    url = await storage.upload(key, data, "image/jpeg")
     ctx.state.setdefault("attachments", []).append({"category": category, "file_url": url})
 
 
@@ -114,7 +114,7 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         idx = ctx.state.get("video_count", 0)
         data = await download(ctx, ctx.video_id)
         key = f"accidents/{ctx.chat_id}/accident_video_{idx}.mp4"
-        url = await s3.upload(key, data, "video/mp4")
+        url = await storage.upload(key, data, "video/mp4")
         ctx.state.setdefault("attachments", []).append(
             {"category": "accident_video", "file_url": url}
         )

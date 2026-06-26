@@ -11,6 +11,7 @@ from app.routers import (
     documents,
     drivers,
     events,
+    files,
     km,
     kpi,
     maintenance_types,
@@ -46,6 +47,7 @@ app.include_router(kpi.router)
 app.include_router(attendance.router)
 app.include_router(maintenance_types.router)
 app.include_router(bot.router)
+app.include_router(files.router)
 
 
 @app.get("/health", tags=["health"], summary="Health check", description="Returns 200 when the service is up.")

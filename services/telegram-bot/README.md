@@ -55,7 +55,8 @@ logged, broadcast sent, document applied) the bot sends an **animated-emoji flou
   confirmation, then applies via `POST /documents/extracted` (vehicle docs, plate-matched)
   or `PATCH /drivers/{id}` (driver license).
 
-Accident photos/videos are stored as S3 attachments and are **not** run through an LLM.
+Accident photos/videos are uploaded through Fleet API (`POST /files` -> Google Drive) and
+stored as attachments; they are **not** run through an LLM.
 
 ## Dev
 
@@ -65,7 +66,7 @@ poetry run pytest
 ```
 
 Config (see repo `.env.example`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`,
-`FLEET_API_URL`, `INTERNAL_SERVICE_TOKEN`, `DATABASE_URL`, `S3_BUCKET_ACCIDENTS`,
-`S3_BUCKET_DOCS`, `AWS_*`, `OPENAI_API_KEY`, `GEMINI_API_KEY`.
+`FLEET_API_URL`, `INTERNAL_SERVICE_TOKEN`, `DATABASE_URL`, `OPENAI_API_KEY`,
+`GEMINI_API_KEY`. Media is uploaded via Fleet API, so the bot needs no storage creds.
 
 Runs as a long-polling worker (`python -m app.main`); no port is exposed.

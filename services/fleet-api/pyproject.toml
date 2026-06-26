@@ -11,6 +11,9 @@ fastapi = "^0.115"
 uvicorn = { extras = ["standard"], version = "^0.30" }
 sqlalchemy = "^2.0"
 psycopg = { extras = ["binary"], version = "^3.1" }
+python-multipart = "^0.0.9"
+google-api-python-client = "^2.140"
+google-auth = "^2.34"
 shepherd-contracts = { path = "../../libs", develop = true }
 shepherd-db = { path = "../../db", develop = true }
 

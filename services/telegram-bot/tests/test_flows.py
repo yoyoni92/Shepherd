@@ -6,7 +6,7 @@ import json
 from unittest.mock import AsyncMock
 
 import httpx
-from app import s3, stt, texts, vision
+from app import storage, stt, texts, vision
 from app.router import dispatch
 
 from tests.conftest import FLEET, whoami_response
@@ -168,7 +168,7 @@ async def test_doc_scan_file_extracts_and_confirms(store, bot, fleet, mock_api, 
     monkeypatch.setattr(
         vision, "extract", AsyncMock(return_value={"plate_number": "55", "valid_to": "2027-02-02"})
     )
-    monkeypatch.setattr(s3, "upload", AsyncMock(return_value="s3url"))
+    monkeypatch.setattr(storage, "upload", AsyncMock(return_value="https://drive/url"))
     store[11] = {"flow": "doc_scan", "step": "awaiting_file", "doc_type": "vehicle_license"}
     mock_api.get(f"{FLEET}/whoami").mock(return_value=whoami_response("admin"))
     await dispatch({"chat_id": 11, "sender_id": 11, "photo_id": "pid"}, bot, fleet)

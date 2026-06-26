@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 
-const bucket = process.env.S3_BUCKET_ACCIDENTS ?? 'shepherd-accidents'
-const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
+// Server-only Fleet API base (never exposed to the browser); Fleet owns storage.
+const FLEET_BASE = process.env.FLEET_API_URL ?? process.env.NEXT_PUBLIC_FLEET_API_URL ?? 'http://localhost:8000'
+const INTERNAL_TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? ''
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -16,14 +16,18 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: 'no file' }, { status: 400 })
 
   const key = `accidents/${randomUUID()}/${file.name}`
-  const bytes = await file.arrayBuffer()
+  const upload = new FormData()
+  upload.append('key', key)
+  upload.append('file', file, file.name)
 
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: Buffer.from(bytes),
-    ContentType: file.type || 'application/octet-stream',
-  }))
+  const res = await fetch(`${FLEET_BASE}/files`, {
+    method: 'POST',
+    headers: { 'X-Internal-Token': INTERNAL_TOKEN },
+    body: upload,
+    cache: 'no-store',
+  })
+  if (!res.ok) return NextResponse.json({ error: 'upload failed' }, { status: 502 })
 
-  return NextResponse.json({ file_url: `s3://${bucket}/${key}` })
+  const { file_url } = await res.json()
+  return NextResponse.json({ file_url })
 }

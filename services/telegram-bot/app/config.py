@@ -17,11 +17,6 @@ class Settings(BaseSettings):
     # bot_sessions store
     database_url: str = ""
 
-    # S3 media (accident attachments + scanned documents)
-    s3_bucket_accidents: str = "shepherd-accidents"
-    s3_bucket_docs: str = "shepherd-docs"
-    aws_default_region: str = "us-east-1"
-
     # LLM touches
     openai_api_key: str = ""  # Whisper STT (accident description)
     gemini_api_key: str = ""  # Gemini vision (admin doc scan)

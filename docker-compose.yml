@@ -44,6 +44,11 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
+      # Google Drive storage (Fleet API owns uploads).
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gdrive-sa.json
+      GDRIVE_FOLDER_ID: ${GDRIVE_FOLDER_ID:-}
+    volumes:
+      - ${GDRIVE_SA_KEY_PATH:-./secrets/gdrive-sa.json}:/run/secrets/gdrive-sa.json:ro
     ports:
       - "8000:8000"
     depends_on:
@@ -220,11 +225,7 @@ services:
       FLEET_API_URL: http://fleet-api:8000
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
-      S3_BUCKET_ACCIDENTS: ${S3_BUCKET_ACCIDENTS:-shepherd-accidents}
-      S3_BUCKET_DOCS: ${S3_BUCKET:-shepherd-docs}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      # Media uploads go through Fleet API (POST /files -> Google Drive); no object-store creds here.
       # LLM touches: Whisper (accident voice -> description), Gemini (admin doc scan).
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

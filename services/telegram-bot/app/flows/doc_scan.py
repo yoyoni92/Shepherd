@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app import keyboards, s3, sessions, texts, vision
-from app.config import settings
+from app import keyboards, sessions, storage, texts, vision
 from app.context import Ctx
 from app.tg import download, send, send_dice
 
@@ -120,7 +119,7 @@ async def doc_scan(ctx: Ctx, route: str | None) -> None:
         ext = "pdf" if is_pdf else "jpg"
         doc_type = ctx.state["doc_type"]
         key = f"documents/{doc_type}/{ctx.chat_id}_{datetime.now(UTC):%Y%m%d%H%M%S}.{ext}"
-        url = await s3.upload(key, data, mime, bucket=settings.s3_bucket_docs)
+        url = await storage.upload(key, data, mime)
         fields = await vision.extract(doc_type, data, mime)
         if not fields:
             await send(ctx, texts.DOC_SCAN_FAILED)  # stay on awaiting_file to retry
