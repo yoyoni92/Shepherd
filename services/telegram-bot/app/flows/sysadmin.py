@@ -307,5 +307,7 @@ async def _exit(ctx: Ctx) -> None:
         return
     await audit(ctx, imp, "stop", detail="exit live session")
     await sessions.exit_impersonation(ctx.chat_id)
-    await send(ctx, texts.SA_EXITED)
+    # Drop any reply keyboard the persona left up (e.g. accident share-location) before
+    # the inline system-admin menu, which would otherwise sit on top of a stale keyboard.
+    await send(ctx, texts.SA_EXITED, reply_markup=keyboards.remove())
     await send(ctx, texts.SYSADMIN_MENU_TITLE, reply_markup=keyboards.sysadmin_menu())

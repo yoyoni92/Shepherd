@@ -74,7 +74,7 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         ctx.state["location"] = f"{ctx.location_lat},{ctx.location_lon}"
         ctx.state["step"] = "awaiting_description"
         await sessions.set_state(ctx.chat_id, ctx.state)
-        await send(ctx, texts.ACCIDENT_DESCRIPTION_PROMPT)
+        await send(ctx, texts.ACCIDENT_DESCRIPTION_PROMPT, reply_markup=keyboards.remove())
         return
 
     if route == "accident_description":

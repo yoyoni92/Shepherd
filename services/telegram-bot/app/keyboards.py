@@ -7,6 +7,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 
 from app import texts
@@ -102,6 +103,15 @@ def request_location() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         one_time_keyboard=True,
     )
+
+
+def remove() -> ReplyKeyboardRemove:
+    """Drop a lingering reply keyboard (share-contact / share-location).
+
+    Inline menus don't replace the bottom reply keyboard, so leaving a
+    share-location/contact prompt requires an explicit removal on its own message.
+    """
+    return ReplyKeyboardRemove()
 
 
 def accident_safe() -> InlineKeyboardMarkup:

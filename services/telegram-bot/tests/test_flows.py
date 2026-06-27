@@ -16,6 +16,14 @@ def sent_texts(bot) -> list[str]:
     return [c.args[1] for c in bot.send_message.call_args_list]
 
 
+def keyboard_removed(bot) -> bool:
+    """True if any send cleared the bottom reply keyboard (ReplyKeyboardRemove)."""
+    return any(
+        getattr(c.kwargs.get("reply_markup"), "remove_keyboard", False)
+        for c in bot.send_message.call_args_list
+    )
+
+
 def menu_callbacks(bot) -> list[str]:
     """Callback strings of the last inline keyboard the bot sent (the role menu)."""
     for call in bot.send_message.call_args_list:
@@ -214,6 +222,8 @@ async def test_accident_safe_requests_location_then_stores_it(store, bot, fleet,
     )
     assert store[7]["location"] == "32.0853,34.7818"
     assert store[7]["step"] == "awaiting_description"
+    # The share-location reply keyboard is cleared once the location is in.
+    assert keyboard_removed(bot)
 
 
 async def test_accident_description_via_text(store, bot, fleet, mock_api):
@@ -571,6 +581,9 @@ async def test_exit_posts_stop_audit_and_clears(store, bot, fleet, mock_api):
     assert caller_ctx(audit) == {"role": "admin", "impersonator": OPERATOR_ID}
     assert 64 not in store  # impersonation fully cleared
     assert texts.SA_EXITED in sent_texts(bot)
+    # A reply keyboard the persona left up (e.g. accident share-location) is removed
+    # so the system-admin menu doesn't sit on top of a stale bottom keyboard.
+    assert keyboard_removed(bot)
 
 
 async def test_impersonated_driver_call_carries_impersonator(store, bot, fleet, mock_api):
