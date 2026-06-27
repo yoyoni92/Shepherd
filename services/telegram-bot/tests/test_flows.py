@@ -9,11 +9,24 @@ import httpx
 from app import storage, stt, texts, vision
 from app.router import dispatch
 
-from tests.conftest import FLEET, whoami_response
+from tests.conftest import COMPANY_ID, FLEET, whoami_response
 
 
 def sent_texts(bot) -> list[str]:
     return [c.args[1] for c in bot.send_message.call_args_list]
+
+
+def menu_callbacks(bot) -> list[str]:
+    """Callback strings of the last inline keyboard the bot sent (the role menu)."""
+    for call in bot.send_message.call_args_list:
+        kb = call.kwargs.get("reply_markup")
+        if kb is not None and hasattr(kb, "inline_keyboard"):
+            return [b.callback_data for row in kb.inline_keyboard for b in row]
+    return []
+
+
+def caller_ctx(route) -> dict:
+    return json.loads(route.calls.last.request.headers["X-Caller-Context"])
 
 
 def last_body(route) -> dict:
@@ -91,6 +104,57 @@ async def test_clock_in(store, bot, fleet, mock_api):
     assert texts.CLOCK_IN_OK.format(time="08:00") in sent_texts(bot)
 
 
+# --- Attendance feature flag (F5): clock gated by the company flag ---
+
+
+async def test_driver_menu_hides_clock_when_attendance_disabled(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(
+        return_value=whoami_response("driver", "d1", attendance_enabled=False)
+    )
+    await dispatch({"chat_id": 50, "sender_id": 50, "text": "hi"}, bot, fleet)
+    cbs = menu_callbacks(bot)
+    assert "clock_in" not in cbs and "clock_out" not in cbs
+    assert "vehicle_issue" in cbs  # the rest of the menu is unaffected
+
+
+async def test_driver_menu_shows_clock_when_attendance_enabled(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(
+        return_value=whoami_response("driver", "d1", attendance_enabled=True)
+    )
+    await dispatch({"chat_id": 51, "sender_id": 51, "text": "hi"}, bot, fleet)
+    cbs = menu_callbacks(bot)
+    assert "clock_in" in cbs and "clock_out" in cbs
+
+
+async def test_clock_denied_when_attendance_disabled(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(
+        return_value=whoami_response("driver", "d1", attendance_enabled=False)
+    )
+    route = mock_api.post(f"{FLEET}/attendance/clock-in").mock(
+        return_value=httpx.Response(200, json={"result": "ok", "time": "08:00"})
+    )
+    await dispatch(
+        {"chat_id": 52, "sender_id": 52, "is_callback": True, "callback_data": "clock_in"},
+        bot,
+        fleet,
+    )
+    assert texts.ATTENDANCE_DISABLED in sent_texts(bot)
+    assert not route.called  # the API is never hit when the flag is off
+
+
+async def test_storage_upload_sends_company_caller_context(mock_api):
+    from app.config import settings
+
+    route = mock_api.post(f"{settings.fleet_api_url.rstrip('/')}/files").mock(
+        return_value=httpx.Response(200, json={"file_url": "https://drive/x"})
+    )
+    url = await storage.upload("accidents/1/a.jpg", b"bytes", "image/jpeg", company_id="c0")
+    assert url == "https://drive/x"
+    headers = route.calls.last.request.headers
+    assert json.loads(headers["X-Caller-Context"]) == {"role": "admin", "company_id": "c0"}
+    assert headers["X-Internal-Token"]
+
+
 async def test_vehicle_issue_logs_event(store, bot, fleet, mock_api):
     store[7] = {"flow": "vehicle_issue", "step": "awaiting_description"}
     mock_api.get(f"{FLEET}/whoami").mock(return_value=whoami_response("driver", "d1"))
@@ -105,6 +169,22 @@ async def test_vehicle_issue_logs_event(store, bot, fleet, mock_api):
     assert body["vehicle_id"] == "v1"
     assert "הבלם לא עובד" in body["message"]
     assert 7 not in store  # session cleared
+
+
+async def test_flow_call_carries_company_id(store, bot, fleet, mock_api):
+    """The per-update client is company-bound: every downstream caller-context is scoped."""
+    store[7] = {"flow": "vehicle_issue", "step": "awaiting_description"}
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=whoami_response("driver", "d1"))
+    veh = mock_api.get(f"{FLEET}/vehicles").mock(
+        return_value=httpx.Response(200, json=[{"vehicle_id": "v1"}])
+    )
+    events = mock_api.post(f"{FLEET}/events").mock(
+        return_value=httpx.Response(201, json={"event_id": "e1"})
+    )
+    await dispatch({"chat_id": 7, "sender_id": 7, "text": "הבלם לא עובד"}, bot, fleet)
+    # Driver-scoped read and admin-scoped write both carry the enrolled user's company.
+    assert caller_ctx(veh) == {"role": "driver", "driver_id": "d1", "company_id": COMPANY_ID}
+    assert caller_ctx(events)["company_id"] == COMPANY_ID
 
 
 # --- Accident: voice and text both fill description; submit posts it ---

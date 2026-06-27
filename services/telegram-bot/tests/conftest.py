@@ -53,7 +53,15 @@ def mock_api():
         yield router
 
 
-def whoami_response(role: str, driver_id: str | None = None):
+COMPANY_ID = "00000000-0000-0000-0000-0000000000c0"
+
+
+def whoami_response(
+    role: str,
+    driver_id: str | None = None,
+    company_id: str = COMPANY_ID,
+    attendance_enabled: bool = True,
+):
     return httpx.Response(
         200,
         json={
@@ -61,5 +69,7 @@ def whoami_response(role: str, driver_id: str | None = None):
             "driver_id": driver_id,
             "driver_name": "דני",
             "user_id": "u1",
+            "company_id": company_id,
+            "attendance_enabled": attendance_enabled,
         },
     )

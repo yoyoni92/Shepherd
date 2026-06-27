@@ -175,10 +175,13 @@ async def dispatch(raw: dict, bot, fleet: FleetClient) -> None:
     chat_id = raw["chat_id"]
     whoami = await fleet.whoami(chat_id)
     state = await sessions.get_state(chat_id)
+    # Bind the per-update client to the acting user's company so every downstream
+    # flow call is tenant-scoped automatically (whoami/enroll stay company-less).
+    scoped = fleet.for_company(whoami.get("company_id")) if whoami else fleet
     ctx = Ctx(
         chat_id=chat_id,
         bot=bot,
-        fleet=fleet,
+        fleet=scoped,
         whoami=whoami,
         state=state,
         is_callback=raw.get("is_callback", False),

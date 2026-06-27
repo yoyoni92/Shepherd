@@ -28,6 +28,9 @@ update -> normalize -> GET /whoami -> read bot_sessions -> route_decision(featur
 - `app/router.py` - ports the n8n Route Decision + Active Flow Router.
 - `app/flows/*.py` - one module per feature (12 ported + `doc_scan`).
 - `app/fleet.py` - async Fleet API client (`X-Internal-Token` + `X-Caller-Context`).
+  Multi-tenant: `whoami` returns the user's `company_id`; `dispatch` binds the
+  per-update client to it (`fleet.for_company(...)`) so every flow call carries the
+  acting company and Fleet API scopes it. `whoami`/`bot-enroll` stay company-less.
 - `app/sessions.py` - `bot_sessions` read/write (psycopg).
 - `app/keyboards.py`, `app/texts.py` - inline keyboards + Hebrew strings (n8n callbacks 1:1).
 

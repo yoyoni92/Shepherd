@@ -53,6 +53,7 @@ CLOCK_IN_ALREADY = "כבר נרשמת לכניסה היום."
 CLOCK_OUT_OK = '✅ יציאה נרשמה בשעה {time}. סה"כ {hours} שעות.'
 CLOCK_OUT_NO_OPEN = "לא נמצאה כניסה פתוחה להיום."
 CLOCK_BLOCKED = "⛔ דיווח נוכחות אפשרי רק בין {start} ל-{end}."
+ATTENDANCE_DISABLED = "⛔ דיווח נוכחות אינו מופעל עבור החברה שלך."
 
 # Vehicle issue
 VEHICLE_ISSUE_PROMPT = "🔧 תאר/י את התקלה ברכב"

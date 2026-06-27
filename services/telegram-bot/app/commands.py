@@ -30,9 +30,19 @@ ADMIN_COMMANDS = [
 ]
 
 
-async def apply(bot, chat_id: int, role: str | None) -> None:
-    """Set the chat's command menu to the role-appropriate list (idempotent)."""
-    cmds = ADMIN_COMMANDS if role == "admin" else DRIVER_COMMANDS
+async def apply(
+    bot, chat_id: int, role: str | None, attendance_enabled: bool = True
+) -> None:
+    """Set the chat's command menu to the role-appropriate list (idempotent).
+
+    Drivers see clock-in/out only when their company's attendance flag is on.
+    """
+    if role == "admin":
+        cmds = ADMIN_COMMANDS
+    elif attendance_enabled:
+        cmds = DRIVER_COMMANDS
+    else:
+        cmds = [c for c in DRIVER_COMMANDS if c[0] not in ("clock_in", "clock_out")]
     await bot.set_my_commands(
         [BotCommand(command=c, description=d) for c, d in cmds],
         scope=BotCommandScopeChat(chat_id=chat_id),

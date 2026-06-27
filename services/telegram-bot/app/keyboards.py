@@ -21,16 +21,18 @@ def _inline(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
     )
 
 
-def driver_menu() -> InlineKeyboardMarkup:
-    return _inline(
-        [
-            [("⏱ כניסה לעבודה", "clock_in"), ("🚪 יציאה מעבודה", "clock_out")],
-            [("🔧 דיווח תקלה", "vehicle_issue")],
-            [("🚨 דיווח תאונה", "accident_start")],
-            [("✏️ עדכון פרטים", "update_details")],
-            [("📊 דוח נוכחות", "attendance_csv"), ("🚗 הרכב שלי", "my_vehicle")],
-        ]
-    )
+def driver_menu(attendance_enabled: bool = True) -> InlineKeyboardMarkup:
+    # The clock-in/out row is shown only when the company's attendance flag is on.
+    rows: list[list[tuple[str, str]]] = []
+    if attendance_enabled:
+        rows.append([("⏱ כניסה לעבודה", "clock_in"), ("🚪 יציאה מעבודה", "clock_out")])
+    rows += [
+        [("🔧 דיווח תקלה", "vehicle_issue")],
+        [("🚨 דיווח תאונה", "accident_start")],
+        [("✏️ עדכון פרטים", "update_details")],
+        [("📊 דוח נוכחות", "attendance_csv"), ("🚗 הרכב שלי", "my_vehicle")],
+    ]
+    return _inline(rows)
 
 
 def admin_menu() -> InlineKeyboardMarkup:

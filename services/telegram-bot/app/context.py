@@ -47,6 +47,15 @@ class Ctx:
         return self.whoami.get("driver_name") if self.whoami else None
 
     @property
+    def company_id(self) -> str | None:
+        return self.whoami.get("company_id") if self.whoami else None
+
+    @property
+    def attendance_enabled(self) -> bool:
+        """Whether the user's company has the attendance feature flag on (default off)."""
+        return bool(self.whoami.get("attendance_enabled")) if self.whoami else False
+
+    @property
     def flow(self) -> str | None:
         return self.state.get("flow")
 

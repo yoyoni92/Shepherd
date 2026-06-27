@@ -8,11 +8,15 @@ from app.tg import send
 
 
 async def menu(ctx: Ctx, route: str | None) -> None:
-    await commands.apply(ctx.bot, ctx.chat_id, ctx.role)
+    await commands.apply(ctx.bot, ctx.chat_id, ctx.role, ctx.attendance_enabled)
     if ctx.role == "admin":
         await send(ctx, texts.ADMIN_MENU_TITLE, reply_markup=keyboards.admin_menu())
     else:
-        await send(ctx, texts.DRIVER_MENU_TITLE, reply_markup=keyboards.driver_menu())
+        await send(
+            ctx,
+            texts.DRIVER_MENU_TITLE,
+            reply_markup=keyboards.driver_menu(ctx.attendance_enabled),
+        )
 
 
 async def access_denied(ctx: Ctx, route: str | None) -> None:

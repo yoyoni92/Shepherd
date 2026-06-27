@@ -21,7 +21,7 @@ _IL = ZoneInfo("Asia/Jerusalem")
 async def _store_photo(ctx: Ctx, category: str) -> None:
     data = await download(ctx, ctx.photo_id)
     key = f"accidents/{ctx.chat_id}/{category}.jpg"
-    url = await storage.upload(key, data, "image/jpeg")
+    url = await storage.upload(key, data, "image/jpeg", ctx.company_id)
     ctx.state.setdefault("attachments", []).append({"category": category, "file_url": url})
 
 
@@ -114,7 +114,7 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         idx = ctx.state.get("video_count", 0)
         data = await download(ctx, ctx.video_id)
         key = f"accidents/{ctx.chat_id}/accident_video_{idx}.mp4"
-        url = await storage.upload(key, data, "video/mp4")
+        url = await storage.upload(key, data, "video/mp4", ctx.company_id)
         ctx.state.setdefault("attachments", []).append(
             {"category": "accident_video", "file_url": url}
         )

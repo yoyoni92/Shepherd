@@ -15,18 +15,34 @@ import httpx
 from app.config import settings
 
 
-def admin_ctx() -> dict[str, str]:
-    return {"role": "admin"}
+def admin_ctx(company_id: str | None = None) -> dict[str, str]:
+    ctx = {"role": "admin"}
+    if company_id:
+        ctx["company_id"] = str(company_id)
+    return ctx
 
 
-def driver_ctx(driver_id: str) -> dict[str, str]:
-    return {"role": "driver", "driver_id": str(driver_id)}
+def driver_ctx(driver_id: str, company_id: str | None = None) -> dict[str, str]:
+    ctx = {"role": "driver", "driver_id": str(driver_id)}
+    if company_id:
+        ctx["company_id"] = str(company_id)
+    return ctx
 
 
 class FleetClient:
-    def __init__(self, base_url: str | None = None, token: str | None = None) -> None:
+    def __init__(
+        self, base_url: str | None = None, token: str | None = None,
+        company_id: str | None = None,
+    ) -> None:
         self._base = (base_url or settings.fleet_api_url).rstrip("/")
         self._token = token or settings.internal_service_token
+        # Bound tenant: every default caller-context (admin/driver) carries it so all
+        # downstream flow calls are company-scoped. whoami/enroll stay company-less.
+        self._company_id = company_id
+
+    def for_company(self, company_id: str | None) -> FleetClient:
+        """A shallow copy bound to ``company_id`` (per-update tenant scoping)."""
+        return FleetClient(self._base, self._token, company_id)
 
     def _headers(self, caller: dict[str, Any] | None) -> dict[str, str]:
         headers = {"X-Internal-Token": self._token}
@@ -66,21 +82,27 @@ class FleetClient:
     async def get(
         self, path: str, *, caller: dict | None = None, params: dict | None = None
     ) -> httpx.Response:
-        return await self._request("GET", path, caller=caller or admin_ctx(), params=params)
+        return await self._request(
+            "GET", path, caller=caller or admin_ctx(self._company_id), params=params
+        )
 
     async def post(
         self, path: str, json_body: dict, *, caller: dict | None = None
     ) -> httpx.Response:
-        return await self._request("POST", path, caller=caller or admin_ctx(), json_body=json_body)
+        return await self._request(
+            "POST", path, caller=caller or admin_ctx(self._company_id), json_body=json_body
+        )
 
     async def patch(
         self, path: str, json_body: dict, *, caller: dict | None = None
     ) -> httpx.Response:
-        return await self._request("PATCH", path, caller=caller or admin_ctx(), json_body=json_body)
+        return await self._request(
+            "PATCH", path, caller=caller or admin_ctx(self._company_id), json_body=json_body
+        )
 
     # --- Convenience ---
     async def driver_vehicle(self, driver_id: str) -> dict[str, Any] | None:
         """The driver's assigned vehicle (Fleet API ownership-filters by caller context)."""
-        r = await self.get("/vehicles", caller=driver_ctx(driver_id))
+        r = await self.get("/vehicles", caller=driver_ctx(driver_id, self._company_id))
         items = r.json() if r.status_code == 200 else []
         return items[0] if items else None

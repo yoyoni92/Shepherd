@@ -119,7 +119,7 @@ async def doc_scan(ctx: Ctx, route: str | None) -> None:
         ext = "pdf" if is_pdf else "jpg"
         doc_type = ctx.state["doc_type"]
         key = f"documents/{doc_type}/{ctx.chat_id}_{datetime.now(UTC):%Y%m%d%H%M%S}.{ext}"
-        url = await storage.upload(key, data, mime)
+        url = await storage.upload(key, data, mime, ctx.company_id)
         fields = await vision.extract(doc_type, data, mime)
         if not fields:
             await send(ctx, texts.DOC_SCAN_FAILED)  # stay on awaiting_file to retry

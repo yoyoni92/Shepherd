@@ -8,6 +8,10 @@ from app.tg import send, send_dice
 
 
 async def clock(ctx: Ctx, route: str | None) -> None:
+    # Attendance is opt-in per company; deny instead of hitting the API when it's off.
+    if not ctx.attendance_enabled:
+        await send(ctx, texts.ATTENDANCE_DISABLED)
+        return
     path = "/attendance/clock-in" if route == "cmd_clock_in" else "/attendance/clock-out"
     resp = await ctx.fleet.post(path, {"driver_id": ctx.driver_id})
     data = resp.json()
