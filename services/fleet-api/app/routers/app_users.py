@@ -19,6 +19,8 @@ def _to_read(u) -> AppUserRead:
         company_id=u.company_id,
         is_active=u.is_active,
         name=u.name,
+        is_system_admin=u.is_system_admin,
+        phone_number=u.phone_number,
         created_at=u.created_at,
     )
 

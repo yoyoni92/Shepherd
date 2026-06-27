@@ -372,6 +372,11 @@ class BotWhoamiResponse(BaseModel):
     company_id: UUID | None = None
     # Lets the bot hide the clock button when the company has attendance disabled.
     attendance_enabled: bool = False
+    # True when the resolved identity is the platform operator (System Admin).
+    is_system_admin: bool = False
+    # The built-in Playground (is_internal) company id, so the bot's Debug mode knows
+    # which company to impersonate within. Only populated for the System Admin.
+    playground_company_id: UUID | None = None
 
 
 class BotEnrollRequest(BaseModel):
@@ -385,6 +390,7 @@ class BotEnrollResponse(BaseModel):
     driver_name: str | None = None
     user_id: UUID
     expires_at: datetime | None = None
+    is_system_admin: bool = False
 
 
 class BotAuthorizationCreate(BaseModel):
@@ -461,12 +467,16 @@ class AppUserCreate(BaseModel):
     role: str  # admin | company_admin
     company_id: UUID | None = None
     name: str | None = None
+    is_system_admin: bool = False
+    phone_number: str | None = None
 
 
 class AppUserUpdate(BaseModel):
     password: str | None = None
     is_active: bool | None = None
     name: str | None = None
+    is_system_admin: bool | None = None
+    phone_number: str | None = None
 
 
 class AppUserRead(BaseModel):
@@ -476,6 +486,8 @@ class AppUserRead(BaseModel):
     company_id: UUID | None = None
     is_active: bool
     name: str | None = None
+    is_system_admin: bool = False
+    phone_number: str | None = None
     created_at: datetime
 
 
@@ -507,3 +519,27 @@ class KpiDailyRead(BaseModel):
     top_customer_km: int | None = None
     top_customer_vehicle_count: int | None = None
     computed_ts: datetime
+
+
+# --- System admin (Telegram operator) ---
+
+class SystemOverviewItem(BaseModel):
+    company_id: UUID
+    name: str
+    vehicle_count: int
+    driver_count: int
+    open_event_count: int
+    attendance_enabled: bool
+    gdrive_configured: bool
+
+
+class SystemOverview(BaseModel):
+    companies: list[SystemOverviewItem]
+
+
+class ImpersonationAuditCreate(BaseModel):
+    company_id: UUID
+    effective_role: str
+    effective_id: str | None = None
+    action: str  # start | stop | write
+    detail: str | None = None

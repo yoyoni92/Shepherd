@@ -26,6 +26,18 @@ router = APIRouter(tags=["bot"])
     summary="Resolve telegram chat_id to a bot user",
 )
 def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
+    # System-admin path wins: the operator is an app_user linked by telegram_chat_id,
+    # not a tenant bot user. Returns a company-less admin context.
+    operator = repo.get_app_user_by_telegram_chat_id(session, chat_id)
+    if operator is not None and operator.is_system_admin:
+        playground = repo.get_internal_company(session)
+        return BotWhoamiResponse(
+            role="admin",
+            company_id=None,
+            is_system_admin=True,
+            user_id=operator.id,
+            playground_company_id=playground.company_id if playground else None,
+        )
     user = repo.get_bot_user_by_chat_id(session, chat_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
@@ -57,6 +69,14 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
     summary="Enroll a telegram user by matching their phone to a driver/authorization",
 )
 def enroll(body: BotEnrollRequest, session: Db) -> BotEnrollResponse:
+    # System-admin precedence: a phone matching an is_system_admin app_user links the
+    # operator's telegram_chat_id (no tenant bot user is created).
+    operator = repo.get_system_app_user_by_phone(session, body.phone_number)
+    if operator is not None:
+        repo.link_app_user_telegram(session, operator, body.telegram_chat_id)
+        return BotEnrollResponse(
+            role="admin", user_id=operator.id, is_system_admin=True
+        )
     user = repo.enroll_bot_user(session, body.telegram_chat_id, body.phone_number)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_authorized")

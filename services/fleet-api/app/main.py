@@ -19,6 +19,7 @@ from app.routers import (
     kpi,
     maintenance_types,
     reports,
+    sysadmin,
     vehicles,
 )
 
@@ -53,6 +54,7 @@ app.include_router(bot.router)
 app.include_router(files.router)
 app.include_router(companies.router)
 app.include_router(app_users.router)
+app.include_router(sysadmin.router)
 app.include_router(auth.router)
 
 

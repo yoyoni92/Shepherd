@@ -16,6 +16,7 @@ from shepherd_db.models import (
     Company,
     CompanySettings,
     Event,
+    ImpersonationAudit,
     KmUpdate,
     KpiDaily,
     MaintenanceType,
@@ -741,12 +742,24 @@ def delete_bot_authorization(session: Session, auth_id: UUID) -> str:
 # Companies (system-admin managed)
 # ---------------------------------------------------------------------------
 
-def list_companies(session: Session) -> list[Company]:
-    return list(session.execute(select(Company).order_by(Company.name)).scalars())
+def list_companies(
+    session: Session, *, include_internal: bool = False
+) -> list[Company]:
+    stmt = select(Company).order_by(Company.name)
+    if not include_internal:
+        stmt = stmt.where(Company.is_internal.is_(False))
+    return list(session.execute(stmt).scalars())
 
 
 def get_company(session: Session, company_id: UUID) -> Company | None:
     return session.get(Company, company_id)
+
+
+def get_internal_company(session: Session) -> Company | None:
+    """The built-in Playground (is_internal) company, or None when not seeded."""
+    return session.execute(
+        select(Company).where(Company.is_internal.is_(True)).order_by(Company.name)
+    ).scalars().first()
 
 
 def create_company(session: Session, data: dict) -> Company:
@@ -841,6 +854,44 @@ def get_app_user_by_email(session: Session, email: str) -> AppUser | None:
     ).scalar_one_or_none()
 
 
+def get_app_user_by_telegram_chat_id(session: Session, chat_id: int) -> AppUser | None:
+    return session.execute(
+        select(AppUser).where(AppUser.telegram_chat_id == chat_id)
+    ).scalar_one_or_none()
+
+
+def get_system_app_user_by_phone(session: Session, phone: str) -> AppUser | None:
+    """A system-admin app_user whose phone matches (normalized), or None.
+
+    Phones are normalized both sides like ``find_enrollment_by_phone``; operators are
+    few so a scan is fine.
+    """
+    target = _normalize_phone(phone)
+    for u in session.execute(
+        select(AppUser).where(AppUser.is_system_admin.is_(True))
+    ).scalars():
+        if u.phone_number and _normalize_phone(u.phone_number) == target:
+            return u
+    return None
+
+
+def link_app_user_telegram(session: Session, user: AppUser, chat_id: int) -> AppUser:
+    user.telegram_chat_id = chat_id
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def list_company_admins(session: Session, company_id: UUID) -> list[AppUser]:
+    return list(
+        session.execute(
+            select(AppUser)
+            .where(AppUser.company_id == company_id, AppUser.role == "company_admin")
+            .order_by(AppUser.email)
+        ).scalars()
+    )
+
+
 def create_app_user(session: Session, data: dict) -> AppUser:
     data = dict(data)
     data["password_hash"] = hash_password(data.pop("password"))
@@ -892,3 +943,66 @@ def set_config(
     session.commit()
     session.refresh(cfg)
     return cfg
+
+
+# ---------------------------------------------------------------------------
+# System admin (Telegram operator): cross-company overview + impersonation audit
+# ---------------------------------------------------------------------------
+
+def system_overview(session: Session) -> list[dict]:
+    """Per-company counts + health flags for the system overview, EXCLUDING internal
+    (Playground) companies."""
+    overview: list[dict] = []
+    for c in session.execute(
+        select(Company).where(Company.is_internal.is_(False)).order_by(Company.name)
+    ).scalars():
+        vehicle_count = session.scalar(
+            select(func.count()).select_from(Vehicle).where(Vehicle.company_id == c.company_id)
+        ) or 0
+        driver_count = session.scalar(
+            select(func.count()).select_from(Driver).where(Driver.company_id == c.company_id)
+        ) or 0
+        open_event_count = session.scalar(
+            select(func.count()).select_from(Event).where(
+                Event.company_id == c.company_id, Event.status == "open"
+            )
+        ) or 0
+        settings = session.get(CompanySettings, c.company_id)
+        attendance_enabled = bool(
+            settings and settings.feature_flags and settings.feature_flags.get("attendance")
+        )
+        gdrive_configured = bool(settings and settings.gdrive_credentials_json)
+        overview.append({
+            "company_id": c.company_id,
+            "name": c.name,
+            "vehicle_count": vehicle_count,
+            "driver_count": driver_count,
+            "open_event_count": open_event_count,
+            "attendance_enabled": attendance_enabled,
+            "gdrive_configured": gdrive_configured,
+        })
+    return overview
+
+
+def write_impersonation_audit(
+    session: Session,
+    *,
+    operator_id: UUID,
+    company_id: UUID,
+    effective_role: str,
+    effective_id: str | None,
+    action: str,
+    detail: str | None = None,
+) -> ImpersonationAudit:
+    row = ImpersonationAudit(
+        operator_id=operator_id,
+        company_id=company_id,
+        effective_role=effective_role,
+        effective_id=effective_id,
+        action=action,
+        detail=detail,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
