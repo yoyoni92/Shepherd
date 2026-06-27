@@ -23,6 +23,7 @@ test-results/
 .env.local
 *.env.local
 !.env.example
+secrets/
 
 # Models / data artifacts
 *.pth
