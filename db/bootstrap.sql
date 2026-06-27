@@ -8,18 +8,23 @@
 CREATE OR REPLACE FUNCTION refresh_kpi_daily() RETURNS void AS $fn$
 DECLARE
   v_window_start timestamptz := (current_date - interval '7 days');
-  v_license_days int := COALESCE(
-    (SELECT (config_value #>> '{}')::int FROM system_config WHERE config_key = 'license_expiring_days'), 30);
-  v_insurance_days int := COALESCE(
-    (SELECT (config_value #>> '{}')::int FROM system_config WHERE config_key = 'insurance_expiring_days'), 30);
 BEGIN
   INSERT INTO kpi_daily (
-    snapshot_date, total_km_7d, avg_km_per_driver_7d, avg_days_between_maintenance,
+    snapshot_date, company_id, total_km_7d, avg_km_per_driver_7d, avg_days_between_maintenance,
     maintenance_due_count, docs_expiring_count, top_customer_id, top_customer_km,
     top_customer_vehicle_count, computed_ts
   )
-  WITH vkm AS (
-    SELECT v.vehicle_id, v.customer_id,
+  WITH cfg AS (
+    -- Per-company alert thresholds (fall back to 30 days when a company has no override).
+    SELECT c.company_id,
+      COALESCE((SELECT (config_value #>> '{}')::int FROM system_config s
+                WHERE s.company_id = c.company_id AND s.config_key = 'license_expiring_days'), 30) AS license_days,
+      COALESCE((SELECT (config_value #>> '{}')::int FROM system_config s
+                WHERE s.company_id = c.company_id AND s.config_key = 'insurance_expiring_days'), 30) AS insurance_days
+    FROM companies c
+  ),
+  vkm AS (
+    SELECT v.company_id, v.vehicle_id, v.customer_id,
       GREATEST(
         COALESCE((SELECT max(k.km) FROM km_updates k
                   WHERE k.vehicle_id = v.vehicle_id AND k.recorded_ts >= v_window_start), 0)
@@ -33,44 +38,54 @@ BEGIN
         0) AS km_7d
     FROM vehicles v
   ),
-  totals AS (SELECT COALESCE(SUM(km_7d), 0)::int AS total_km FROM vkm),
-  drv AS (SELECT COUNT(*)::int AS n FROM drivers),
+  totals AS (SELECT company_id, COALESCE(SUM(km_7d), 0)::int AS total_km FROM vkm GROUP BY company_id),
+  drv AS (SELECT company_id, COUNT(*)::int AS n FROM drivers GROUP BY company_id),
   gaps AS (
-    SELECT AVG(gap) AS avg_gap FROM (
-      SELECT (service_date - LAG(service_date)
+    SELECT company_id, AVG(gap) AS avg_gap FROM (
+      SELECT company_id, (service_date - LAG(service_date)
               OVER (PARTITION BY vehicle_id ORDER BY service_date)) AS gap
       FROM vehicle_care
-    ) g WHERE gap IS NOT NULL
+    ) g WHERE gap IS NOT NULL GROUP BY company_id
   ),
   maint AS (
-    SELECT COUNT(*)::int AS n FROM vehicles
+    SELECT company_id, COUNT(*)::int AS n FROM vehicles
     WHERE current_km IS NOT NULL AND next_maintenance_km IS NOT NULL
       AND current_km >= next_maintenance_km
+    GROUP BY company_id
   ),
   docs AS (
-    SELECT COUNT(*)::int AS n FROM vehicles
-    WHERE (insurance_valid_to IS NOT NULL AND insurance_valid_to <= current_date + v_insurance_days)
-       OR (license_valid_to IS NOT NULL AND license_valid_to <= current_date + v_license_days)
+    SELECT v.company_id, COUNT(*)::int AS n FROM vehicles v
+    JOIN cfg ON cfg.company_id = v.company_id
+    WHERE (v.insurance_valid_to IS NOT NULL AND v.insurance_valid_to <= current_date + cfg.insurance_days)
+       OR (v.license_valid_to IS NOT NULL AND v.license_valid_to <= current_date + cfg.license_days)
+    GROUP BY v.company_id
   ),
   topc AS (
-    SELECT customer_id, SUM(km_7d)::int AS km
+    SELECT DISTINCT ON (company_id) company_id, customer_id, SUM(km_7d)::int AS km
     FROM vkm WHERE customer_id IS NOT NULL
-    GROUP BY customer_id ORDER BY SUM(km_7d) DESC NULLS LAST LIMIT 1
+    GROUP BY company_id, customer_id
+    ORDER BY company_id, SUM(km_7d) DESC NULLS LAST
   )
   SELECT current_date,
-         totals.total_km,
-         totals.total_km::numeric / NULLIF(drv.n, 0),
+         c.company_id,
+         COALESCE(totals.total_km, 0),
+         COALESCE(totals.total_km, 0)::numeric / NULLIF(drv.n, 0),
          gaps.avg_gap,
-         maint.n,
-         docs.n,
+         COALESCE(maint.n, 0),
+         COALESCE(docs.n, 0),
          topc.customer_id,
          topc.km,
-         (SELECT COUNT(*)::int FROM vehicles vv WHERE vv.customer_id = topc.customer_id),
+         (SELECT COUNT(*)::int FROM vehicles vv
+          WHERE vv.customer_id = topc.customer_id AND vv.company_id = c.company_id),
          now()
-  FROM totals
-  CROSS JOIN drv CROSS JOIN gaps CROSS JOIN maint CROSS JOIN docs
-  LEFT JOIN topc ON true
-  ON CONFLICT (snapshot_date) DO UPDATE SET
+  FROM companies c
+  LEFT JOIN totals ON totals.company_id = c.company_id
+  LEFT JOIN drv ON drv.company_id = c.company_id
+  LEFT JOIN gaps ON gaps.company_id = c.company_id
+  LEFT JOIN maint ON maint.company_id = c.company_id
+  LEFT JOIN docs ON docs.company_id = c.company_id
+  LEFT JOIN topc ON topc.company_id = c.company_id
+  ON CONFLICT (snapshot_date, company_id) DO UPDATE SET
     total_km_7d = EXCLUDED.total_km_7d,
     avg_km_per_driver_7d = EXCLUDED.avg_km_per_driver_7d,
     avg_days_between_maintenance = EXCLUDED.avg_days_between_maintenance,

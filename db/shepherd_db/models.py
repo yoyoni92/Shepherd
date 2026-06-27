@@ -127,6 +127,11 @@ class UserRoleEnum(str, enum.Enum):
     driver = "driver"
 
 
+class AppUserRoleEnum(str, enum.Enum):
+    admin = "admin"
+    company_admin = "company_admin"
+
+
 # ---------------------------------------------------------------------------
 # SQLAlchemy Enum type helpers (named types matching PG enum names)
 # ---------------------------------------------------------------------------
@@ -211,6 +216,11 @@ user_role_type = SAEnum(
     name="user_role_enum",
     create_type=True,
 )
+app_user_role_type = SAEnum(
+    AppUserRoleEnum,
+    name="app_user_role_enum",
+    create_type=True,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -222,12 +232,77 @@ class Base(DeclarativeBase):
     pass
 
 
+class TenantMixin:
+    """Adds a NOT NULL ``company_id`` FK to ``companies``.
+
+    Mix into every tenant-owned table (``class Foo(TenantMixin, Base)``) so each row
+    belongs to exactly one company. Tenant isolation is enforced in the API by filtering
+    on / asserting this column - there is no global ORM filter.
+    """
+
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        nullable=False,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tables
 # ---------------------------------------------------------------------------
 
 
-class Driver(Base):
+class Company(Base):
+    """Top-level tenant. Every domain row belongs to one company (multi-tenancy)."""
+
+    __tablename__ = "companies"
+
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name = mapped_column(Text, nullable=False)
+    is_active = mapped_column(Boolean, nullable=False, server_default="true")
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class CompanySettings(Base):
+    """Per-tenant settings, 1:1 with companies (the PK is also the FK).
+
+    Holds the company's own Google Drive config (folder + service-account credentials,
+    validated on save) and a ``feature_flags`` JSONB blob (e.g. ``{"attendance": true}``).
+    NOT a ``TenantMixin``: ``company_id`` is the primary key, not just a tenant tag.
+    ``gdrive_credentials_json`` is a secret - never returned in reads.
+    """
+
+    __tablename__ = "company_settings"
+
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        primary_key=True,
+    )
+    gdrive_folder_id = mapped_column(Text, nullable=True)
+    gdrive_credentials_json = mapped_column(Text, nullable=True)  # SECRET - never returned
+    feature_flags = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class Driver(TenantMixin, Base):
     __tablename__ = "drivers"
 
     driver_id = mapped_column(
@@ -236,7 +311,7 @@ class Driver(Base):
         server_default=text("gen_random_uuid()"),
     )
     full_name = mapped_column(Text, nullable=False)
-    phone_number = mapped_column(Text, unique=True, nullable=False)
+    phone_number = mapped_column(Text, nullable=False)
     license_number = mapped_column(Text, nullable=True)
     license_valid_to = mapped_column(Date, nullable=True)
     status = mapped_column(
@@ -245,8 +320,10 @@ class Driver(Base):
         server_default="active",
     )
 
+    __table_args__ = (UniqueConstraint("company_id", "phone_number"),)
 
-class Customer(Base):
+
+class Customer(TenantMixin, Base):
     __tablename__ = "customers"
 
     customer_id = mapped_column(
@@ -264,7 +341,7 @@ class Customer(Base):
     )
 
 
-class MaintenanceType(Base):
+class MaintenanceType(TenantMixin, Base):
     """Admin-defined maintenance cycle: an ordered list of service step labels plus a
     fixed km interval. Vehicles reference one; next_maintenance() advances through `steps`."""
 
@@ -275,7 +352,7 @@ class MaintenanceType(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    name = mapped_column(Text, unique=True, nullable=False)
+    name = mapped_column(Text, nullable=False)
     description = mapped_column(Text, nullable=True)
     interval_km = mapped_column(Integer, nullable=False)
     steps = mapped_column(JSONB, nullable=False)  # ordered list of unique step labels
@@ -285,8 +362,10 @@ class MaintenanceType(Base):
         server_default=text("now()"),
     )
 
+    __table_args__ = (UniqueConstraint("company_id", "name"),)
 
-class Vehicle(Base):
+
+class Vehicle(TenantMixin, Base):
     __tablename__ = "vehicles"
 
     vehicle_id = mapped_column(
@@ -294,7 +373,7 @@ class Vehicle(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    licensing_plate = mapped_column(Text, unique=True, nullable=False)
+    licensing_plate = mapped_column(Text, nullable=False)
     nickname = mapped_column(Text, nullable=True)
     vehicle_type = mapped_column(vehicle_type_type, nullable=True)
     inseration_ts = mapped_column(DateTime(timezone=True), nullable=True)
@@ -332,8 +411,10 @@ class Vehicle(Base):
     customer = relationship("Customer", foreign_keys=[customer_id])
     maintenance_type = relationship("MaintenanceType", foreign_keys=[maintenance_type_id])
 
+    __table_args__ = (UniqueConstraint("company_id", "licensing_plate"),)
 
-class Accident(Base):
+
+class Accident(TenantMixin, Base):
     __tablename__ = "accidents"
 
     accident_id = mapped_column(
@@ -363,7 +444,7 @@ class Accident(Base):
     attachments = relationship("AccidentAttachment", back_populates="accident")
 
 
-class AccidentAttachment(Base):
+class AccidentAttachment(TenantMixin, Base):
     __tablename__ = "accident_attachments"
 
     attachment_id = mapped_column(
@@ -387,7 +468,7 @@ class AccidentAttachment(Base):
     accident = relationship("Accident", foreign_keys=[accident_id], back_populates="attachments")
 
 
-class KmUpdate(Base):
+class KmUpdate(TenantMixin, Base):
     __tablename__ = "km_updates"
 
     km_update_id = mapped_column(
@@ -417,7 +498,7 @@ class KmUpdate(Base):
     driver = relationship("Driver", foreign_keys=[driver_id])
 
 
-class VehicleCare(Base):
+class VehicleCare(TenantMixin, Base):
     __tablename__ = "vehicle_care"
 
     care_id = mapped_column(
@@ -453,7 +534,7 @@ class VehicleCare(Base):
     driver = relationship("Driver", foreign_keys=[driver_id])
 
 
-class Report(Base):
+class Report(TenantMixin, Base):
     __tablename__ = "reports"
 
     report_id = mapped_column(
@@ -494,7 +575,7 @@ class Report(Base):
     driver = relationship("Driver", foreign_keys=[driver_id])
 
 
-class Event(Base):
+class Event(TenantMixin, Base):
     __tablename__ = "events"
 
     event_id = mapped_column(
@@ -531,6 +612,13 @@ class Event(Base):
 class SystemConfig(Base):
     __tablename__ = "system_config"
 
+    # Per-company config: composite PK (company_id, config_key). Not the mixin - company_id
+    # is part of the key here, not just a tenant tag.
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        primary_key=True,
+    )
     config_key = mapped_column(Text, primary_key=True)
     config_value = mapped_column(JSONB, nullable=False)
     description = mapped_column(Text, nullable=True)
@@ -549,6 +637,12 @@ class KpiDaily(Base):
     __tablename__ = "kpi_daily"
 
     snapshot_date = mapped_column(Date, primary_key=True)
+    # Per-company snapshot: composite PK (snapshot_date, company_id).
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        primary_key=True,
+    )
     total_km_7d = mapped_column(Integer, nullable=True)
     avg_km_per_driver_7d = mapped_column(Numeric, nullable=True)
     avg_days_between_maintenance = mapped_column(Numeric, nullable=True)
@@ -568,7 +662,7 @@ class KpiDaily(Base):
     )
 
 
-class AttendanceRecord(Base):
+class AttendanceRecord(TenantMixin, Base):
     """Per-driver daily clock-in/out (drivers double as employees). One row per
     (driver, work_date); the webui generates the weekday skeleton and overlays these."""
 
@@ -597,7 +691,7 @@ class AttendanceRecord(Base):
     __table_args__ = (UniqueConstraint("driver_id", "work_date"),)
 
 
-class ChannelIdentity(Base):
+class ChannelIdentity(TenantMixin, Base):
     __tablename__ = "channel_identities"
 
     identity_id = mapped_column(
@@ -643,6 +737,12 @@ class BotAuthorization(Base):
         ForeignKey("drivers.driver_id"),
         nullable=True,
     )
+    # Derived from the inviting caller's company (Feature 3).
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        nullable=False,
+    )
     expires_at = mapped_column(DateTime(timezone=True), nullable=True)
     created_at = mapped_column(
         DateTime(timezone=True),
@@ -669,6 +769,12 @@ class BotUser(Base):
         ForeignKey("drivers.driver_id"),
         nullable=True,
     )
+    # Derived from the matched driver / authorization at enrollment (Feature 3).
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        nullable=False,
+    )
     expires_at = mapped_column(DateTime(timezone=True), nullable=True)
     created_at = mapped_column(
         DateTime(timezone=True),
@@ -677,6 +783,38 @@ class BotUser(Base):
     )
 
     driver = relationship("Driver", foreign_keys=[driver_id])
+
+
+class AppUser(Base):
+    """Credentialed application identity (web console today, mobile later).
+
+    NOT a ``TenantMixin``: this is the identity table itself. A system ``admin`` has
+    ``company_id`` NULL (manages all companies); a ``company_admin`` is bound to one
+    company. The company_id rule is enforced in the API, not the DB.
+    """
+
+    __tablename__ = "app_users"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    email = mapped_column(Text, nullable=False, unique=True)
+    password_hash = mapped_column(Text, nullable=False)
+    role = mapped_column(app_user_role_type, nullable=False)
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        nullable=True,
+    )
+    is_active = mapped_column(Boolean, nullable=False, server_default="true")
+    name = mapped_column(Text, nullable=True)
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
 
 
 class BotSession(Base):

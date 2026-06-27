@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import create_engine, text
 
 from shepherd_db.logic import next_maintenance
+from shepherd_db.security import hash_password
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -16,6 +17,10 @@ DATABASE_URL = os.environ.get(
 )
 
 SEED_NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+
+# Default Company - fixed id shared with the test suite (conftest.DEFAULT_COMPANY_ID)
+# so seed + tests are deterministic. Every seeded domain row belongs to it.
+DEFAULT_COMPANY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000c0")
 
 
 def stable_uuid(namespace: str, key) -> uuid.UUID:
@@ -65,16 +70,28 @@ VENDORS = ["Toyota", "Ford", "Hyundai", "Kia", "Volkswagen"]
 MODELS = ["Corolla", "Transit", "Tucson", "Sportage", "Caddy"]
 
 
+def _seed_companies(conn):
+    conn.execute(
+        text("""
+            INSERT INTO companies (company_id, name)
+            VALUES (:id, 'Default Company')
+            ON CONFLICT (company_id) DO NOTHING
+        """),
+        {"id": DEFAULT_COMPANY_ID},
+    )
+
+
 def _seed_drivers(conn):
     for i in range(1, 26):
         conn.execute(
             text("""
-                INSERT INTO drivers (driver_id, full_name, phone_number, license_number, status)
-                VALUES (:id, :name, :phone, :lic, 'active')
+                INSERT INTO drivers (driver_id, company_id, full_name, phone_number, license_number, status)
+                VALUES (:id, :company_id, :name, :phone, :lic, 'active')
                 ON CONFLICT (driver_id) DO NOTHING
             """),
             {
                 "id": stable_uuid("driver", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "name": f"Driver {i}",
                 "phone": f"+9725{i:08d}",
                 "lic": f"IL-DRV-{i:05d}",
@@ -86,12 +103,13 @@ def _seed_customers(conn):
     for i in range(1, 26):
         conn.execute(
             text("""
-                INSERT INTO customers (customer_id, full_name, phone_number, email, status)
-                VALUES (:id, :name, :phone, :email, 'active')
+                INSERT INTO customers (customer_id, company_id, full_name, phone_number, email, status)
+                VALUES (:id, :company_id, :name, :phone, :email, 'active')
                 ON CONFLICT (customer_id) DO NOTHING
             """),
             {
                 "id": stable_uuid("customer", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "name": f"Customer {i}",
                 "phone": f"+9726{i:08d}",
                 "email": f"customer{i}@example.com",
@@ -103,12 +121,13 @@ def _seed_maintenance_types(conn):
     for idx, mt in enumerate(MAINTENANCE_TYPES):
         conn.execute(
             text("""
-                INSERT INTO maintenance_types (id, name, description, interval_km, steps)
-                VALUES (:id, :name, :desc, :interval, :steps)
+                INSERT INTO maintenance_types (id, company_id, name, description, interval_km, steps)
+                VALUES (:id, :company_id, :name, :desc, :interval, :steps)
                 ON CONFLICT (id) DO NOTHING
             """),
             {
                 "id": stable_uuid("maintenance_type", idx),
+                "company_id": DEFAULT_COMPANY_ID,
                 "name": mt["name"],
                 "desc": mt["description"],
                 "interval": mt["interval_km"],
@@ -128,14 +147,14 @@ def _seed_vehicles(conn):
         conn.execute(
             text("""
                 INSERT INTO vehicles (
-                    vehicle_id, licensing_plate, nickname, inseration_ts,
+                    vehicle_id, company_id, licensing_plate, nickname, inseration_ts,
                     insurance_valid_to, license_valid_to,
                     allowed_driver, vendor, model,
                     last_maintenance_date, last_maintenance_type,
                     last_maintenance_km, next_maintenance_km, next_maintenance_type,
                     current_km, driver_id, maintenance_type_id, customer_id
                 ) VALUES (
-                    :id, :plate, :nick, :ins_ts,
+                    :id, :company_id, :plate, :nick, :ins_ts,
                     :insurance_valid_to, :license_valid_to,
                     'all_drivers', :vendor, :model,
                     :last_maint_date, :last_maint_type,
@@ -146,6 +165,7 @@ def _seed_vehicles(conn):
             """),
             {
                 "id": stable_uuid("vehicle", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "plate": f"TLV-{i:04d}",
                 "nick": f"Fleet-{i}",
                 "ins_ts": datetime(2024, 1, i % 28 + 1, tzinfo=timezone.utc),
@@ -171,11 +191,11 @@ def _seed_accidents(conn):
         conn.execute(
             text("""
                 INSERT INTO accidents (
-                    accident_id, vehicle_id, driver_id, datetime,
+                    accident_id, company_id, vehicle_id, driver_id, datetime,
                     location, description,
                     another_driver_licensing_plate, another_driver_phone_number
                 ) VALUES (
-                    :id, :vehicle_id, :driver_id, :dt,
+                    :id, :company_id, :vehicle_id, :driver_id, :dt,
                     :location, :desc,
                     :other_plate, :other_phone
                 )
@@ -183,6 +203,7 @@ def _seed_accidents(conn):
             """),
             {
                 "id": stable_uuid("accident", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "vehicle_id": stable_uuid("vehicle", i),
                 "driver_id": stable_uuid("driver", i),
                 "dt": datetime(2025, (i % 12) + 1, i % 28 + 1, tzinfo=timezone.utc),
@@ -204,14 +225,15 @@ def _seed_accident_attachments(conn):
             conn.execute(
                 text("""
                     INSERT INTO accident_attachments (
-                        attachment_id, accident_id, category, file_url, uploaded_ts
+                        attachment_id, company_id, accident_id, category, file_url, uploaded_ts
                     ) VALUES (
-                        :id, :accident_id, :category, :file_url, :uploaded_ts
+                        :id, :company_id, :accident_id, :category, :file_url, :uploaded_ts
                     )
                     ON CONFLICT (attachment_id) DO NOTHING
                 """),
                 {
                     "id": stable_uuid("attachment", attach_i),
+                    "company_id": DEFAULT_COMPANY_ID,
                     "accident_id": acc_id,
                     "category": category,
                     "file_url": f"accidents/{acc_id}/attachments/{attach_i}.jpg",
@@ -230,14 +252,15 @@ def _seed_km_updates(conn):
             conn.execute(
                 text("""
                     INSERT INTO km_updates (
-                        km_update_id, vehicle_id, km, recorded_ts, driver_id, source
+                        km_update_id, company_id, vehicle_id, km, recorded_ts, driver_id, source
                     ) VALUES (
-                        :id, :vehicle_id, :km, :recorded_ts, :driver_id, :source
+                        :id, :company_id, :vehicle_id, :km, :recorded_ts, :driver_id, :source
                     )
                     ON CONFLICT (km_update_id) DO NOTHING
                 """),
                 {
                     "id": stable_uuid("km_update", update_i),
+                    "company_id": DEFAULT_COMPANY_ID,
                     "vehicle_id": stable_uuid("vehicle", v_i),
                     "km": km,
                     "recorded_ts": datetime(2025, (j % 12) + 1, j * 5, tzinfo=timezone.utc),
@@ -264,11 +287,11 @@ def _seed_vehicle_care(conn):
         conn.execute(
             text("""
                 INSERT INTO vehicle_care (
-                    care_id, vehicle_id, service_date, maintenance_type,
+                    care_id, company_id, vehicle_id, service_date, maintenance_type,
                     km_at_service, description, cost, garage,
                     invoice_file_url, next_maintenance_km, driver_id
                 ) VALUES (
-                    :id, :vehicle_id, :service_date, :maint_type,
+                    :id, :company_id, :vehicle_id, :service_date, :maint_type,
                     :km_at_service, :desc, :cost, :garage,
                     :invoice_url, :next_maint_km, :driver_id
                 )
@@ -276,6 +299,7 @@ def _seed_vehicle_care(conn):
             """),
             {
                 "id": care_id,
+                "company_id": DEFAULT_COMPANY_ID,
                 "vehicle_id": vehicle_id,
                 "service_date": date(2025, (i % 12) + 1, 10),
                 "maint_type": last_type,
@@ -295,11 +319,11 @@ def _seed_reports(conn):
         conn.execute(
             text("""
                 INSERT INTO reports (
-                    report_id, vehicle_id, driver_id, ticket_type,
+                    report_id, company_id, vehicle_id, driver_id, ticket_type,
                     violation_desc, amount, issued_ts, due_date,
                     status, location, authority
                 ) VALUES (
-                    :id, :vehicle_id, :driver_id, :ticket_type,
+                    :id, :company_id, :vehicle_id, :driver_id, :ticket_type,
                     :desc, :amount, :issued_ts, :due_date,
                     'unpaid', :location, :authority
                 )
@@ -307,6 +331,7 @@ def _seed_reports(conn):
             """),
             {
                 "id": stable_uuid("report", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "vehicle_id": stable_uuid("vehicle", i),
                 "driver_id": stable_uuid("driver", i),
                 "ticket_type": TICKET_TYPES[i % 2],
@@ -328,11 +353,11 @@ def _seed_events(conn):
         conn.execute(
             text("""
                 INSERT INTO events (
-                    event_id, vehicle_id, event_type, severity,
+                    event_id, company_id, vehicle_id, event_type, severity,
                     message, payload_json, source_type, source_id,
                     status, notified
                 ) VALUES (
-                    :id, :vehicle_id, :event_type, :severity,
+                    :id, :company_id, :vehicle_id, :event_type, :severity,
                     :message, :payload, :source_type, :source_id,
                     'open', false
                 )
@@ -340,6 +365,7 @@ def _seed_events(conn):
             """),
             {
                 "id": stable_uuid("event", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "vehicle_id": stable_uuid("vehicle", (i % 25) + 1),
                 "event_type": event_type,
                 "severity": severity,
@@ -355,11 +381,12 @@ def _seed_system_config(conn):
     for key, value, description in CONFIG:
         conn.execute(
             text("""
-                INSERT INTO system_config (config_key, config_value, description)
-                VALUES (:key, :value, :desc)
-                ON CONFLICT (config_key) DO NOTHING
+                INSERT INTO system_config (company_id, config_key, config_value, description)
+                VALUES (:company_id, :key, :value, :desc)
+                ON CONFLICT (company_id, config_key) DO NOTHING
             """),
             {
+                "company_id": DEFAULT_COMPANY_ID,
                 "key": key,
                 "value": json.dumps(value),
                 "desc": description,
@@ -372,22 +399,70 @@ def _seed_channel_identities(conn):
         conn.execute(
             text("""
                 INSERT INTO channel_identities (
-                    identity_id, channel, external_id, phone_number, status
+                    identity_id, company_id, channel, external_id, phone_number, status
                 ) VALUES (
-                    :id, 'telegram', :external_id, :phone, 'linked'
+                    :id, :company_id, 'telegram', :external_id, :phone, 'linked'
                 )
                 ON CONFLICT (channel, external_id) DO NOTHING
             """),
             {
                 "id": stable_uuid("channel_identity", i),
+                "company_id": DEFAULT_COMPANY_ID,
                 "external_id": f"tg_user_{i:06d}",
                 "phone": f"+9725{i:08d}",
             },
         )
 
 
+def _seed_company_settings(conn):
+    # The Default Company starts with attendance OFF (empty feature_flags) and Drive
+    # unconfigured (null folder + credentials). System admin configures these per company.
+    conn.execute(
+        text("""
+            INSERT INTO company_settings (company_id, feature_flags)
+            VALUES (:id, '{}'::jsonb)
+            ON CONFLICT (company_id) DO NOTHING
+        """),
+        {"id": DEFAULT_COMPANY_ID},
+    )
+
+
+def _seed_app_users(conn):
+    # System admin (no company) - credentials default to the webui .env.example values.
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@fleetops.io")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "shepherd")
+    conn.execute(
+        text("""
+            INSERT INTO app_users (id, email, password_hash, role, company_id, name)
+            VALUES (:id, :email, :hash, 'admin', NULL, 'System Admin')
+            ON CONFLICT (email) DO NOTHING
+        """),
+        {
+            "id": stable_uuid("app_user", admin_email),
+            "email": admin_email,
+            "hash": hash_password(admin_password),
+        },
+    )
+    # Demo company_admin bound to the Default Company.
+    conn.execute(
+        text("""
+            INSERT INTO app_users (id, email, password_hash, role, company_id, name)
+            VALUES (:id, :email, :hash, 'company_admin', :company_id, 'Demo Company Admin')
+            ON CONFLICT (email) DO NOTHING
+        """),
+        {
+            "id": stable_uuid("app_user", "company@fleetops.io"),
+            "email": "company@fleetops.io",
+            "hash": hash_password("shepherd"),
+            "company_id": DEFAULT_COMPANY_ID,
+        },
+    )
+
+
 def seed(engine):
     with engine.connect() as conn:
+        _seed_companies(conn)
+        _seed_company_settings(conn)
         _seed_drivers(conn)
         _seed_customers(conn)
         _seed_maintenance_types(conn)
@@ -400,6 +475,7 @@ def seed(engine):
         _seed_events(conn)
         _seed_system_config(conn)
         _seed_channel_identities(conn)
+        _seed_app_users(conn)
         conn.commit()
 
 
