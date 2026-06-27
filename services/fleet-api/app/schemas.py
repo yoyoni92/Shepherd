@@ -479,6 +479,13 @@ class AppUserUpdate(BaseModel):
     phone_number: str | None = None
 
 
+class AttendanceSettings(BaseModel):
+    """Per-company attendance clock-in window (stored in system_config)."""
+    enabled: bool = False
+    start: str = "00:00"
+    end: str = "23:59"
+
+
 class AppUserRead(BaseModel):
     user_id: UUID
     email: str

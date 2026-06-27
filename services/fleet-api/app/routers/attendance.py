@@ -11,6 +11,7 @@ from app.schemas import (
     AttendanceDayRead,
     AttendancePatch,
     AttendanceRecordRead,
+    AttendanceSettings,
     ClockRequest,
     ClockResponse,
 )
@@ -102,6 +103,38 @@ def clock_out(body: ClockRequest, session: Db) -> ClockResponse:
         return ClockResponse(result="blocked", window_start=start, window_end=end)
     result, t, hours = repo.attendance_clock_out(session, body.driver_id, now.strftime("%H:%M"), now.date())
     return ClockResponse(result=result, time=t, hours=hours, window_start=start, window_end=end)
+
+
+# --- Settings (company-scoped; managed by the company admin in the Attendance tab) ---
+
+
+@router.get(
+    "/settings",
+    response_model=AttendanceSettings,
+    summary="Read the attendance clock-in window for the caller's company",
+)
+def get_settings(session: Db, caller: Caller) -> AttendanceSettings:
+    assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
+    if not caller.company_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company context required")
+    enabled, start, end = _window(session, UUID(caller.company_id))
+    return AttendanceSettings(enabled=enabled, start=start, end=end)
+
+
+@router.put(
+    "/settings",
+    response_model=AttendanceSettings,
+    summary="Update the attendance clock-in window for the caller's company",
+)
+def put_settings(body: AttendanceSettings, session: Db, caller: Caller) -> AttendanceSettings:
+    assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
+    if not caller.company_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company context required")
+    cid = UUID(caller.company_id)
+    repo.set_config(session, "attendance_window_enabled", body.enabled, cid)
+    repo.set_config(session, "attendance_window_start", body.start, cid)
+    repo.set_config(session, "attendance_window_end", body.end, cid)
+    return body
 
 
 # --- Reads ---
