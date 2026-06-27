@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, status
 
 from app import repo
@@ -6,6 +8,10 @@ from app.deps import Caller, Db
 from app.schemas import ConfigRead, ConfigUpdate
 
 router = APIRouter(prefix="/config", tags=["config"])
+
+
+def _company(caller) -> UUID | None:
+    return UUID(caller.company_id) if caller.company_id else None
 
 
 def _to_read(c) -> ConfigRead:
@@ -24,7 +30,7 @@ def _to_read(c) -> ConfigRead:
 )
 def list_config(session: Db, caller: Caller) -> list[ConfigRead]:
     assert_permitted(caller.role, Action.READ_CONFIG)
-    return [_to_read(c) for c in repo.get_all_config(session)]
+    return [_to_read(c) for c in repo.get_all_config(session, _company(caller))]
 
 
 @router.get(
@@ -34,7 +40,7 @@ def list_config(session: Db, caller: Caller) -> list[ConfigRead]:
 )
 def get_config(key: str, session: Db, caller: Caller) -> ConfigRead:
     assert_permitted(caller.role, Action.READ_CONFIG)
-    entry = repo.get_config_key(session, key)
+    entry = repo.get_config_key(session, key, _company(caller))
     if not entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config key not found")
     return _to_read(entry)
@@ -48,4 +54,4 @@ def get_config(key: str, session: Db, caller: Caller) -> ConfigRead:
 )
 def update_config(key: str, body: ConfigUpdate, session: Db, caller: Caller) -> ConfigRead:
     assert_permitted(caller.role, Action.EDIT_CONFIG)
-    return _to_read(repo.set_config(session, key, body.config_value))
+    return _to_read(repo.set_config(session, key, body.config_value, _company(caller)))

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import repo
-from app.auth import Action, assert_permitted
+from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db, verify_internal_token
 from app.schemas import (
     AttendanceDayRead,
@@ -30,10 +30,10 @@ def _to_read(r) -> AttendanceRecordRead:
     )
 
 
-def _window(session) -> tuple[bool, str, str]:
+def _window(session, company_id) -> tuple[bool, str, str]:
     """Read the attendance reporting window from system_config (feature flag off by default)."""
     def val(key):
-        c = repo.get_config_key(session, key)
+        c = repo.get_config_key(session, key, company_id)
         return c.config_value if c else None
 
     enabled = val("attendance_window_enabled")
@@ -50,6 +50,17 @@ def _outside_window(now: datetime, start: str, end: str) -> bool:
     return cur < sh * 60 + sm or cur > eh * 60 + em
 
 
+def _assert_attendance_enabled(session, caller) -> None:
+    """403 when the caller's company has the attendance feature flag off.
+
+    A caller with no company (system superadmin) is cross-company and passes through.
+    """
+    if caller.company_id and not repo.company_feature_enabled(
+        session, UUID(caller.company_id), "attendance"
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="attendance disabled")
+
+
 # --- Bot self-service clock in/out (internal service only; window enforced here) ---
 
 
@@ -61,7 +72,13 @@ def _outside_window(now: datetime, start: str, end: str) -> bool:
 )
 def clock_in(body: ClockRequest, session: Db) -> ClockResponse:
     now = datetime.now(_IL_TZ)
-    enabled, start, end = _window(session)
+    driver = repo.get_driver(session, body.driver_id)
+    company_id = driver.company_id if driver else None
+    # Attendance is gated per company; signal "disabled" in the typed response so the
+    # bot doesn't need to special-case an HTTP error here.
+    if company_id is None or not repo.company_feature_enabled(session, company_id, "attendance"):
+        return ClockResponse(result="disabled")
+    enabled, start, end = _window(session, company_id)
     if enabled and _outside_window(now, start, end):
         return ClockResponse(result="blocked", window_start=start, window_end=end)
     result, t = repo.attendance_clock_in(session, body.driver_id, now.strftime("%H:%M"), now.date())
@@ -76,7 +93,11 @@ def clock_in(body: ClockRequest, session: Db) -> ClockResponse:
 )
 def clock_out(body: ClockRequest, session: Db) -> ClockResponse:
     now = datetime.now(_IL_TZ)
-    enabled, start, end = _window(session)
+    driver = repo.get_driver(session, body.driver_id)
+    company_id = driver.company_id if driver else None
+    if company_id is None or not repo.company_feature_enabled(session, company_id, "attendance"):
+        return ClockResponse(result="disabled")
+    enabled, start, end = _window(session, company_id)
     if enabled and _outside_window(now, start, end):
         return ClockResponse(result="blocked", window_start=start, window_end=end)
     result, t, hours = repo.attendance_clock_out(session, body.driver_id, now.strftime("%H:%M"), now.date())
@@ -93,7 +114,9 @@ def clock_out(body: ClockRequest, session: Db) -> ClockResponse:
 )
 def list_today(session: Db, caller: Caller) -> list[AttendanceDayRead]:
     assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
+    _assert_attendance_enabled(session, caller)
     today = datetime.now(_IL_TZ).date()
+    company_id = UUID(caller.company_id) if caller.company_id else None
     return [
         AttendanceDayRead(
             driver_id=r.driver_id,
@@ -102,7 +125,7 @@ def list_today(session: Db, caller: Caller) -> list[AttendanceDayRead]:
             clock_out=r.clock_out,
             status=r.status.value,
         )
-        for r, name in repo.list_attendance_day(session, today)
+        for r, name in repo.list_attendance_day(session, today, company_id=company_id)
     ]
 
 
@@ -116,11 +139,16 @@ def list_month(
     month: str, session: Db, caller: Caller, driver_id: UUID | None = None
 ) -> list[AttendanceRecordRead]:
     assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
+    _assert_attendance_enabled(session, caller)
     try:
         d = datetime.strptime(month, "%Y-%m")
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="month must be YYYY-MM")
-    return [_to_read(r) for r in repo.list_attendance_month(session, d.year, d.month, driver_id)]
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    return [
+        _to_read(r)
+        for r in repo.list_attendance_month(session, d.year, d.month, driver_id, company_id=company_id)
+    ]
 
 
 @router.patch(
@@ -135,5 +163,13 @@ def upsert_day(driver_id: UUID, day: str, body: AttendancePatch, session: Db, ca
         work_date = date.fromisoformat(day)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="day must be YYYY-MM-DD")
+    # The record inherits the driver's company, so the driver must be in the caller's company.
+    # Tenant isolation (404) is asserted before the feature gate so cross-tenant probes can't
+    # learn another company's attendance state.
+    driver = repo.get_driver(session, driver_id)
+    if driver is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+    assert_company(driver, caller)
+    _assert_attendance_enabled(session, caller)
     rec = repo.upsert_attendance(session, driver_id, work_date, body.model_dump())
     return _to_read(rec)

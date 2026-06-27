@@ -4,7 +4,26 @@ Drivers double as employees: PATCH upserts one (driver, date) row, GET returns a
 """
 import uuid
 
-from tests.conftest import admin_headers, driver_headers
+import pytest
+
+from tests.conftest import (
+    DEFAULT_COMPANY_ID,
+    admin_headers,
+    driver_headers,
+    superadmin_headers,
+)
+
+
+@pytest.fixture(autouse=True)
+def _enable_attendance(client):
+    # Attendance defaults OFF per company (Feature 5); these tests opt the Default
+    # Company in. feature_flags-only patches skip Drive validation, so no mocking needed.
+    r = client.patch(
+        f"/companies/{DEFAULT_COMPANY_ID}/settings",
+        headers=superadmin_headers(),
+        json={"feature_flags": {"attendance": True}},
+    )
+    assert r.status_code == 200
 
 
 def _make_driver(client) -> str:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from shepherd_contracts.auth import Role
 
 from app import repo
-from app.auth import Action, assert_permitted
+from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
 from app.schemas import VehicleCreate, VehicleRead, VehicleUpdate
 
@@ -43,12 +43,13 @@ def _to_read(v) -> VehicleRead:
 )
 def list_vehicles(session: Db, caller: Caller) -> list[VehicleRead]:
     assert_permitted(caller.role, Action.READ_VEHICLES)
+    company_id = UUID(caller.company_id) if caller.company_id else None
     if caller.role == Role.driver:
-        vehicles = repo.list_vehicles(session, driver_id=UUID(caller.driver_id))
+        vehicles = repo.list_vehicles(session, driver_id=UUID(caller.driver_id), company_id=company_id)
     elif caller.role == Role.customer:
-        vehicles = repo.list_vehicles(session, customer_id=UUID(caller.customer_id))
+        vehicles = repo.list_vehicles(session, customer_id=UUID(caller.customer_id), company_id=company_id)
     else:
-        vehicles = repo.list_vehicles(session)
+        vehicles = repo.list_vehicles(session, company_id=company_id)
     return [_to_read(v) for v in vehicles]
 
 
@@ -62,6 +63,7 @@ def get_vehicle(plate: str, session: Db, caller: Caller) -> VehicleRead:
     vehicle = repo.get_vehicle_by_plate(session, plate)
     if vehicle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+    assert_company(vehicle, caller)
 
     if caller.role == Role.driver:
         is_owner = str(vehicle.driver_id) == caller.driver_id
@@ -84,10 +86,13 @@ def get_vehicle(plate: str, session: Db, caller: Caller) -> VehicleRead:
 def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleRead:
     assert_permitted(caller.role, Action.MANAGE_VEHICLES)
 
-    if repo.get_vehicle_by_plate(session, body.licensing_plate):
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    if repo.get_vehicle_by_plate(session, body.licensing_plate, company_id=company_id):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plate already exists")
 
-    vehicle = repo.create_vehicle(session, body.model_dump())
+    data = body.model_dump()
+    data["company_id"] = caller.company_id
+    vehicle = repo.create_vehicle(session, data)
     return _to_read(vehicle)
 
 
@@ -99,9 +104,11 @@ def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleR
 )
 def update_vehicle(vehicle_id: UUID, body: VehicleUpdate, session: Db, caller: Caller) -> VehicleRead:
     assert_permitted(caller.role, Action.MANAGE_VEHICLES)
-    vehicle = repo.update_vehicle(session, vehicle_id, body.model_dump(exclude_unset=True))
-    if vehicle is None:
+    existing = repo.get_vehicle_by_id(session, vehicle_id)
+    if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+    assert_company(existing, caller)
+    vehicle = repo.update_vehicle(session, vehicle_id, body.model_dump(exclude_unset=True))
     return _to_read(vehicle)
 
 
@@ -113,5 +120,8 @@ def update_vehicle(vehicle_id: UUID, body: VehicleUpdate, session: Db, caller: C
 )
 def delete_vehicle(vehicle_id: UUID, session: Db, caller: Caller) -> None:
     assert_permitted(caller.role, Action.MANAGE_VEHICLES)
-    if not repo.delete_vehicle(session, vehicle_id):
+    existing = repo.get_vehicle_by_id(session, vehicle_id)
+    if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+    assert_company(existing, caller)
+    repo.delete_vehicle(session, vehicle_id)

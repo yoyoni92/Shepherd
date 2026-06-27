@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter
 
 from app import repo
@@ -20,5 +22,8 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 )
 def extracted_document(body: DocumentExtractedRequest, session: Db, caller: Caller) -> DocumentExtractedResponse:
     assert_permitted(caller.role, Action.WRITE_REPORTS)
-    status_str, event_id, report_id = repo.process_extracted_doc(session, body.model_dump())
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    status_str, event_id, report_id = repo.process_extracted_doc(
+        session, body.model_dump(), company_id=company_id
+    )
     return DocumentExtractedResponse(status=status_str, event_id=event_id, report_id=report_id)

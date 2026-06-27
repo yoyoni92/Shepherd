@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter
 
 from app import repo
@@ -31,4 +33,5 @@ def _to_read(k) -> KpiDailyRead:
 )
 def list_kpi_daily(session: Db, caller: Caller, limit: int = 2) -> list[KpiDailyRead]:
     assert_permitted(caller.role, Action.READ_KPI)
-    return [_to_read(k) for k in repo.list_kpi_daily(session, limit=limit)]
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    return [_to_read(k) for k in repo.list_kpi_daily(session, limit=limit, company_id=company_id)]

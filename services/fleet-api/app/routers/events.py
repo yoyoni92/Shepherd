@@ -10,6 +10,10 @@ from app.schemas import EventCreate, EventRead
 router = APIRouter(prefix="/events", tags=["events"])
 
 
+def _company(caller) -> UUID | None:
+    return UUID(caller.company_id) if caller.company_id else None
+
+
 def _to_read(e) -> EventRead:
     return EventRead(
         event_id=e.event_id,
@@ -30,7 +34,10 @@ def _to_read(e) -> EventRead:
 )
 def list_events(session: Db, caller: Caller, vehicle_id: UUID | None = None) -> list[EventRead]:
     assert_permitted(caller.role, Action.READ_EVENTS)
-    return [_to_read(e) for e in repo.list_events(session, vehicle_id=vehicle_id)]
+    return [
+        _to_read(e)
+        for e in repo.list_events(session, vehicle_id=vehicle_id, company_id=_company(caller))
+    ]
 
 
 @router.post(
@@ -43,5 +50,6 @@ def list_events(session: Db, caller: Caller, vehicle_id: UUID | None = None) -> 
 def create_event(body: EventCreate, session: Db, caller: Caller) -> EventRead:
     assert_permitted(caller.role, Action.WRITE_EVENTS)
     data = body.model_dump()
+    data["company_id"] = caller.company_id
     event = repo.create_event(session, data)
     return _to_read(event)

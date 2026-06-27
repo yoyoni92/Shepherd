@@ -3,7 +3,7 @@ from enum import Enum
 
 from fastapi import HTTPException, status
 
-from shepherd_contracts.auth import Role
+from shepherd_contracts.auth import CallerContext, Role
 
 
 class Action(str, Enum):
@@ -27,31 +27,39 @@ class Action(str, Enum):
     MANAGE_MAINTENANCE_TYPES = "manage_maintenance_types"
     MANAGE_BOT_USERS = "manage_bot_users"
     MANAGE_BOT_INVITES = "manage_bot_invites"
+    MANAGE_APP_USERS = "manage_app_users"
+    MANAGE_COMPANIES = "manage_companies"
 
 
 # {action: {role: ownership_required}}
 # None = forbidden; False = allowed regardless of ownership; True = only if is_owner
+# company_admin mirrors admin for operational actions (F1's repo scoping enforces
+# per-company isolation), incl. bot management scoped to its own company
+# (MANAGE_BOT_USERS, MANAGE_BOT_INVITES - repo filters + assert_company isolate),
+# but is denied system-wide management: MANAGE_APP_USERS, MANAGE_COMPANIES, EDIT_CONFIG.
 _MATRIX: dict[Action, dict[Role, bool | None]] = {
-    Action.READ_VEHICLES:    {Role.admin: False, Role.driver: True,  Role.customer: True},
-    Action.MANAGE_VEHICLES:  {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.MANAGE_DRIVERS:   {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.MANAGE_CUSTOMERS: {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.KM_UPDATE:        {Role.admin: False, Role.driver: True,  Role.customer: None},
-    Action.LOG_ACCIDENT:     {Role.admin: False, Role.driver: True,  Role.customer: None},
-    Action.READ_ACCIDENTS:   {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.LOG_CARE:         {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.SUBMIT_DOCUMENT:  {Role.admin: False, Role.driver: True,  Role.customer: True},
-    Action.WRITE_REPORTS:    {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.READ_REPORTS:     {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.READ_EVENTS:      {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.WRITE_EVENTS:     {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.READ_CONFIG:      {Role.admin: False, Role.driver: False,  Role.customer: False},
-    Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.MANAGE_ATTENDANCE: {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.MANAGE_MAINTENANCE_TYPES: {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.MANAGE_BOT_USERS:         {Role.admin: False, Role.driver: None,  Role.customer: None},
-    Action.MANAGE_BOT_INVITES:       {Role.admin: False, Role.driver: None,  Role.customer: None},
+    Action.READ_VEHICLES:    {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},
+    Action.MANAGE_VEHICLES:  {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_DRIVERS:   {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_CUSTOMERS: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.KM_UPDATE:        {Role.admin: False, Role.driver: True,  Role.customer: None, Role.company_admin: False},
+    Action.LOG_ACCIDENT:     {Role.admin: False, Role.driver: True,  Role.customer: None, Role.company_admin: False},
+    Action.READ_ACCIDENTS:   {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.LOG_CARE:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.SUBMIT_DOCUMENT:  {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},
+    Action.WRITE_REPORTS:    {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.READ_REPORTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.READ_EVENTS:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.WRITE_EVENTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.READ_CONFIG:      {Role.admin: False, Role.driver: False,  Role.customer: False, Role.company_admin: False},
+    Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: None},
+    Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_ATTENDANCE: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_MAINTENANCE_TYPES: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_BOT_USERS:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_BOT_INVITES:       {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
+    Action.MANAGE_APP_USERS:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: None},
+    Action.MANAGE_COMPANIES:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: None},
 }
 
 
@@ -67,3 +75,17 @@ def can(role: Role, action: Action, *, is_owner: bool = True) -> bool:
 def assert_permitted(role: Role, action: Action, *, is_owner: bool = True) -> None:
     if not can(role, action, is_owner=is_owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def assert_company(row: object, caller: CallerContext) -> None:
+    """Tenant isolation for by-PK reads/writes.
+
+    When the caller is company-scoped (``caller.company_id`` set), a row whose
+    ``company_id`` differs is treated as if it did not exist (404, not 403) so one
+    tenant cannot probe another tenant's row existence. A caller with no company
+    (system superadmin) passes through unfiltered.
+    """
+    if caller.company_id is None:
+        return
+    if row is None or str(getattr(row, "company_id", None)) != caller.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")

@@ -3,11 +3,15 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from app import repo
-from app.auth import Action, assert_permitted
+from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
 from app.schemas import CustomerCreate, CustomerRead, CustomerUpdate
 
 router = APIRouter(prefix="/customers", tags=["customers"])
+
+
+def _company(caller) -> UUID | None:
+    return UUID(caller.company_id) if caller.company_id else None
 
 
 def _to_read(c) -> CustomerRead:
@@ -27,7 +31,7 @@ def _to_read(c) -> CustomerRead:
 )
 def list_customers(session: Db, caller: Caller) -> list[CustomerRead]:
     assert_permitted(caller.role, Action.MANAGE_CUSTOMERS)
-    return [_to_read(c) for c in repo.list_customers(session)]
+    return [_to_read(c) for c in repo.list_customers(session, company_id=_company(caller))]
 
 
 @router.post(
@@ -38,7 +42,9 @@ def list_customers(session: Db, caller: Caller) -> list[CustomerRead]:
 )
 def create_customer(body: CustomerCreate, session: Db, caller: Caller) -> CustomerRead:
     assert_permitted(caller.role, Action.MANAGE_CUSTOMERS)
-    return _to_read(repo.create_customer(session, body.model_dump()))
+    data = body.model_dump()
+    data["company_id"] = caller.company_id
+    return _to_read(repo.create_customer(session, data))
 
 
 @router.patch(
@@ -49,9 +55,11 @@ def create_customer(body: CustomerCreate, session: Db, caller: Caller) -> Custom
 )
 def update_customer(customer_id: UUID, body: CustomerUpdate, session: Db, caller: Caller) -> CustomerRead:
     assert_permitted(caller.role, Action.MANAGE_CUSTOMERS)
-    customer = repo.update_customer(session, customer_id, body.model_dump(exclude_unset=True))
-    if customer is None:
+    existing = repo.get_customer(session, customer_id)
+    if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    assert_company(existing, caller)
+    customer = repo.update_customer(session, customer_id, body.model_dump(exclude_unset=True))
     return _to_read(customer)
 
 
@@ -63,5 +71,8 @@ def update_customer(customer_id: UUID, body: CustomerUpdate, session: Db, caller
 )
 def delete_customer(customer_id: UUID, session: Db, caller: Caller) -> None:
     assert_permitted(caller.role, Action.MANAGE_CUSTOMERS)
-    if not repo.delete_customer(session, customer_id):
+    existing = repo.get_customer(session, customer_id)
+    if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    assert_company(existing, caller)
+    repo.delete_customer(session, customer_id)

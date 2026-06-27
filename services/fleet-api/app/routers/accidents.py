@@ -1,8 +1,10 @@
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, status
 from shepherd_contracts.auth import Role
 
 from app import repo
-from app.auth import Action, assert_permitted
+from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
 from app.schemas import (
     AccidentCreate,
@@ -45,7 +47,8 @@ def _to_list_item(a) -> AccidentListItem:
 )
 def list_accidents(session: Db, caller: Caller) -> list[AccidentListItem]:
     assert_permitted(caller.role, Action.READ_ACCIDENTS)
-    return [_to_list_item(a) for a in repo.list_accidents(session)]
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    return [_to_list_item(a) for a in repo.list_accidents(session, company_id=company_id)]
 
 
 @router.post(
@@ -64,6 +67,7 @@ def log_accident(body: AccidentCreate, session: Db, caller: Caller) -> AccidentR
     vehicle = repo.get_vehicle_by_id(session, body.vehicle_id)
     if vehicle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+    assert_company(vehicle, caller)
 
     if caller.role == Role.driver:
         is_owner = str(vehicle.driver_id) == caller.driver_id
@@ -79,6 +83,7 @@ def log_accident(body: AccidentCreate, session: Db, caller: Caller) -> AccidentR
     data = {
         "vehicle_id": body.vehicle_id,
         "driver_id": driver_id,
+        "company_id": vehicle.company_id,
         "datetime": body.datetime,
         "location": body.location,
         "description": body.description,

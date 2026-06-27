@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter
 
 from app import repo
@@ -6,6 +8,10 @@ from app.deps import Caller, Db
 from app.schemas import ReportCreate, ReportRead
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+
+def _company(caller) -> UUID | None:
+    return UUID(caller.company_id) if caller.company_id else None
 
 
 def _to_read(r) -> ReportRead:
@@ -26,7 +32,7 @@ def _to_read(r) -> ReportRead:
 )
 def list_reports(session: Db, caller: Caller) -> list[ReportRead]:
     assert_permitted(caller.role, Action.READ_REPORTS)
-    return [_to_read(r) for r in repo.list_reports(session)]
+    return [_to_read(r) for r in repo.list_reports(session, company_id=_company(caller))]
 
 
 @router.post(
@@ -38,4 +44,6 @@ def list_reports(session: Db, caller: Caller) -> list[ReportRead]:
 )
 def create_report(body: ReportCreate, session: Db, caller: Caller) -> ReportRead:
     assert_permitted(caller.role, Action.WRITE_REPORTS)
-    return _to_read(repo.create_report(session, body.model_dump()))
+    data = body.model_dump()
+    data["company_id"] = caller.company_id
+    return _to_read(repo.create_report(session, data))

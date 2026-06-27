@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from shepherd_contracts.auth import Role
 
 from app import repo
-from app.auth import Action, assert_permitted
+from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
 from app.schemas import KmUpdateRequest, KmUpdateResponse
 
@@ -25,6 +25,7 @@ def update_km(body: KmUpdateRequest, session: Db, caller: Caller) -> KmUpdateRes
     vehicle = repo.get_vehicle_by_id(session, body.vehicle_id)
     if vehicle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+    assert_company(vehicle, caller)
 
     if caller.role == Role.driver:
         is_owner = str(vehicle.driver_id) == caller.driver_id

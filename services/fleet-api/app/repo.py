@@ -9,9 +9,12 @@ from shepherd_db.logic import next_maintenance
 from shepherd_db.models import (
     Accident,
     AccidentAttachment,
+    AppUser,
     AttendanceRecord,
     BotAuthorization,
     BotUser,
+    Company,
+    CompanySettings,
     Event,
     KmUpdate,
     KpiDaily,
@@ -23,16 +26,20 @@ from shepherd_db.models import (
     Driver,
     Customer,
 )
+from shepherd_db.security import hash_password
 
 
 # ---------------------------------------------------------------------------
 # Vehicles
 # ---------------------------------------------------------------------------
 
-def get_vehicle_by_plate(session: Session, plate: str) -> Vehicle | None:
-    return session.execute(
-        select(Vehicle).where(Vehicle.licensing_plate == plate)
-    ).scalar_one_or_none()
+def get_vehicle_by_plate(
+    session: Session, plate: str, *, company_id: UUID | None = None
+) -> Vehicle | None:
+    stmt = select(Vehicle).where(Vehicle.licensing_plate == plate)
+    if company_id is not None:
+        stmt = stmt.where(Vehicle.company_id == company_id)
+    return session.execute(stmt).scalar_one_or_none()
 
 
 def get_vehicle_by_id(session: Session, vehicle_id: UUID) -> Vehicle | None:
@@ -44,8 +51,11 @@ def list_vehicles(
     *,
     driver_id: UUID | None = None,
     customer_id: UUID | None = None,
+    company_id: UUID | None = None,
 ) -> list[Vehicle]:
     stmt = select(Vehicle)
+    if company_id is not None:
+        stmt = stmt.where(Vehicle.company_id == company_id)
     if driver_id is not None:
         stmt = stmt.where(Vehicle.driver_id == driver_id)
     elif customer_id is not None:
@@ -89,8 +99,11 @@ def get_driver(session: Session, driver_id: UUID) -> Driver | None:
     return session.get(Driver, driver_id)
 
 
-def list_drivers(session: Session) -> list[Driver]:
-    return list(session.execute(select(Driver)).scalars())
+def list_drivers(session: Session, *, company_id: UUID | None = None) -> list[Driver]:
+    stmt = select(Driver)
+    if company_id is not None:
+        stmt = stmt.where(Driver.company_id == company_id)
+    return list(session.execute(stmt).scalars())
 
 
 def create_driver(session: Session, data: dict) -> Driver:
@@ -125,8 +138,15 @@ def delete_driver(session: Session, driver_id: UUID) -> bool:
 # Customers
 # ---------------------------------------------------------------------------
 
-def list_customers(session: Session) -> list[Customer]:
-    return list(session.execute(select(Customer)).scalars())
+def get_customer(session: Session, customer_id: UUID) -> Customer | None:
+    return session.get(Customer, customer_id)
+
+
+def list_customers(session: Session, *, company_id: UUID | None = None) -> list[Customer]:
+    stmt = select(Customer)
+    if company_id is not None:
+        stmt = stmt.where(Customer.company_id == company_id)
+    return list(session.execute(stmt).scalars())
 
 
 def create_customer(session: Session, data: dict) -> Customer:
@@ -165,8 +185,8 @@ def delete_customer(session: Session, customer_id: UUID) -> bool:
 # KM updates
 # ---------------------------------------------------------------------------
 
-def get_maintenance_buffer(session: Session) -> int:
-    cfg = session.get(SystemConfig, "maintenance_km_buffer")
+def get_maintenance_buffer(session: Session, company_id: UUID | None = None) -> int:
+    cfg = session.get(SystemConfig, (company_id, "maintenance_km_buffer"))
     return int(cfg.config_value) if cfg is not None else 500
 
 
@@ -179,16 +199,20 @@ def update_km(
     source: str,
 ) -> tuple[UUID, bool]:
     """Insert km_update row, update vehicle.current_km. Returns (km_update_id, maintenance_triggered)."""
-    km_update = KmUpdate(vehicle_id=vehicle_id, km=km, driver_id=driver_id, source=source)
+    # Load the vehicle first so the km_update + any derived event inherit its company_id.
+    vehicle = session.get(Vehicle, vehicle_id)
+    km_update = KmUpdate(
+        vehicle_id=vehicle_id, km=km, driver_id=driver_id, source=source,
+        company_id=vehicle.company_id,
+    )
     session.add(km_update)
     session.flush()  # get km_update_id before checking trigger
 
-    vehicle = session.get(Vehicle, vehicle_id)
     vehicle.current_km = km
 
     triggered = False
     if vehicle.next_maintenance_km is not None:
-        buffer = get_maintenance_buffer(session)
+        buffer = get_maintenance_buffer(session, vehicle.company_id)
         if km >= vehicle.next_maintenance_km - buffer:
             event = Event(
                 vehicle_id=vehicle_id,
@@ -197,6 +221,7 @@ def update_km(
                 message="Maintenance due soon",
                 source_type="km_updates",
                 source_id=km_update.km_update_id,
+                company_id=vehicle.company_id,
             )
             session.add(event)
             triggered = True
@@ -210,12 +235,16 @@ def update_km(
 # ---------------------------------------------------------------------------
 
 def create_accident(session: Session, data: dict, attachments: list[dict]) -> UUID:
+    # data carries company_id (router copies it off the loaded vehicle); attachments
+    # and the derived event inherit it from the accident.
     accident = Accident(**data)
     session.add(accident)
     session.flush()
 
     for att in attachments:
-        session.add(AccidentAttachment(accident_id=accident.accident_id, **att))
+        session.add(AccidentAttachment(
+            accident_id=accident.accident_id, company_id=accident.company_id, **att
+        ))
 
     session.add(Event(
         vehicle_id=accident.vehicle_id,
@@ -224,17 +253,21 @@ def create_accident(session: Session, data: dict, attachments: list[dict]) -> UU
         message="Accident logged",
         source_type="accidents",
         source_id=accident.accident_id,
+        company_id=accident.company_id,
     ))
     session.commit()
     return accident.accident_id
 
 
-def list_accidents(session: Session) -> list[Accident]:
-    return list(session.scalars(
+def list_accidents(session: Session, *, company_id: UUID | None = None) -> list[Accident]:
+    stmt = (
         select(Accident)
         .options(selectinload(Accident.attachments))
         .order_by(Accident.datetime.desc())
-    ))
+    )
+    if company_id is not None:
+        stmt = stmt.where(Accident.company_id == company_id)
+    return list(session.scalars(stmt))
 
 
 # ---------------------------------------------------------------------------
@@ -242,11 +275,12 @@ def list_accidents(session: Session) -> list[Accident]:
 # ---------------------------------------------------------------------------
 
 def create_care(session: Session, data: dict) -> VehicleCare:
-    care = VehicleCare(**data)
+    # Care inherits company_id from its vehicle (set before flush - it's NOT NULL).
+    vehicle = session.get(Vehicle, data["vehicle_id"])
+    care = VehicleCare(**data, company_id=vehicle.company_id)
     session.add(care)
     session.flush()
 
-    vehicle = session.get(Vehicle, care.vehicle_id)
     # Cycle is data-driven: read the assigned maintenance type's steps + interval.
     mtype = vehicle.maintenance_type
     steps = mtype.steps if mtype else [care.maintenance_type]
@@ -271,10 +305,17 @@ def create_care(session: Session, data: dict) -> VehicleCare:
 # Documents extracted
 # ---------------------------------------------------------------------------
 
-def process_extracted_doc(session: Session, payload: dict) -> tuple[str, UUID | None, UUID | None]:
-    """Apply extracted document to DB. Returns (status, event_id, report_id)."""
+def process_extracted_doc(
+    session: Session, payload: dict, *, company_id: UUID | None = None
+) -> tuple[str, UUID | None, UUID | None]:
+    """Apply extracted document to DB. Returns (status, event_id, report_id).
+
+    The matched vehicle's company_id is inherited by the report + events. When the
+    plate is not found there is no vehicle, so the review event is tagged with the
+    caller's company_id instead.
+    """
     plate = payload["licensing_plate"]
-    vehicle = get_vehicle_by_plate(session, plate)
+    vehicle = get_vehicle_by_plate(session, plate, company_id=company_id)
 
     if vehicle is None:
         event = Event(
@@ -282,6 +323,7 @@ def process_extracted_doc(session: Session, payload: dict) -> tuple[str, UUID | 
             severity="warning",
             message="Extracted doc plate not found in fleet",
             payload_json={"plate": plate},
+            company_id=company_id,
         )
         session.add(event)
         session.commit()
@@ -309,6 +351,7 @@ def process_extracted_doc(session: Session, payload: dict) -> tuple[str, UUID | 
             due_date=payload.get("due_date"),
             authority=payload.get("authority"),
             file_url=payload.get("ticket_file_url"),
+            company_id=vehicle.company_id,
         )
         session.add(report)
         session.flush()
@@ -319,6 +362,7 @@ def process_extracted_doc(session: Session, payload: dict) -> tuple[str, UUID | 
             message="Ticket received via doc extraction",
             source_type="reports",
             source_id=report.report_id,
+            company_id=vehicle.company_id,
         ))
         report_id = report.report_id
 
@@ -330,8 +374,11 @@ def process_extracted_doc(session: Session, payload: dict) -> tuple[str, UUID | 
 # Reports
 # ---------------------------------------------------------------------------
 
-def list_reports(session: Session) -> list[Report]:
-    return list(session.execute(select(Report).order_by(Report.created_ts.desc())).scalars())
+def list_reports(session: Session, *, company_id: UUID | None = None) -> list[Report]:
+    stmt = select(Report).order_by(Report.created_ts.desc())
+    if company_id is not None:
+        stmt = stmt.where(Report.company_id == company_id)
+    return list(session.execute(stmt).scalars())
 
 
 def create_report(session: Session, data: dict) -> Report:
@@ -346,8 +393,12 @@ def create_report(session: Session, data: dict) -> Report:
 # Events
 # ---------------------------------------------------------------------------
 
-def list_events(session: Session, vehicle_id: UUID | None = None) -> list[Event]:
+def list_events(
+    session: Session, vehicle_id: UUID | None = None, *, company_id: UUID | None = None
+) -> list[Event]:
     stmt = select(Event).order_by(Event.triggered_ts.desc())
+    if company_id is not None:
+        stmt = stmt.where(Event.company_id == company_id)
     if vehicle_id is not None:
         stmt = stmt.where(Event.vehicle_id == vehicle_id)
     return list(session.execute(stmt).scalars())
@@ -365,20 +416,30 @@ def create_event(session: Session, data: dict) -> Event:
 # System config
 # ---------------------------------------------------------------------------
 
-def get_all_config(session: Session) -> list[SystemConfig]:
-    return list(session.execute(select(SystemConfig).order_by(SystemConfig.config_key)).scalars())
+def get_all_config(session: Session, company_id: UUID | None = None) -> list[SystemConfig]:
+    stmt = select(SystemConfig).order_by(SystemConfig.config_key)
+    if company_id is not None:
+        stmt = stmt.where(SystemConfig.company_id == company_id)
+    return list(session.execute(stmt).scalars())
 
 
-def get_config_key(session: Session, key: str) -> SystemConfig | None:
-    return session.get(SystemConfig, key)
+def get_config_key(
+    session: Session, key: str, company_id: UUID | None = None
+) -> SystemConfig | None:
+    return session.get(SystemConfig, (company_id, key))
 
 
 # ---------------------------------------------------------------------------
 # Maintenance types (admin-managed catalog)
 # ---------------------------------------------------------------------------
 
-def list_maintenance_types(session: Session) -> list[MaintenanceType]:
-    return list(session.execute(select(MaintenanceType).order_by(MaintenanceType.name)).scalars())
+def list_maintenance_types(
+    session: Session, *, company_id: UUID | None = None
+) -> list[MaintenanceType]:
+    stmt = select(MaintenanceType).order_by(MaintenanceType.name)
+    if company_id is not None:
+        stmt = stmt.where(MaintenanceType.company_id == company_id)
+    return list(session.execute(stmt).scalars())
 
 
 def get_maintenance_type(session: Session, type_id: UUID) -> MaintenanceType | None:
@@ -424,7 +485,8 @@ def delete_maintenance_type(session: Session, type_id: UUID) -> bool:
 # ---------------------------------------------------------------------------
 
 def list_attendance_month(
-    session: Session, year: int, month: int, driver_id: UUID | None = None
+    session: Session, year: int, month: int, driver_id: UUID | None = None,
+    *, company_id: UUID | None = None,
 ) -> list[AttendanceRecord]:
     from calendar import monthrange
     from datetime import date
@@ -432,12 +494,16 @@ def list_attendance_month(
     start = date(year, month, 1)
     end = date(year, month, monthrange(year, month)[1])
     stmt = select(AttendanceRecord).where(AttendanceRecord.work_date.between(start, end))
+    if company_id is not None:
+        stmt = stmt.where(AttendanceRecord.company_id == company_id)
     if driver_id is not None:
         stmt = stmt.where(AttendanceRecord.driver_id == driver_id)
     return list(session.execute(stmt.order_by(AttendanceRecord.work_date)).scalars())
 
 
-def list_attendance_day(session: Session, work_date) -> list[tuple[AttendanceRecord, str]]:
+def list_attendance_day(
+    session: Session, work_date, *, company_id: UUID | None = None
+) -> list[tuple[AttendanceRecord, str]]:
     """Records for a single day joined with driver names (for the admin view)."""
     stmt = (
         select(AttendanceRecord, Driver.full_name)
@@ -445,6 +511,8 @@ def list_attendance_day(session: Session, work_date) -> list[tuple[AttendanceRec
         .where(AttendanceRecord.work_date == work_date)
         .order_by(AttendanceRecord.clock_in)
     )
+    if company_id is not None:
+        stmt = stmt.where(AttendanceRecord.company_id == company_id)
     return [(r, name) for r, name in session.execute(stmt).all()]
 
 
@@ -458,7 +526,11 @@ def attendance_clock_in(session: Session, driver_id: UUID, time_str: str, work_d
     if rec is not None and rec.clock_in:
         return ("already_in", rec.clock_in)
     if rec is None:
-        rec = AttendanceRecord(driver_id=driver_id, work_date=work_date, clock_in=time_str, status="present")
+        driver = session.get(Driver, driver_id)
+        rec = AttendanceRecord(
+            driver_id=driver_id, work_date=work_date, clock_in=time_str, status="present",
+            company_id=driver.company_id if driver else None,
+        )
         session.add(rec)
     else:
         rec.clock_in = time_str
@@ -495,7 +567,11 @@ def upsert_attendance(session: Session, driver_id: UUID, work_date, data: dict) 
         )
     ).scalar_one_or_none()
     if rec is None:
-        rec = AttendanceRecord(driver_id=driver_id, work_date=work_date, **data)
+        driver = session.get(Driver, driver_id)
+        rec = AttendanceRecord(
+            driver_id=driver_id, work_date=work_date,
+            company_id=driver.company_id if driver else None, **data,
+        )
         session.add(rec)
     else:
         for key, value in data.items():
@@ -509,9 +585,13 @@ def upsert_attendance(session: Session, driver_id: UUID, work_date, data: dict) 
 # KPI daily rollup (read-only; populated by refresh_kpi_daily())
 # ---------------------------------------------------------------------------
 
-def list_kpi_daily(session: Session, limit: int = 2) -> list[KpiDaily]:
-    stmt = select(KpiDaily).order_by(KpiDaily.snapshot_date.desc()).limit(limit)
-    return list(session.execute(stmt).scalars())
+def list_kpi_daily(
+    session: Session, limit: int = 2, *, company_id: UUID | None = None
+) -> list[KpiDaily]:
+    stmt = select(KpiDaily).order_by(KpiDaily.snapshot_date.desc())
+    if company_id is not None:
+        stmt = stmt.where(KpiDaily.company_id == company_id)
+    return list(session.execute(stmt.limit(limit)).scalars())
 
 
 # ---------------------------------------------------------------------------
@@ -524,8 +604,13 @@ def get_bot_user_by_chat_id(session: Session, chat_id: int) -> BotUser | None:
     ).scalar_one_or_none()
 
 
-def list_bot_users(session: Session, role: str | None = None) -> list[BotUser]:
+def list_bot_users(
+    session: Session, role: str | None = None, *, company_id: UUID | None = None
+) -> list[BotUser]:
     stmt = select(BotUser)
+    # company_id is nullable on bot tables (writers land in Feature 3); only filter when given.
+    if company_id is not None:
+        stmt = stmt.where(BotUser.company_id == company_id)
     if role is not None:
         stmt = stmt.where(BotUser.role == role)
     return list(session.execute(stmt).scalars())
@@ -550,18 +635,20 @@ def _normalize_phone(p: str) -> str:
 
 
 def find_enrollment_by_phone(session: Session, phone: str):
-    """(role, driver_id, expires_at) for a phone, or None.
+    """(role, driver_id, expires_at, company_id) for a phone, or None.
 
     An active driver wins (permanent driver role); otherwise a non-expired
-    bot_authorization. Phones are normalized both sides; fleets are small so a scan
-    is fine. ponytail: O(n) scan, add a normalized index if a fleet ever gets large.
+    bot_authorization. The company is resolved alongside (the driver's company for a
+    driver match; the authorization's company otherwise) so enrollment binds the bot
+    user to the right tenant. Phones are normalized both sides; fleets are small so a
+    scan is fine. ponytail: O(n) scan, add a normalized index if a fleet ever gets large.
     """
     from datetime import datetime, timezone
 
     target = _normalize_phone(phone)
     for d in session.execute(select(Driver).where(Driver.status == "active")).scalars():
         if _normalize_phone(d.phone_number) == target:
-            return ("driver", d.driver_id, None)
+            return ("driver", d.driver_id, None, d.company_id)
     now = datetime.now(timezone.utc)
     for a in session.execute(
         select(BotAuthorization).where(
@@ -570,7 +657,7 @@ def find_enrollment_by_phone(session: Session, phone: str):
     ).scalars():
         if _normalize_phone(a.phone_number) == target:
             role = a.role.value if hasattr(a.role, "value") else a.role
-            return (role, a.driver_id, a.expires_at)
+            return (role, a.driver_id, a.expires_at, a.company_id)
     return None
 
 
@@ -579,7 +666,7 @@ def enroll_bot_user(session: Session, telegram_chat_id: int, phone_number: str) 
     match = find_enrollment_by_phone(session, phone_number)
     if match is None:
         return None
-    role, driver_id, expires_at = match
+    role, driver_id, expires_at, company_id = match
     existing = session.execute(
         select(BotUser).where(BotUser.telegram_chat_id == telegram_chat_id)
     ).scalar_one_or_none()
@@ -588,7 +675,7 @@ def enroll_bot_user(session: Session, telegram_chat_id: int, phone_number: str) 
         session.flush()
     user = BotUser(
         telegram_chat_id=telegram_chat_id, role=role, driver_id=driver_id,
-        phone_number=phone_number, expires_at=expires_at,
+        phone_number=phone_number, expires_at=expires_at, company_id=company_id,
     )
     session.add(user)
     session.commit()
@@ -596,15 +683,30 @@ def enroll_bot_user(session: Session, telegram_chat_id: int, phone_number: str) 
     return user
 
 
+def get_bot_user(session: Session, user_id: UUID) -> BotUser | None:
+    return session.get(BotUser, user_id)
+
+
+def get_bot_authorization(session: Session, auth_id: UUID) -> BotAuthorization | None:
+    return session.get(BotAuthorization, auth_id)
+
+
 def create_bot_authorization(
     session: Session, phone_number: str, role: str = "driver",
-    driver_id: UUID | None = None, expires_at=None,
+    driver_id: UUID | None = None, expires_at=None, *, company_id: UUID | None = None,
 ) -> BotAuthorization:
     from sqlalchemy import delete as sa_delete
-    # One authorization per phone - supersede any prior so the table stays clean.
-    session.execute(sa_delete(BotAuthorization).where(BotAuthorization.phone_number == phone_number))
+    # One authorization per (company, phone) - supersede any prior within the same
+    # tenant so the table stays clean without touching another company's grants.
+    session.execute(
+        sa_delete(BotAuthorization).where(
+            BotAuthorization.phone_number == phone_number,
+            BotAuthorization.company_id == company_id,
+        )
+    )
     auth = BotAuthorization(
-        phone_number=phone_number, role=role, driver_id=driver_id, expires_at=expires_at
+        phone_number=phone_number, role=role, driver_id=driver_id,
+        expires_at=expires_at, company_id=company_id,
     )
     session.add(auth)
     session.commit()
@@ -612,16 +714,18 @@ def create_bot_authorization(
     return auth
 
 
-def list_bot_authorizations(session: Session) -> list[BotAuthorization]:
+def list_bot_authorizations(
+    session: Session, *, company_id: UUID | None = None
+) -> list[BotAuthorization]:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    return list(
-        session.execute(
-            select(BotAuthorization).where(
-                (BotAuthorization.expires_at.is_(None)) | (BotAuthorization.expires_at > now)
-            )
-        ).scalars()
+    stmt = select(BotAuthorization).where(
+        (BotAuthorization.expires_at.is_(None)) | (BotAuthorization.expires_at > now)
     )
+    # company_id is nullable on bot tables (writers land in Feature 3); only filter when given.
+    if company_id is not None:
+        stmt = stmt.where(BotAuthorization.company_id == company_id)
+    return list(session.execute(stmt).scalars())
 
 
 def delete_bot_authorization(session: Session, auth_id: UUID) -> str:
@@ -633,11 +737,154 @@ def delete_bot_authorization(session: Session, auth_id: UUID) -> str:
     return "ok"
 
 
-def set_config(session: Session, key: str, value: object) -> SystemConfig:
+# ---------------------------------------------------------------------------
+# Companies (system-admin managed)
+# ---------------------------------------------------------------------------
+
+def list_companies(session: Session) -> list[Company]:
+    return list(session.execute(select(Company).order_by(Company.name)).scalars())
+
+
+def get_company(session: Session, company_id: UUID) -> Company | None:
+    return session.get(Company, company_id)
+
+
+def create_company(session: Session, data: dict) -> Company:
+    company = Company(**data)
+    session.add(company)
+    session.commit()
+    session.refresh(company)
+    return company
+
+
+def update_company(session: Session, company_id: UUID, data: dict) -> Company | None:
+    company = session.get(Company, company_id)
+    if company is None:
+        return None
+    for key, value in data.items():
+        setattr(company, key, value)
+    session.commit()
+    session.refresh(company)
+    return company
+
+
+def delete_company(session: Session, company_id: UUID) -> bool:
+    company = session.get(Company, company_id)
+    if company is None:
+        return False
+    session.delete(company)
+    session.commit()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Company settings (per-tenant config; 1:1 with companies)
+# ---------------------------------------------------------------------------
+
+_UNSET = object()
+
+
+def get_company_settings(session: Session, company_id: UUID) -> CompanySettings | None:
+    return session.get(CompanySettings, company_id)
+
+
+def upsert_company_settings(
+    session: Session,
+    company_id: UUID,
+    *,
+    gdrive_folder_id=_UNSET,
+    gdrive_credentials_json=_UNSET,
+    feature_flags=_UNSET,
+) -> CompanySettings:
+    """Create-or-update the company's settings row, writing only provided fields."""
     from datetime import datetime, timezone
-    cfg = session.get(SystemConfig, key)
+
+    row = session.get(CompanySettings, company_id)
+    if row is None:
+        row = CompanySettings(company_id=company_id)
+        session.add(row)
+    if gdrive_folder_id is not _UNSET:
+        row.gdrive_folder_id = gdrive_folder_id
+    if gdrive_credentials_json is not _UNSET:
+        row.gdrive_credentials_json = gdrive_credentials_json
+    if feature_flags is not _UNSET:
+        row.feature_flags = feature_flags
+    row.updated_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def company_feature_enabled(session: Session, company_id: UUID, flag: str) -> bool:
+    """True when the company's feature_flags has ``flag`` truthy (default False)."""
+    row = session.get(CompanySettings, company_id)
+    if row is None or not row.feature_flags:
+        return False
+    return bool(row.feature_flags.get(flag, False))
+
+
+# ---------------------------------------------------------------------------
+# App users (credentialed identity; system-admin managed)
+# ---------------------------------------------------------------------------
+
+def list_app_users(session: Session) -> list[AppUser]:
+    return list(session.execute(select(AppUser).order_by(AppUser.email)).scalars())
+
+
+def get_app_user(session: Session, user_id: UUID) -> AppUser | None:
+    return session.get(AppUser, user_id)
+
+
+def get_app_user_by_email(session: Session, email: str) -> AppUser | None:
+    return session.execute(
+        select(AppUser).where(AppUser.email == email)
+    ).scalar_one_or_none()
+
+
+def create_app_user(session: Session, data: dict) -> AppUser:
+    data = dict(data)
+    data["password_hash"] = hash_password(data.pop("password"))
+    user = AppUser(**data)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def update_app_user(session: Session, user_id: UUID, data: dict) -> AppUser | None:
+    user = session.get(AppUser, user_id)
+    if user is None:
+        return None
+    data = dict(data)
+    password = data.pop("password", None)
+    if password is not None:
+        user.password_hash = hash_password(password)
+    for key, value in data.items():
+        setattr(user, key, value)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def delete_app_user(session: Session, user_id: UUID) -> bool:
+    user = session.get(AppUser, user_id)
+    if user is None:
+        return False
+    session.delete(user)
+    session.commit()
+    return True
+
+
+def set_config(
+    session: Session, key: str, value: object, company_id: UUID | None = None
+) -> SystemConfig:
+    from datetime import datetime, timezone
+    cfg = session.get(SystemConfig, (company_id, key))
     if cfg is None:
-        cfg = SystemConfig(config_key=key, config_value=value, updated_ts=datetime.now(timezone.utc))
+        cfg = SystemConfig(
+            company_id=company_id, config_key=key, config_value=value,
+            updated_ts=datetime.now(timezone.utc),
+        )
         session.add(cfg)
     else:
         cfg.config_value = value

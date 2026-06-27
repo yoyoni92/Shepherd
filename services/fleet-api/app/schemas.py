@@ -355,7 +355,7 @@ class ClockRequest(BaseModel):
 
 
 class ClockResponse(BaseModel):
-    result: str  # ok | already_in | no_open | blocked
+    result: str  # ok | already_in | no_open | blocked | disabled
     time: str | None = None
     hours: str | None = None
     window_start: str | None = None
@@ -369,6 +369,9 @@ class BotWhoamiResponse(BaseModel):
     driver_id: UUID | None = None
     driver_name: str | None = None
     user_id: UUID
+    company_id: UUID | None = None
+    # Lets the bot hide the clock button when the company has attendance disabled.
+    attendance_enabled: bool = False
 
 
 class BotEnrollRequest(BaseModel):
@@ -414,6 +417,81 @@ class BotUserRead(BaseModel):
 
 class UserRolePatch(BaseModel):
     role: str
+
+
+# --- Companies (system-admin only) ---
+
+class CompanyCreate(BaseModel):
+    name: str
+
+
+class CompanyUpdate(BaseModel):
+    name: str | None = None
+    is_active: bool | None = None
+
+
+class CompanyRead(BaseModel):
+    company_id: UUID
+    name: str
+    is_active: bool
+    created_at: datetime
+
+
+# --- Per-company settings (Drive + feature flags; system-admin only) ---
+
+class CompanySettingsRead(BaseModel):
+    company_id: UUID
+    gdrive_folder_id: str | None = None
+    # The raw credentials blob is a secret and is never returned - only whether it's set.
+    gdrive_configured: bool
+    feature_flags: dict = {}
+
+
+class CompanySettingsUpdate(BaseModel):
+    gdrive_folder_id: str | None = None
+    gdrive_credentials_json: str | None = None
+    feature_flags: dict | None = None
+
+
+# --- App users (credentialed identity; system-admin only) ---
+
+class AppUserCreate(BaseModel):
+    email: str
+    password: str
+    role: str  # admin | company_admin
+    company_id: UUID | None = None
+    name: str | None = None
+
+
+class AppUserUpdate(BaseModel):
+    password: str | None = None
+    is_active: bool | None = None
+    name: str | None = None
+
+
+class AppUserRead(BaseModel):
+    user_id: UUID
+    email: str
+    role: str
+    company_id: UUID | None = None
+    is_active: bool
+    name: str | None = None
+    created_at: datetime
+
+
+# --- Auth / login (channel-agnostic) ---
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    user: AppUserRead
+    token: str
+    # The user's company feature flags (empty for a system admin with no company), so the
+    # webui can gate nav without a round-trip.
+    feature_flags: dict = {}
 
 
 # --- KPI daily rollup ---

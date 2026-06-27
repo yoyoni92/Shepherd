@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import repo
-from app.auth import Action, assert_permitted
+from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db, verify_internal_token
 from app.schemas import (
     BotAuthorizationCreate,
@@ -35,11 +35,18 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
     if user.driver is not None and user.driver.status.value != "active":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
+    attendance_enabled = (
+        repo.company_feature_enabled(session, user.company_id, "attendance")
+        if user.company_id
+        else False
+    )
     return BotWhoamiResponse(
         role=user.role.value,
         driver_id=user.driver_id,
         driver_name=user.driver.full_name if user.driver else None,
         user_id=user.id,
+        company_id=user.company_id,
+        attendance_enabled=attendance_enabled,
     )
 
 
@@ -86,8 +93,10 @@ def create_authorization(body: BotAuthorizationCreate, session: Db, caller: Call
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
     if body.driver_id is not None and repo.get_driver(session, body.driver_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+    company_id = UUID(caller.company_id) if caller.company_id else None
     auth = repo.create_bot_authorization(
-        session, body.phone_number, body.role, body.driver_id, body.expires_at
+        session, body.phone_number, body.role, body.driver_id, body.expires_at,
+        company_id=company_id,
     )
     return _authz_read(auth)
 
@@ -99,7 +108,8 @@ def create_authorization(body: BotAuthorizationCreate, session: Db, caller: Call
 )
 def list_authorizations(session: Db, caller: Caller) -> list[BotAuthorizationRead]:
     assert_permitted(caller.role, Action.MANAGE_BOT_INVITES)
-    return [_authz_read(a) for a in repo.list_bot_authorizations(session)]
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    return [_authz_read(a) for a in repo.list_bot_authorizations(session, company_id=company_id)]
 
 
 @router.delete(
@@ -109,8 +119,11 @@ def list_authorizations(session: Db, caller: Caller) -> list[BotAuthorizationRea
 )
 def delete_authorization(auth_id: UUID, session: Db, caller: Caller) -> None:
     assert_permitted(caller.role, Action.MANAGE_BOT_INVITES)
-    if repo.delete_bot_authorization(session, auth_id) == "not_found":
+    auth = repo.get_bot_authorization(session, auth_id)
+    if auth is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Authorization not found")
+    assert_company(auth, caller)
+    repo.delete_bot_authorization(session, auth_id)
 
 
 def _user_read(u) -> BotUserRead:
@@ -135,7 +148,8 @@ def list_users(session: Db, caller: Caller, role: str | None = None) -> list[Bot
     assert_permitted(caller.role, Action.MANAGE_BOT_USERS)
     if role is not None and role not in ("admin", "driver"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
-    return [_user_read(u) for u in repo.list_bot_users(session, role)]
+    company_id = UUID(caller.company_id) if caller.company_id else None
+    return [_user_read(u) for u in repo.list_bot_users(session, role, company_id=company_id)]
 
 
 @router.patch(
@@ -145,7 +159,9 @@ def list_users(session: Db, caller: Caller, role: str | None = None) -> list[Bot
 )
 def update_user_role(user_id: UUID, body: UserRolePatch, session: Db, caller: Caller) -> BotUserRead:
     assert_permitted(caller.role, Action.MANAGE_BOT_USERS)
-    user = repo.update_bot_user_role(session, user_id, body.role)
-    if user is None:
+    existing = repo.get_bot_user(session, user_id)
+    if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert_company(existing, caller)
+    user = repo.update_bot_user_role(session, user_id, body.role)
     return _user_read(user)
