@@ -128,6 +128,159 @@ public stores)? Driver session lifetime / re-auth policy on mobile (the bot has 
 
 Run the existing `eval/` harness on every CI push against a golden fixture set; gate merges on pass rate >= 95%.
 
+### Free-Text Guardrails (bot input, enforced in Fleet API)
+
+**What**: Add input guardrails to the free-text the `services/telegram-bot` accepts from drivers and
+admins (vehicle-issue descriptions, broadcasts, detail updates, future chat), with the **enforcement
+authority living in `services/fleet-api`** so every channel - bot today, mobile app later - is
+validated the same way.
+
+**Why**: Today free text gets only `.strip()` in `telegram-bot/app/main.py:normalize_message`, then
+flows straight to the Fleet API (e.g. `flows/vehicle_issue.py`). Nothing checks length, language,
+injection attempts, abusive content, or PII before it is stored. Centralizing the rules in the
+Fleet API means the bot can give fast inline feedback while the backend stays the single source of
+truth no client can bypass.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Rule set | Length/empty bounds, allowed-script (Hebrew/Latin/digits) checks, profanity + abuse filter, prompt-injection heuristics, and PII redaction policy for free-text fields |
+| Fleet API enforcement | A shared validation/sanitization layer applied to every endpoint that accepts free text; reject with a structured error or store a sanitized value |
+| Bot pre-check | Lightweight client-side mirror in the bot for instant Hebrew feedback, but never the only gate |
+| Observability | Log rejected/redacted inputs (admin-only) for tuning thresholds |
+
+**Approach**:
+1. Define the rule set as a reusable validator in `libs/` or `fleet-api/app`, unit-tested against
+   Hebrew and edge-case inputs.
+2. Wire it into the Fleet API request path for all free-text endpoints.
+3. Add a thin mirror in the bot's `validate.py` for UX, delegating the authoritative verdict to the API.
+
+**Outcome**: no unbounded or unsafe free text reaches the database, and the same guardrails protect
+every current and future client because they live behind the Fleet API.
+
+---
+
+### Automatic Document Detection (incoming photos/files)
+
+**What**: Auto-detect the **type** of each incoming photo/document in the bot (vehicle license,
+insurance, driver license, ticket, accident photo, "other") instead of asking the admin to pick it
+from an inline keyboard.
+
+**Why**: `telegram-bot/app/flows/doc_scan.py` currently makes the user choose the document type
+manually before the Gemini scan, and `vision.py` ships a hardcoded prompt per type. Drivers sending
+a photo have no doc-type picker at all. Classifying the file first lets the right extraction prompt
+run automatically and routes the file to the correct flow.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Classifier | A first-pass Gemini-vision (or lightweight) call that labels the document type and confidence before extraction |
+| Routing | Map the detected type to the matching extraction prompt / flow; fall back to manual selection on low confidence |
+| Coverage | Handle photos and PDFs, single and multi-page, with graceful "unrecognized document" handling |
+| Validation | Cross-check detected type against the flow the user is in (e.g. reject a license when insurance was requested) |
+
+**Approach**:
+1. Add a classification step in front of the existing extraction in `doc_scan.py` / `vision.py`.
+2. Select the extraction prompt from the detected type; keep the manual picker as a low-confidence fallback.
+3. Extend the bot so a driver-sent photo is classified and routed without an admin in the loop.
+
+**Outcome**: documents are recognized and processed automatically, with manual selection reserved
+for ambiguous cases.
+
+---
+
+### Image/Document to PDF Converter
+
+**What**: A proper converter that turns incoming images and documents into normalized **PDFs**
+before they are stored in Google Drive.
+
+**Why**: Today files are uploaded as-is - `doc_scan.py` only checks `endswith(".pdf")` to set the
+MIME type and `fleet-api/app/drive.py` stores the original bytes. There is **no conversion**, so a
+glovebox photo of an insurance card and a real PDF live side by side in inconsistent formats, which
+hurts archival, multi-page handling, and downstream RAG over Drive files.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Conversion | JPEG/PNG/HEIC images and Office-style docs to PDF; combine multiple photos of one document into a single multi-page PDF |
+| Normalization | Sensible page sizing, orientation/auto-rotate, optional compression |
+| Pipeline placement | Convert after capture and before `drive.upload`, so Drive holds a consistent PDF per document |
+| Metadata | Preserve doc type, entity linkage, and original capture timestamp on the stored PDF |
+
+**Approach**:
+1. Add a conversion utility (Fleet API side, near `drive.py`) accepting image/doc bytes and emitting a PDF.
+2. Call it from the upload path so stored artifacts are uniformly PDF.
+3. Support batching several images into one PDF for multi-page documents.
+
+**Outcome**: every stored document is a consistent, archival-quality PDF, simplifying viewing,
+multi-page handling, and future Drive-files RAG.
+
+---
+
+### Gmail Insurance Listener
+
+**What**: A listener on a team Gmail inbox that watches for incoming **insurance** emails/attachments,
+extracts the insurance document, and feeds it into the same ingestion pipeline (detect to convert to
+extract to store, link to the right vehicle).
+
+**Why**: Insurance policies frequently arrive by email, not through the bot. There is **no Gmail
+integration anywhere** today (`fleet-api` only talks to Google Drive). Watching the inbox closes the
+gap so insurance renewals are captured automatically instead of relying on someone forwarding a photo
+to the bot.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Inbox watch | Gmail API push (Pub/Sub `watch`) or polling for messages matching insurer senders/subjects |
+| Filter + extract | Identify insurance mail, pull PDF/image attachments, run them through document detection + extraction |
+| Linkage | Match the policy to a vehicle (plate/policy number) and create/update the insurance record + `insurance_expiring` event |
+| Auth + safety | Service-account / OAuth setup, dedupe already-processed messages, quarantine unrecognized mail for admin review |
+
+**Approach**:
+1. Stand up Gmail API auth and a `watch`/poll loop in a small listener (Fleet API service or worker).
+2. Filter to insurance mail, extract attachments, and route them through the shared detect/convert/extract pipeline.
+3. Reconcile against vehicles and write the insurance record + expiry event, deduping by message id.
+
+**Outcome**: insurance documents that arrive by email are ingested automatically and kept in sync
+with each vehicle's insurance record, with no manual forwarding.
+
+---
+
+### Event Alert Pipeline
+
+**What**: A real alert/notification **pipeline** over the existing `events` table so that
+maintenance-due, license/insurance-expiring, ticket, accident, and vehicle-issue events reliably
+reach the right admins through one path.
+
+**Why**: Events are already modeled (`db/shepherd_db/models.py`, `fleet-api/app/routers/events.py`)
+and carry an unused `notified` boolean, but there is **no alerting service**: notifications happen
+only as ad-hoc direct Telegram sends inside individual flows (e.g. `flows/accident.py`). Time-based
+events (expiries, maintenance due) are never proactively pushed at all.
+
+**Scope**:
+
+| Layer | What |
+|-------|------|
+| Dispatcher | A service that scans for unnotified/triggered events and fans them out, flipping `notified` once delivered |
+| Channels | Telegram admin messages today; pluggable for email / mobile push (ties into the Mobile App's push) later |
+| Routing + severity | Map event type + severity to recipients and urgency; throttle/group to avoid spam |
+| Scheduling | A periodic job that generates time-based events (expiries, maintenance windows) and feeds them into the same pipeline |
+| Reliability | Idempotent delivery, retries, and an admin-visible delivery log |
+
+**Approach**:
+1. Build a dispatcher that consumes events and sets `notified` on successful delivery.
+2. Move the inline Telegram sends behind this single pipeline.
+3. Add a scheduled generator for expiry/maintenance events; design channels so mobile push slots in later.
+
+**Outcome**: one reliable, auditable path from event to alert - no missed expiries, no scattered
+notification code - and a foundation the mobile app's push notifications can reuse.
+
+---
+
 ### Drive-files RAG
 
 Build a retrieval-augmented chat over the team's Google Drive files, with a new webui chat

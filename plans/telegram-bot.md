@@ -106,10 +106,19 @@ CREATE TABLE bot_sessions (
 );
 ```
 
-`state` shape example (accident flow, step 3):
+`state` shape example (accident flow, mid-wizard):
 ```json
-{ "flow": "accident", "step": "awaiting_vehicle_clear", "accident_id": "uuid" }
+{
+  "flow": "accident",
+  "step": "awaiting_description",
+  "vehicle_id": "uuid",
+  "datetime": "2026-06-24T10:00:00+03:00",
+  "location": "32.0853,34.7818",
+  "attachments": []
+}
 ```
+The accident row is only created at the end (single `POST /accidents`), so no
+`accident_id` is held in the session; media accumulates in `attachments` instead.
 
 ### 1.4 - Extend `accident_attachment_category_enum`
 
@@ -313,91 +322,69 @@ Main menu (sent on `/start` or `🏠 תפריט ראשי`):
 
 ### Flow 4.3 - Accident Report (multi-step)
 
-State machine stored in `bot_sessions`. Steps:
+State machine stored in `bot_sessions`. Implemented in `app/flows/accident.py`;
+all bot copy lives in `app/texts.py` (the canonical source - referenced by
+constant name below rather than re-inlined, so the two cannot drift again).
 
-| Step key | Bot message | Wait for |
+| Step key | Bot message (`texts.py`) | Wait for |
 |---|---|---|
-| `start` | הודעת רגיעה (see below) | button: `✅ אני במקום בטוח ועצרתי` |
-| `awaiting_video` | בקשת סרטון (see below) | video upload -> S3 |
-| `awaiting_vehicle_clear` | פינוי רכב (see below) | button: `✅ הכביש פנוי` |
-| `awaiting_insurance_photo` | `📸 צלם את מסמך הביטוח של הצד השני` | photo -> S3 |
-| `awaiting_driver_license_photo` | `📸 צלם את רישיון הנהיגה של הצד השני` | photo -> S3 |
-| `awaiting_car_license_photo` | `📸 צלם את רישיון הרכב של הצד השני` | photo -> S3 |
-| `awaiting_manager_call` | הוראות התקשרות עם מנהל (see below) | button: `✅ דיברתי עם המנהל` |
-| `done` | סיכום + התראה לאדמינים | - |
+| _(entry `cmd_accident`)_ | guard `NO_VEHICLE` if the driver has no vehicle, else `ACCIDENT_SAFE_PROMPT` | - |
+| `awaiting_safe` | `ACCIDENT_SAFE_PROMPT` | inline button `accident_safe` (`ACCIDENT_SAFE_BUTTON`) |
+| `awaiting_location` | `ACCIDENT_LOCATION_PROMPT` | location share - reply button `ACCIDENT_LOCATION_BUTTON` (`request_location=True`) |
+| `awaiting_description` | `ACCIDENT_DESCRIPTION_PROMPT` | voice (-> Whisper STT) or text |
+| `awaiting_road_clear` | `ACCIDENT_ROAD_CLEAR_PROMPT` | inline button `accident_road_clear` (`ACCIDENT_ROAD_CLEAR_BUTTON`) |
+| `awaiting_insurance_photo` | `ACCIDENT_INSURANCE_PROMPT` | photo -> stored `another_driver_insurance` |
+| `awaiting_driver_license_photo` | `ACCIDENT_DRIVER_LICENSE_PROMPT` | photo -> stored `another_driver_license` |
+| `awaiting_car_license_photo` | `ACCIDENT_CAR_LICENSE_PROMPT` | photo -> stored `another_car_registration` |
+| `awaiting_area_videos` | `ACCIDENT_VIDEOS_PROMPT` (each: `ACCIDENT_VIDEO_RECEIVED`) | one or more videos (loop), then inline button `accident_videos_done` (`ACCIDENT_VIDEOS_DONE_BUTTON`) |
+| `awaiting_manager_call` | `ACCIDENT_MANAGER_PROMPT` | inline button `accident_manager_called` (`ACCIDENT_MANAGER_BUTTON`) |
+| _(done)_ | `ACCIDENT_COMPLETE` + admin notify | - |
 
-**Full Hebrew messages:**
+Order: safe -> location -> description -> road clear -> 3 document photos ->
+area video(s) loop -> submit -> manager call -> done. The location step uses
+Telegram's native location share (`KeyboardButton(request_location=True)`,
+mirroring the phone-share `request_contact` pattern) and is stored as a
+`"lat,lon"` string.
 
-Step `start`:
+**Current Hebrew copy** (from `app/texts.py`):
 ```
-🚨 דיווח תאונה
-
-קודם כל - תירגע/י. 🫁
-שתה/י מים, נשום/י עמוק.
-
-📍 עצור/י במקום בטוח בצד הדרך.
-🚫 אל תזיז/י את הרכב עדיין!
-
-כשאת/ה במקום בטוח ועצרת, לחץ/י להמשך:
-[✅ אני במקום בטוח ועצרתי]
-```
-
-Step `awaiting_video`:
-```
-📹 כעת צלם/י סרטון של האירוע.
-
-בסרטון:
-- הסבר/י מה קרה בתאונה
-- הראה/י את אזור התאונה
-- הראה/י את כל הרכבים המעורבים
-- הראה/י את הנזק לרכב שלך
-
-שלח/י את הסרטון כאן:
-```
-
-Step `awaiting_vehicle_clear`:
-```
-✅ הסרטון התקבל.
-
-🚗 כעת פנה/י את הכביש בצורה בטוחה
-   והזז/י את הרכב לצד.
-
-כשהכביש פנוי:
-[✅ הכביש פנוי]
+ACCIDENT_SAFE_PROMPT      🚨 קודם כל - את/ה בטוח/ה?\nודא/י שאת/ה במקום בטוח ועצרת, ואז המשך/י.
+ACCIDENT_SAFE_BUTTON      ✅ אני במקום בטוח ועצרתי
+ACCIDENT_LOCATION_PROMPT  📍 שתף/י את המיקום שלך כדי שנדע איפה קרתה התאונה.
+ACCIDENT_LOCATION_BUTTON  📍 שיתוף מיקום
+ACCIDENT_DESCRIPTION_PROMPT  🎙️ תאר/י את האירוע בהודעה קולית או בטקסט.
+ACCIDENT_ROAD_CLEAR_PROMPT   🚗 כשהכביש פנוי, לחץ/י על הכפתור.
+ACCIDENT_ROAD_CLEAR_BUTTON   ✅ הכביש פנוי
+ACCIDENT_INSURANCE_PROMPT      📸 צלם/י את מסמך הביטוח של הצד השני.
+ACCIDENT_DRIVER_LICENSE_PROMPT 📸 צלם/י את רישיון הנהיגה של הצד השני.
+ACCIDENT_CAR_LICENSE_PROMPT    📸 צלם/י את רישיון הרכב של הצד השני.
+ACCIDENT_VIDEOS_PROMPT    🎥 שלח/י סרטון/ים של זירת התאונה. בסיום לחץ/י על הכפתור.
+ACCIDENT_VIDEOS_DONE_BUTTON  ✅ סיום
+ACCIDENT_VIDEO_RECEIVED   ✅ הסרטון התקבל. שלח/י עוד, או לחץ/י על סיום.
+ACCIDENT_MANAGER_PROMPT   📞 צור/י קשר עם המנהל שלך עכשיו.
+ACCIDENT_MANAGER_BUTTON   ✅ דיברתי עם המנהל
+ACCIDENT_COMPLETE         ✅ דיווח התאונה הושלם. המנהלים קיבלו עדכון.
 ```
 
-Step `awaiting_manager_call`:
-```
-📞 צור/י קשר עם המנהל שלך עכשיו
-   ופעל/י לפי הנחיותיו.
-
-כשסיימת לדבר:
-[✅ דיברתי עם המנהל]
-```
-
-Step `done` (to driver):
-```
-✅ דיווח התאונה הושלם.
-המנהלים קיבלו עדכון.
-מספר דיווח: #<accident_id_short>
-```
-
-Admin DM (sent to ALL rows in `users` where `role = 'admin'`):
+Admin DM (`ACCIDENT_ADMIN_NOTIFY`, sent to every admin returned by
+`GET /users?role=admin` that has a `telegram_chat_id`):
 ```
 🚨 דיווח תאונה חדש
 
-נהג: <driver_name>
-רכב: <plate> - <make> <model>
-זמן: <datetime>
-מזהה: #<accident_id_short>
-
-קבצים: סרטון + 3 תמונות מסמכים
+נהג: {driver}
+זמן: {time}
 ```
 
-**DB writes during accident flow:**
-- On `start`: `INSERT INTO accidents (vehicle_id, driver_id, datetime)` -> get `accident_id`, save to session.
-- On video received: upload to S3 -> `INSERT INTO accident_attachments (accident_id, category='accident_video', file_url)`.
-- On each doc photo: `INSERT INTO accident_attachments` with matching category.
+**Persistence (via Fleet API, not direct DB writes):**
+- Each photo/video is uploaded to storage through the Fleet API (`POST /files`
+  -> Google Drive) as it arrives, and appended to the session's `attachments`
+  list as `{category, file_url}`.
+- On `accident_videos_done`, the bot makes a single `POST /accidents` with
+  `{vehicle_id, driver_id, datetime, location, description, attachments[]}`;
+  the Fleet API persists the accident plus its attachments and emits an
+  `accident_logged` event.
+- On manager-call confirmation the bot notifies the admins, then clears the
+  session.
 
 ### Flow 4.4 - Update Personal Details
 
