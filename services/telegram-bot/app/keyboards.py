@@ -48,9 +48,57 @@ def admin_menu() -> InlineKeyboardMarkup:
     )
 
 
+def sysadmin_menu() -> InlineKeyboardMarkup:
+    return _inline(
+        [
+            [(texts.SA_OVERVIEW_BTN, "sa_overview")],
+            [(texts.SA_DEBUG_BTN, "sa_debug")],
+            [(texts.SA_LIVE_BTN, "sa_live")],
+        ]
+    )
+
+
+def sa_debug_pick() -> InlineKeyboardMarkup:
+    return _inline(
+        [
+            [(texts.SA_DEBUG_DRIVER_BTN, "sa_dbg_driver")],
+            [(texts.SA_DEBUG_ADMIN_BTN, "sa_dbg_admin")],
+        ]
+    )
+
+
+def sa_live_role_pick() -> InlineKeyboardMarkup:
+    return _inline(
+        [
+            [(texts.SA_ROLE_ADMIN_BTN, "sa_role_admin")],
+            [(texts.SA_ROLE_DRIVER_BTN, "sa_role_driver")],
+        ]
+    )
+
+
+def sa_exit() -> InlineKeyboardMarkup:
+    return _inline([[(texts.SA_EXIT_BTN, "sa_exit")]])
+
+
+def with_exit(kb: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
+    """Append the always-available 'exit impersonation' row to a persona menu."""
+    kb.inline_keyboard.append(
+        [InlineKeyboardButton(text=texts.SA_EXIT_BTN, callback_data="sa_exit")]
+    )
+    return kb
+
+
 def request_contact() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=texts.CLAIM_SHARE_BUTTON, request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def request_location() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=texts.ACCIDENT_LOCATION_BUTTON, request_location=True)]],
         resize_keyboard=True,
         one_time_keyboard=True,
     )

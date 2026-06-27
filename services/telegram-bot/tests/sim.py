@@ -21,6 +21,7 @@ from aiogram.types import (
     Contact,
     Document,
     File,
+    Location,
     Message,
     PhotoSize,
     Update,
@@ -126,6 +127,10 @@ class TelegramSim:
     async def share_contact(self, chat_id: int, phone: str) -> None:
         contact = Contact(phone_number=phone, user_id=chat_id, first_name="user")
         await self._feed(message=self._message(chat_id, contact=contact))
+
+    async def share_location(self, chat_id: int, lat: float, lon: float) -> None:
+        loc = Location(latitude=lat, longitude=lon)
+        await self._feed(message=self._message(chat_id, location=loc))
 
     async def voice(self, chat_id: int) -> None:
         await self._feed(

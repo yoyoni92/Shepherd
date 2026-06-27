@@ -4,19 +4,25 @@ from __future__ import annotations
 
 from app import commands, keyboards, texts
 from app.context import Ctx
+from app.flows.sysadmin import banner
 from app.tg import send
 
 
 async def menu(ctx: Ctx, route: str | None) -> None:
+    # System Admin, not impersonating: the operator's own cross-company menu.
+    if ctx.is_system_admin and not ctx.impersonation:
+        await send(ctx, texts.SYSADMIN_MENU_TITLE, reply_markup=keyboards.sysadmin_menu())
+        return
     await commands.apply(ctx.bot, ctx.chat_id, ctx.role, ctx.attendance_enabled)
     if ctx.role == "admin":
-        await send(ctx, texts.ADMIN_MENU_TITLE, reply_markup=keyboards.admin_menu())
+        title, kb = texts.ADMIN_MENU_TITLE, keyboards.admin_menu()
     else:
-        await send(
-            ctx,
-            texts.DRIVER_MENU_TITLE,
-            reply_markup=keyboards.driver_menu(ctx.attendance_enabled),
-        )
+        title, kb = texts.DRIVER_MENU_TITLE, keyboards.driver_menu(ctx.attendance_enabled)
+    # While impersonating, prefix the persistent banner + offer the exit control.
+    if ctx.impersonation:
+        title = f"{banner(ctx.impersonation)}\n\n{title}"
+        kb = keyboards.with_exit(kb)
+    await send(ctx, title, reply_markup=kb)
 
 
 async def access_denied(ctx: Ctx, route: str | None) -> None:

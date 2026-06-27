@@ -22,14 +22,25 @@ def store(monkeypatch):
         return dict(data.get(chat_id, {}))
 
     async def set_state(chat_id, state):
+        # Mirror prod: a sticky impersonation context survives flow-state writes.
+        if "impersonation" not in state and "impersonation" in data.get(chat_id, {}):
+            state = {**state, "impersonation": data[chat_id]["impersonation"]}
         data[chat_id] = dict(state)
 
     async def clear_state(chat_id):
+        imp = data.get(chat_id, {}).get("impersonation")
+        if imp is not None:
+            data[chat_id] = {"impersonation": imp}
+        else:
+            data.pop(chat_id, None)
+
+    async def exit_impersonation(chat_id):
         data.pop(chat_id, None)
 
     monkeypatch.setattr(sessions, "get_state", get_state)
     monkeypatch.setattr(sessions, "set_state", set_state)
     monkeypatch.setattr(sessions, "clear_state", clear_state)
+    monkeypatch.setattr(sessions, "exit_impersonation", exit_impersonation)
     return data
 
 

@@ -28,6 +28,8 @@ class Ctx:
     document_name: str | None = None
     contact_phone: str | None = None
     contact_user_id: int | None = None
+    location_lat: float | None = None
+    location_lon: float | None = None
     sender_id: int | None = None
     is_start: bool = False
     start_token: str | None = None
@@ -54,6 +56,17 @@ class Ctx:
     def attendance_enabled(self) -> bool:
         """Whether the user's company has the attendance feature flag on (default off)."""
         return bool(self.whoami.get("attendance_enabled")) if self.whoami else False
+
+    @property
+    def is_system_admin(self) -> bool:
+        """The platform operator (System Admin). False once whoami is rewritten to a
+        persona, so the system-admin menu only shows when not impersonating."""
+        return bool(self.whoami.get("is_system_admin")) if self.whoami else False
+
+    @property
+    def impersonation(self) -> dict[str, Any] | None:
+        """Active impersonation context (Feature 6), or None when acting as oneself."""
+        return self.state.get("impersonation")
 
     @property
     def flow(self) -> str | None:

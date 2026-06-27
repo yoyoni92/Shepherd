@@ -1,7 +1,8 @@
 """Flow 4.3 - Accident report wizard.
 
-Steps: safe -> description (voice via Whisper, or text) -> road clear -> 3 document
-photos -> area video(s) loop -> POST /accidents -> manager call -> notify admins.
+Steps: safe -> location (driver shares it via Telegram) -> description (voice via
+Whisper, or text) -> road clear -> 3 document photos -> area video(s) loop ->
+POST /accidents -> manager call -> notify admins.
 All media is stored as attachments (Fleet API -> Drive); none is run through an LLM
 (only the voice description is transcribed).
 """
@@ -64,6 +65,13 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "accident_safe":
+        ctx.state["step"] = "awaiting_location"
+        await sessions.set_state(ctx.chat_id, ctx.state)
+        await send(ctx, texts.ACCIDENT_LOCATION_PROMPT, reply_markup=keyboards.request_location())
+        return
+
+    if route == "accident_location":
+        ctx.state["location"] = f"{ctx.location_lat},{ctx.location_lon}"
         ctx.state["step"] = "awaiting_description"
         await sessions.set_state(ctx.chat_id, ctx.state)
         await send(ctx, texts.ACCIDENT_DESCRIPTION_PROMPT)
@@ -132,6 +140,7 @@ async def accident(ctx: Ctx, route: str | None) -> None:
                 "vehicle_id": ctx.state["vehicle_id"],
                 "driver_id": ctx.driver_id,
                 "datetime": ctx.state["datetime"],
+                "location": ctx.state.get("location"),
                 "description": ctx.state.get("description"),
                 "attachments": ctx.state.get("attachments", []),
             },

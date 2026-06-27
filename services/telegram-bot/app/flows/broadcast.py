@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app import keyboards, sessions, texts
 from app.context import Ctx
+from app.flows.sysadmin import audit
 from app.tg import send, send_dice
 
 
@@ -35,6 +36,10 @@ async def broadcast(ctx: Ctx, route: str | None) -> None:
 
     if route == "broadcast_send":
         message = ctx.state.get("message", "")
+        # Broadcast-to-all is the bot's one destructive action; its confirm step is the
+        # yes/no guard, so a Customer-Live confirmed send is recorded in the audit trail.
+        if ctx.impersonation:
+            await audit(ctx, ctx.impersonation, "write", detail="broadcast")
         for chat in ctx.state.get("recipients", []):
             await ctx.bot.send_message(chat, message, parse_mode="HTML")
         await sessions.clear_state(ctx.chat_id)

@@ -45,8 +45,17 @@ async def get_state(chat_id: int) -> dict[str, Any]:
 
 
 async def set_state(chat_id: int, state: dict[str, Any]) -> None:
-    """Upsert the full state for a chat."""
+    """Upsert the full state for a chat.
+
+    A System-Admin impersonation context (Feature 6) is sticky: it survives a flow's
+    own state writes so the operator stays in-persona across multi-step flows, unless
+    the new state explicitly carries its own ``impersonation`` key.
+    """
     assert _pool is not None, "pool not opened"
+    if "impersonation" not in state:
+        existing = await get_state(chat_id)
+        if "impersonation" in existing:
+            state = {**state, "impersonation": existing["impersonation"]}
     async with _pool.connection() as conn:
         await conn.execute(
             "INSERT INTO bot_sessions (chat_id, state, updated_at) VALUES (%s, %s::jsonb, now()) "
@@ -56,6 +65,23 @@ async def set_state(chat_id: int, state: dict[str, Any]) -> None:
 
 
 async def clear_state(chat_id: int) -> None:
+    """Clear a chat's flow state. An active impersonation context is preserved (use the
+    Feature 6 exit path to leave it); otherwise the row is removed."""
+    assert _pool is not None, "pool not opened"
+    existing = await get_state(chat_id)
+    imp = existing.get("impersonation")
+    async with _pool.connection() as conn:
+        if imp is not None:
+            await conn.execute(
+                "UPDATE bot_sessions SET state = %s::jsonb, updated_at = now() WHERE chat_id = %s",
+                (json.dumps({"impersonation": imp}), chat_id),
+            )
+        else:
+            await conn.execute("DELETE FROM bot_sessions WHERE chat_id = %s", (chat_id,))
+
+
+async def exit_impersonation(chat_id: int) -> None:
+    """Leave System-Admin impersonation: drop the whole session row (Feature 6 exit)."""
     assert _pool is not None, "pool not opened"
     async with _pool.connection() as conn:
         await conn.execute("DELETE FROM bot_sessions WHERE chat_id = %s", (chat_id,))

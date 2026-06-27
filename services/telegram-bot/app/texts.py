@@ -45,7 +45,46 @@ WELCOME = {"driver": WELCOME_DRIVER, "admin": WELCOME_ADMIN}
 
 # Menus
 DRIVER_MENU_TITLE = "תפריט נהג - מה תרצה/י לעשות?"
-ADMIN_MENU_TITLE = "תפריט מנהל - מה תרצה/י לעשות?"
+ADMIN_MENU_TITLE = "תפריט מנהל חברה - מה תרצה/י לעשות?"
+
+# --- System Admin (Feature 6) ---
+SYSADMIN_MENU_TITLE = "👑 תפריט מנהל מערכת - מה תרצה/י לעשות?"
+SA_OVERVIEW_BTN = "📊 סקירת מערכת"
+SA_DEBUG_BTN = "🛠 מצב דיבאג"
+SA_LIVE_BTN = "🎭 לקוח חי"
+# Overview
+SA_OVERVIEW_TITLE = "📊 סקירת מערכת"
+SA_OVERVIEW_EMPTY = "אין חברות להצגה."
+SA_OVERVIEW_LINE = (
+    "🏢 {name}\n"
+    "   רכבים: {vehicles} · נהגים: {drivers} · אירועים פתוחים: {events}\n"
+    "   נוכחות: {attendance} · Drive: {drive}"
+)
+SA_ON = "פעיל"
+SA_OFF = "כבוי"
+# Debug
+SA_DEBUG_PICK = "🛠 מצב דיבאג (Playground) - כפרסונה של מי לפעול?"
+SA_DEBUG_DRIVER_BTN = "🚗 נהג (Playground)"
+SA_DEBUG_ADMIN_BTN = "🛠 מנהל (Playground)"
+SA_NO_PLAYGROUND = "⚠️ חברת ה-Playground אינה מוגדרת."
+SA_NO_DRIVERS = "⚠️ לא נמצאו נהגים."
+SA_NO_COMPANIES = "⚠️ אין חברות זמינות."
+SA_DEBUG_ACK = "🛠 נכנסת למצב דיבאג כ{persona} ב-Playground. הפעולות אינן אמיתיות."
+# Customer Live
+SA_LIVE_PICK_COMPANY = "🎭 לקוח חי - בחר/י חברה:"
+SA_LIVE_PICK_ROLE = "🎭 {company} - כפרסונה של מי לפעול?"
+SA_ROLE_ADMIN_BTN = "🛠 מנהל חברה"
+SA_ROLE_DRIVER_BTN = "🚗 נהג"
+SA_LIVE_PICK_DRIVER = "🎭 {company} - בחר/י נהג:"
+SA_LIVE_PICK_ADMIN = "🎭 {company} - בחר/י מנהל:"
+SA_LIVE_ACK = "🎭 אתה פועל כעת כ{persona} · {company}.\n⚠️ הפעולות אמיתיות ומתועדות."
+# Banner + exit
+SA_BANNER_LIVE = "🎭 פועל כ{persona} · {company}"
+SA_BANNER_DEBUG = "🛠 Playground"
+SA_PERSONA_ADMIN = "מנהל חברה"
+SA_PERSONA_DRIVER = "נהג"
+SA_EXIT_BTN = "🚪 צא ממצב התחזות"
+SA_EXITED = "✅ יצאת ממצב התחזות."
 
 # Clock
 CLOCK_IN_OK = "✅ כניסה נרשמה בשעה {time}."
@@ -64,6 +103,8 @@ NO_VEHICLE = "לא נמצא רכב המשויך אליך."
 # Accident
 ACCIDENT_SAFE_PROMPT = "🚨 קודם כל - את/ה בטוח/ה?\n" "ודא/י שאת/ה במקום בטוח ועצרת, ואז המשך/י."
 ACCIDENT_SAFE_BUTTON = "✅ אני במקום בטוח ועצרתי"
+ACCIDENT_LOCATION_PROMPT = "📍 שתף/י את המיקום שלך כדי שנדע איפה קרתה התאונה."
+ACCIDENT_LOCATION_BUTTON = "📍 שיתוף מיקום"
 ACCIDENT_DESCRIPTION_PROMPT = "🎙️ תאר/י את האירוע בהודעה קולית או בטקסט."
 ACCIDENT_ROAD_CLEAR_PROMPT = "🚗 כשהכביש פנוי, לחץ/י על הכפתור."
 ACCIDENT_ROAD_CLEAR_BUTTON = "✅ הכביש פנוי"

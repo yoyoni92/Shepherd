@@ -268,6 +268,8 @@ async def test_driver_accident_full_wizard(sim, rec, mock_api, monkeypatch):
     await sim.tap(DRIVER_CHAT, "accident_start")
     assert texts.ACCIDENT_SAFE_PROMPT in rec.sent_texts()
     await sim.tap(DRIVER_CHAT, "accident_safe")
+    assert texts.ACCIDENT_LOCATION_PROMPT in rec.sent_texts()
+    await sim.share_location(DRIVER_CHAT, 32.0853, 34.7818)  # accident scene
     await sim.text(DRIVER_CHAT, "פגעתי בעמוד")  # description via text
     await sim.tap(DRIVER_CHAT, "accident_road_clear")
     await sim.photo(DRIVER_CHAT)  # other driver's insurance
@@ -279,6 +281,7 @@ async def test_driver_accident_full_wizard(sim, rec, mock_api, monkeypatch):
 
     sent = body_of(accident)
     assert sent["vehicle_id"] == "v1"
+    assert sent["location"] == "32.0853,34.7818"
     assert sent["description"] == "פגעתי בעמוד"
     assert len(sent["attachments"]) == 4  # 3 photos + 1 video
 
@@ -297,6 +300,7 @@ async def test_driver_accident_description_via_voice(sim, rec, mock_api, monkeyp
     )
     await sim.tap(DRIVER_CHAT, "accident_start")
     await sim.tap(DRIVER_CHAT, "accident_safe")
+    await sim.share_location(DRIVER_CHAT, 32.0853, 34.7818)
     await sim.voice(DRIVER_CHAT)
     # Whisper transcript becomes the description; flow advances to the road-clear step.
     assert texts.ACCIDENT_ROAD_CLEAR_PROMPT in rec.sent_texts()

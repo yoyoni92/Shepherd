@@ -12,6 +12,7 @@ from app.flows.doc_scan import doc_scan
 from app.flows.fleet_summary import fleet_summary
 from app.flows.maintenance import maintenance
 from app.flows.my_vehicle import my_vehicle
+from app.flows.sysadmin import sysadmin
 from app.flows.update_details import update_details
 from app.flows.update_driver import update_driver
 from app.flows.vehicle_issue import vehicle_issue
@@ -32,4 +33,5 @@ FEATURES = {
     "update_driver": update_driver,
     "maintenance": maintenance,
     "doc_scan": doc_scan,
+    "sysadmin": sysadmin,
 }

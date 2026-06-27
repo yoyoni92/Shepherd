@@ -29,6 +29,14 @@ CALLBACK_MAP: dict[str, tuple[str, str]] = {
     "doc_scan": ("doc_scan", "cmd_doc_scan"),
     "maint_overdue": ("maintenance", "cmd_maint_overdue"),
     "maint_log": ("maintenance", "cmd_maint_log"),
+    # System admin (Feature 6)
+    "sa_overview": ("sysadmin", "overview"),
+    "sa_debug": ("sysadmin", "debug_menu"),
+    "sa_dbg_driver": ("sysadmin", "debug_driver"),
+    "sa_dbg_admin": ("sysadmin", "debug_admin"),
+    "sa_live": ("sysadmin", "live_start"),
+    "sa_exit": ("sysadmin", "exit"),
+    "exit": ("sysadmin", "exit"),
 }
 
 FLOW_TO_FEATURE: dict[str, str] = {
@@ -39,6 +47,7 @@ FLOW_TO_FEATURE: dict[str, str] = {
     "update_driver": "update_driver",
     "maint_log": "maintenance",
     "doc_scan": "doc_scan",
+    "sa_live": "sysadmin",
 }
 
 # Features requiring a specific role (the Fleet API enforces too; this gates the bot UX).
@@ -67,6 +76,8 @@ def active_route(ctx: Ctx) -> str | None:
     if flow == "accident":
         if step == "awaiting_safe" and cb == "accident_safe":
             return "accident_safe"
+        if step == "awaiting_location" and ctx.location_lat is not None:
+            return "accident_location"
         if step == "awaiting_description" and (ctx.voice_id or text):
             return "accident_description"
         if step == "awaiting_road_clear" and cb == "accident_road_clear":
@@ -130,6 +141,17 @@ def active_route(ctx: Ctx) -> str | None:
             return "maint_log_km"
         return None
 
+    if flow == "sa_live":
+        if step == "pick_company" and cb and cb.startswith("sa_co_"):
+            return "live_pick_company"
+        if step == "pick_role" and cb in ("sa_role_admin", "sa_role_driver"):
+            return "live_pick_role"
+        if step == "pick_driver" and cb and cb.startswith("sa_drv_"):
+            return "live_pick_driver"
+        if step == "pick_admin" and cb and cb.startswith("sa_adm_"):
+            return "live_pick_admin"
+        return None
+
     if flow == "doc_scan":
         if step == "awaiting_type" and cb and cb.startswith("ds_type_"):
             return "doc_scan_type"
@@ -175,9 +197,28 @@ async def dispatch(raw: dict, bot, fleet: FleetClient) -> None:
     chat_id = raw["chat_id"]
     whoami = await fleet.whoami(chat_id)
     state = await sessions.get_state(chat_id)
-    # Bind the per-update client to the acting user's company so every downstream
-    # flow call is tenant-scoped automatically (whoami/enroll stay company-less).
-    scoped = fleet.for_company(whoami.get("company_id")) if whoami else fleet
+    # System-admin impersonation (Feature 6): when a session carries an impersonation
+    # context, rewrite whoami to the effective persona so every existing menu/feature/
+    # flow/role path runs as that persona unchanged, and bind the per-update client to
+    # the effective company + operator id so Customer-Live writes are auditable.
+    imp = state.get("impersonation") if whoami else None
+    if imp:
+        whoami = {
+            "role": imp["role"],
+            "driver_id": imp.get("driver_id"),
+            "driver_name": imp.get("driver_name"),
+            "company_id": imp.get("company_id"),
+            "attendance_enabled": imp.get("attendance_enabled", True),
+        }
+        scoped = fleet.for_company(imp.get("company_id")).as_impersonator(
+            imp.get("operator_id")
+        )
+    elif whoami:
+        # Bind the per-update client to the acting user's company so every downstream
+        # flow call is tenant-scoped automatically (whoami/enroll stay company-less).
+        scoped = fleet.for_company(whoami.get("company_id"))
+    else:
+        scoped = fleet
     ctx = Ctx(
         chat_id=chat_id,
         bot=bot,
@@ -195,6 +236,8 @@ async def dispatch(raw: dict, bot, fleet: FleetClient) -> None:
         document_name=raw.get("document_name"),
         contact_phone=raw.get("contact_phone"),
         contact_user_id=raw.get("contact_user_id"),
+        location_lat=raw.get("location_lat"),
+        location_lon=raw.get("location_lon"),
         sender_id=raw.get("sender_id"),
         is_start=raw.get("is_start", False),
         start_token=raw.get("start_token"),

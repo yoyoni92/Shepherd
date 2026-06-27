@@ -46,6 +46,9 @@ def normalize_message(m: Message) -> dict:
     if m.contact:
         raw["contact_phone"] = m.contact.phone_number
         raw["contact_user_id"] = m.contact.user_id
+    if m.location:
+        raw["location_lat"] = m.location.latitude
+        raw["location_lon"] = m.location.longitude
     return raw
 
 

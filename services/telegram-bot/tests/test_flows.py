@@ -190,6 +190,32 @@ async def test_flow_call_carries_company_id(store, bot, fleet, mock_api):
 # --- Accident: voice and text both fill description; submit posts it ---
 
 
+async def test_accident_safe_requests_location_then_stores_it(store, bot, fleet, mock_api):
+    store[7] = {
+        "flow": "accident",
+        "step": "awaiting_safe",
+        "vehicle_id": "v1",
+        "datetime": "2026-06-24T10:00:00",
+        "attachments": [],
+    }
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=whoami_response("driver", "d1"))
+    # Confirming safety advances to the location step (not straight to the description).
+    await dispatch(
+        {"chat_id": 7, "sender_id": 7, "is_callback": True, "callback_data": "accident_safe"},
+        bot,
+        fleet,
+    )
+    assert store[7]["step"] == "awaiting_location"
+    # Sharing the location stores "lat,lon" and advances to the description step.
+    await dispatch(
+        {"chat_id": 7, "sender_id": 7, "location_lat": 32.0853, "location_lon": 34.7818},
+        bot,
+        fleet,
+    )
+    assert store[7]["location"] == "32.0853,34.7818"
+    assert store[7]["step"] == "awaiting_description"
+
+
 async def test_accident_description_via_text(store, bot, fleet, mock_api):
     store[8] = {
         "flow": "accident",
@@ -389,3 +415,215 @@ async def test_update_driver_license_apply_patches_driver(store, bot, fleet, moc
     assert texts.UPDATE_DRIVER_DONE in sent_texts(bot)
     assert 41 not in store
     bot.send_dice.assert_awaited_once()
+
+
+# --- Feature 6: System Admin (overview / debug / customer-live impersonation) ---
+
+OPERATOR_ID = "op-1"
+LIVE_CO = "00000000-0000-0000-0000-0000000000c9"
+PLAYGROUND = "00000000-0000-0000-0000-0000000000aa"
+
+
+def sysadmin_whoami(playground: str | None = PLAYGROUND) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "role": "admin",
+            "driver_id": None,
+            "driver_name": None,
+            "user_id": OPERATOR_ID,
+            "company_id": None,
+            "attendance_enabled": False,
+            "is_system_admin": True,
+            "playground_company_id": playground,
+        },
+    )
+
+
+def live_imp(role: str = "admin", **extra) -> dict:
+    imp = {
+        "mode": "live",
+        "role": role,
+        "company_id": LIVE_CO,
+        "company_name": "Acme",
+        "operator_id": OPERATOR_ID,
+        "effective_id": "x1",
+        "attendance_enabled": True,
+    }
+    imp.update(extra)
+    return imp
+
+
+async def test_system_admin_menu_shown(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    await dispatch({"chat_id": 60, "sender_id": 60, "text": "hi"}, bot, fleet)
+    assert texts.SYSADMIN_MENU_TITLE in sent_texts(bot)
+    assert menu_callbacks(bot) == ["sa_overview", "sa_debug", "sa_live"]
+
+
+async def test_overview_uses_system_admin_context(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    route = mock_api.get(f"{FLEET}/sysadmin/overview").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "companies": [
+                    {
+                        "company_id": LIVE_CO,
+                        "name": "Acme",
+                        "vehicle_count": 3,
+                        "driver_count": 5,
+                        "open_event_count": 1,
+                        "attendance_enabled": True,
+                        "gdrive_configured": False,
+                    }
+                ]
+            },
+        )
+    )
+    await dispatch(
+        {"chat_id": 61, "sender_id": 61, "is_callback": True, "callback_data": "sa_overview"},
+        bot,
+        fleet,
+    )
+    # The overview reads as the company-less system admin (no company_id, no impersonator).
+    assert caller_ctx(route) == {"role": "admin"}
+    assert any("Acme" in t for t in sent_texts(bot))
+
+
+async def test_enter_debug_binds_playground_persona(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    mock_api.get(f"{FLEET}/sysadmin/companies/{PLAYGROUND}/drivers").mock(
+        return_value=httpx.Response(200, json=[{"driver_id": "pd1", "full_name": "Playground 1"}])
+    )
+    audit = mock_api.post(f"{FLEET}/sysadmin/impersonation-audit").mock(
+        return_value=httpx.Response(201, json={"status": "ok"})
+    )
+    await dispatch(
+        {"chat_id": 62, "sender_id": 62, "is_callback": True, "callback_data": "sa_dbg_driver"},
+        bot,
+        fleet,
+    )
+    imp = store[62]["impersonation"]
+    assert imp["mode"] == "debug"
+    assert imp["role"] == "driver"
+    assert imp["company_id"] == PLAYGROUND
+    assert imp["driver_id"] == "pd1"
+    assert not audit.called  # Debug is unaudited
+
+
+async def test_enter_live_sets_context_and_posts_start_audit(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    mock_api.get(f"{FLEET}/sysadmin/companies").mock(
+        return_value=httpx.Response(200, json=[{"company_id": LIVE_CO, "name": "Acme"}])
+    )
+    mock_api.get(f"{FLEET}/sysadmin/companies/{LIVE_CO}/drivers").mock(
+        return_value=httpx.Response(200, json=[{"driver_id": "d9", "full_name": "Live Driver"}])
+    )
+    audit = mock_api.post(f"{FLEET}/sysadmin/impersonation-audit").mock(
+        return_value=httpx.Response(201, json={"status": "ok"})
+    )
+
+    def cb(data):
+        return {"chat_id": 63, "sender_id": 63, "is_callback": True, "callback_data": data}
+
+    await dispatch(cb("sa_live"), bot, fleet)
+    await dispatch(cb(f"sa_co_{LIVE_CO}"), bot, fleet)
+    await dispatch(cb("sa_role_driver"), bot, fleet)
+    await dispatch(cb("sa_drv_d9"), bot, fleet)
+
+    imp = store[63]["impersonation"]
+    assert imp["mode"] == "live"
+    assert imp == {
+        "mode": "live",
+        "role": "driver",
+        "company_id": LIVE_CO,
+        "company_name": "Acme",
+        "driver_id": "d9",
+        "driver_name": "Live Driver",
+        "effective_id": "d9",
+        "operator_id": OPERATOR_ID,
+        "attendance_enabled": True,
+    }
+    assert audit.called
+    # Audit POSTs use the system-admin caller (operator id, no company scope).
+    assert caller_ctx(audit) == {"role": "admin", "impersonator": OPERATOR_ID}
+    body = last_body(audit)
+    assert body["action"] == "start"
+    assert body["effective_role"] == "driver"
+    assert body["company_id"] == LIVE_CO
+    assert body["effective_id"] == "d9"
+
+
+async def test_exit_posts_stop_audit_and_clears(store, bot, fleet, mock_api):
+    store[64] = {"impersonation": live_imp(role="admin")}
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    audit = mock_api.post(f"{FLEET}/sysadmin/impersonation-audit").mock(
+        return_value=httpx.Response(201, json={"status": "ok"})
+    )
+    await dispatch(
+        {"chat_id": 64, "sender_id": 64, "is_callback": True, "callback_data": "sa_exit"},
+        bot,
+        fleet,
+    )
+    assert audit.called
+    assert last_body(audit)["action"] == "stop"
+    assert caller_ctx(audit) == {"role": "admin", "impersonator": OPERATOR_ID}
+    assert 64 not in store  # impersonation fully cleared
+    assert texts.SA_EXITED in sent_texts(bot)
+
+
+async def test_impersonated_driver_call_carries_impersonator(store, bot, fleet, mock_api):
+    store[65] = {"impersonation": live_imp(role="driver", driver_id="d9", effective_id="d9")}
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    route = mock_api.post(f"{FLEET}/attendance/clock-in").mock(
+        return_value=httpx.Response(200, json={"result": "ok", "time": "08:00"})
+    )
+    await dispatch(
+        {"chat_id": 65, "sender_id": 65, "is_callback": True, "callback_data": "clock_in"},
+        bot,
+        fleet,
+    )
+    assert caller_ctx(route) == {
+        "role": "admin",
+        "company_id": LIVE_CO,
+        "impersonator": OPERATOR_ID,
+    }
+
+
+async def test_live_destructive_broadcast_audits_write(store, bot, fleet, mock_api):
+    store[66] = {
+        "flow": "broadcast",
+        "step": "awaiting_confirm",
+        "message": "hi",
+        "recipients": [111],
+        "impersonation": live_imp(role="admin"),
+    }
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    audit = mock_api.post(f"{FLEET}/sysadmin/impersonation-audit").mock(
+        return_value=httpx.Response(201, json={"status": "ok"})
+    )
+    await dispatch(
+        {"chat_id": 66, "sender_id": 66, "is_callback": True, "callback_data": "broadcast_confirm"},
+        bot,
+        fleet,
+    )
+    assert audit.called
+    assert last_body(audit)["action"] == "write"
+    assert last_body(audit)["detail"] == "broadcast"
+    assert texts.BROADCAST_SENT in sent_texts(bot)
+
+
+async def test_live_non_destructive_does_not_audit(store, bot, fleet, mock_api):
+    store[67] = {"impersonation": live_imp(role="admin")}
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    mock_api.get(f"{FLEET}/kpi/daily").mock(return_value=httpx.Response(200, json=[]))
+    audit = mock_api.post(f"{FLEET}/sysadmin/impersonation-audit").mock(
+        return_value=httpx.Response(201, json={"status": "ok"})
+    )
+    await dispatch(
+        {"chat_id": 67, "sender_id": 67, "is_callback": True, "callback_data": "admin_summary"},
+        bot,
+        fleet,
+    )
+    assert not audit.called
