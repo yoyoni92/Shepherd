@@ -57,6 +57,16 @@ const ACCIDENTS = [
   },
 ]
 
+const COMPANIES = [
+  { company_id: 'co1', name: 'ברירת מחדל', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { company_id: 'co2', name: 'מובילי הדרום', is_active: false, created_at: '2026-02-01T00:00:00Z' },
+]
+
+const APP_USERS = [
+  { user_id: 'au1', email: 'admin@fleetops.io', role: 'admin', company_id: null, is_active: true, name: 'מנהל', created_at: '2026-01-01T00:00:00Z' },
+  { user_id: 'au2', email: 'ca@co1.io', role: 'company_admin', company_id: 'co1', is_active: true, name: 'מנהל חברה', created_at: '2026-01-02T00:00:00Z' },
+]
+
 const CONFIG = [
   { config_key: 'license_expiring_days', config_value: 30, description: 'days ahead to warn on רישוי' },
   { config_key: 'insurance_expiring_days', config_value: 30, description: 'days ahead to warn on insurance' },
@@ -143,6 +153,49 @@ export const handlers = [
     const body = (await request.json()) as { config_value: unknown }
     return HttpResponse.json({ config_key: params.key, config_value: body.config_value, description: null })
   }),
+
+  // Companies (system-admin only)
+  http.get(`${FLEET}/companies`, () => HttpResponse.json(COMPANIES)),
+  http.post(`${FLEET}/companies`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ company_id: 'co99', is_active: true, created_at: '2026-06-26T00:00:00Z', ...body }, { status: 201 })
+  }),
+  http.patch(`${FLEET}/companies/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ company_id: params.id, name: 'n', is_active: true, created_at: '2026-06-26T00:00:00Z', ...body })
+  }),
+  http.delete(`${FLEET}/companies/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  // Per-company settings (Drive credentials redacted to gdrive_configured + feature flags)
+  http.get(`${FLEET}/companies/:id/settings`, ({ params }) =>
+    HttpResponse.json({
+      company_id: params.id,
+      gdrive_folder_id: 'folder-1',
+      gdrive_configured: true,
+      feature_flags: { attendance: false },
+    }),
+  ),
+  http.patch(`${FLEET}/companies/:id/settings`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({
+      company_id: params.id,
+      gdrive_folder_id: (body.gdrive_folder_id as string) ?? null,
+      gdrive_configured: true,
+      feature_flags: (body.feature_flags as Record<string, unknown>) ?? {},
+    })
+  }),
+
+  // App users (system-admin only)
+  http.get(`${FLEET}/app-users`, () => HttpResponse.json(APP_USERS)),
+  http.post(`${FLEET}/app-users`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ user_id: 'au99', is_active: true, created_at: '2026-06-26T00:00:00Z', ...body }, { status: 201 })
+  }),
+  http.patch(`${FLEET}/app-users/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ user_id: params.id, email: 'e@x.io', role: 'company_admin', company_id: 'co1', is_active: true, name: null, created_at: '2026-06-26T00:00:00Z', ...body })
+  }),
+  http.delete(`${FLEET}/app-users/:id`, () => new HttpResponse(null, { status: 204 })),
 
   // System health aggregator (same-origin Next route)
   http.get('*/api/health', () =>

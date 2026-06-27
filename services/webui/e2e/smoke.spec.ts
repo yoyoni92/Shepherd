@@ -19,9 +19,9 @@ test('login and navigate all sections without error', async ({ page }) => {
     'events',
     'attendance',
     'maintenance-types',
+    'accidents',
     'config',
     'health',
-    'chat',
   ]
   for (const path of sections) {
     await page.goto(`/${path}`)

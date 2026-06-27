@@ -2,56 +2,27 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
-import {
-  LayoutDashboard,
-  Truck,
-  User,
-  Building2,
-  TriangleAlert,
-  CalendarCheck,
-  Wrench,
-  Settings,
-  Activity,
-  LogOut,
-  Bot,
-  ShieldAlert,
-  type LucideIcon,
-} from 'lucide-react'
+import { signOut, useSession } from 'next-auth/react'
+import { Truck, LogOut } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
 import { useCustomers } from '@/hooks/useCustomers'
 import { useEvents } from '@/hooks/useEvents'
-import { useAccidents } from '@/hooks/useAccidents'
 import { useHealth } from '@/hooks/useHealth'
 import { openCount } from '@/lib/events'
 import { summarizeHealth, type Overall } from '@/lib/health'
-
-type NavItem = { href: string; label: string; Icon: LucideIcon; badge?: 'vehicles' | 'drivers' | 'customers' | 'events' | 'accidents'; statusDot?: boolean }
-
-const NAV: NavItem[] = [
-  { href: '/dashboard', label: 'לוח בקרה', Icon: LayoutDashboard },
-  { href: '/vehicles', label: 'רכבים', Icon: Truck, badge: 'vehicles' },
-  { href: '/drivers', label: 'נהגים', Icon: User, badge: 'drivers' },
-  { href: '/customers', label: 'לקוחות', Icon: Building2, badge: 'customers' },
-  { href: '/events', label: 'משימות', Icon: TriangleAlert, badge: 'events' },
-  { href: '/accidents', label: 'תאונות', Icon: ShieldAlert, badge: 'accidents' },
-  { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck },
-  { href: '/bot', label: 'ניהול בוט', Icon: Bot },
-  { href: '/maintenance-types', label: 'סוגי טיפול', Icon: Wrench },
-  { href: '/config', label: 'הגדרות', Icon: Settings },
-  { href: '/health', label: 'מצב מערכת', Icon: Activity, statusDot: true },
-]
+import { filterNav, NAV } from '@/lib/nav'
 
 const HEALTH_DOT: Record<Overall, string> = { ok: '#34d399', degraded: '#fbbf24', down: '#f87171' }
 
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const nav = filterNav(NAV, session?.user?.role, session?.user?.feature_flags)
   const { vehicles } = useVehicles()
   const { drivers } = useDrivers()
   const { customers } = useCustomers()
   const { events } = useEvents()
-  const { accidents } = useAccidents()
   const { services } = useHealth()
   const healthColor = HEALTH_DOT[summarizeHealth(services)]
   const counts: Record<string, number> = {
@@ -59,7 +30,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     drivers: drivers.length,
     customers: customers.length,
     events: openCount(events),
-    accidents: accidents.length,
   }
 
   return (
@@ -81,7 +51,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ href, label, Icon, badge, statusDot }) => {
+        {nav.map(({ href, label, Icon, badge, statusDot }) => {
           const active = pathname === href || pathname?.startsWith(href + '/')
           const count = badge ? counts[badge] : undefined
           return (

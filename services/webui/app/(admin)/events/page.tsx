@@ -4,6 +4,8 @@ import { useEvents } from '@/hooks/useEvents'
 import { sortEvents } from '@/lib/events'
 import { EventRow } from '@/components/EventRow'
 import { EVENT_TYPE_LABEL, SEVERITY_META, EVENT_STATUS_META } from '@/components/meta'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { AccidentsPanel } from '@/components/AccidentsPanel'
 
 const ANY = ''
 
@@ -61,27 +63,38 @@ export default function EventsPage() {
   )
 
   return (
-    <div className="animate-fade-up" style={{ maxWidth: 980 }}>
-      <div className="flex items-center gap-2.5 mb-4 flex-wrap">
-        <Select value={type} onChange={setType} placeholder="כל הסוגים" options={labelOptions(EVENT_TYPE_LABEL)} />
-        <Select value={severity} onChange={setSeverity} placeholder="כל החומרות" options={metaOptions(SEVERITY_META)} />
-        <Select value={status} onChange={setStatus} placeholder="כל הסטטוסים" options={metaOptions(EVENT_STATUS_META)} />
-        <Select
-          value={vehicle}
-          onChange={setVehicle}
-          placeholder="כל הרכבים"
-          options={vehicleIds.map((id) => ({ value: id, label: id }))}
-        />
-        <div className="flex-1" />
-        <span className="text-[13px] text-faint font-semibold">{filtered.length} משימות</span>
-      </div>
+    <Tabs defaultValue="events" className="animate-fade-up" style={{ maxWidth: 980 }}>
+      <TabsList className="mb-4">
+        <TabsTrigger value="events">משימות</TabsTrigger>
+        <TabsTrigger value="accidents">תאונות</TabsTrigger>
+      </TabsList>
 
-      <div className="flex flex-col gap-[11px]">
-        {filtered.length === 0 && <div className="text-[13px] text-faint">אין משימות תואמות</div>}
-        {filtered.map((e) => (
-          <EventRow key={e.event_id} e={e} />
-        ))}
-      </div>
-    </div>
+      <TabsContent value="events">
+        <div className="flex items-center gap-2.5 mb-4 flex-wrap">
+          <Select value={type} onChange={setType} placeholder="כל הסוגים" options={labelOptions(EVENT_TYPE_LABEL)} />
+          <Select value={severity} onChange={setSeverity} placeholder="כל החומרות" options={metaOptions(SEVERITY_META)} />
+          <Select value={status} onChange={setStatus} placeholder="כל הסטטוסים" options={metaOptions(EVENT_STATUS_META)} />
+          <Select
+            value={vehicle}
+            onChange={setVehicle}
+            placeholder="כל הרכבים"
+            options={vehicleIds.map((id) => ({ value: id, label: id }))}
+          />
+          <div className="flex-1" />
+          <span className="text-[13px] text-faint font-semibold">{filtered.length} משימות</span>
+        </div>
+
+        <div className="flex flex-col gap-[11px]">
+          {filtered.length === 0 && <div className="text-[13px] text-faint">אין משימות תואמות</div>}
+          {filtered.map((e) => (
+            <EventRow key={e.event_id} e={e} />
+          ))}
+        </div>
+      </TabsContent>
+
+      <TabsContent value="accidents">
+        <AccidentsPanel />
+      </TabsContent>
+    </Tabs>
   )
 }

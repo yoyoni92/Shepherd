@@ -12,6 +12,17 @@ import {
   BotUserReadSchema,
   BotAuthorizationReadSchema,
   AccidentReadSchema,
+  CompanyReadSchema,
+  CompanySettingsReadSchema,
+  AppUserReadSchema,
+  type CompanyRead,
+  type CompanyCreate,
+  type CompanyUpdate,
+  type CompanySettingsRead,
+  type CompanySettingsUpdate,
+  type AppUserRead,
+  type AppUserCreate,
+  type AppUserUpdate,
   type VehicleRead,
   type MaintenanceTypeCreate,
   type VehicleCreate,
@@ -151,4 +162,47 @@ export const fetchAccidents = () => get('/accidents', z.array(AccidentReadSchema
 export const createAccident = (a: AccidentCreate): Promise<{ accident_id: string }> =>
   send('POST', '/accidents', a, z.object({ accident_id: z.string() }))
 
+// Companies (system-admin only)
+export const fetchCompanies = (): Promise<CompanyRead[]> => get('/companies', z.array(CompanyReadSchema))
+export const createCompany = (c: CompanyCreate): Promise<CompanyRead> =>
+  send('POST', '/companies', c, CompanyReadSchema)
+export const updateCompany = (companyId: string, patch: CompanyUpdate): Promise<CompanyRead> =>
+  send('PATCH', `/companies/${companyId}`, patch, CompanyReadSchema)
+export const deleteCompany = (companyId: string) => send('DELETE', `/companies/${companyId}`, undefined)
+
+// Per-company settings (Drive + feature flags). Reads never expose the credentials blob.
+export const fetchCompanySettings = (companyId: string): Promise<CompanySettingsRead> =>
+  get(`/companies/${companyId}/settings`, CompanySettingsReadSchema)
+// Surfaces the server's validate-then-persist 400 detail (e.g. "Drive folder not accessible: ...").
+export async function updateCompanySettings(
+  companyId: string,
+  patch: CompanySettingsUpdate,
+): Promise<CompanySettingsRead> {
+  const res = await fetch(`${BASE}/companies/${companyId}/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    let detail = `Fleet API PATCH /companies/${companyId}/settings: ${res.status}`
+    try {
+      const body = await res.json()
+      if (body?.detail) detail = body.detail
+    } catch {
+      /* no JSON body */
+    }
+    throw new Error(detail)
+  }
+  return CompanySettingsReadSchema.parse(await res.json())
+}
+
+// App users / login management (system-admin only)
+export const fetchAppUsers = (): Promise<AppUserRead[]> => get('/app-users', z.array(AppUserReadSchema))
+export const createAppUser = (u: AppUserCreate): Promise<AppUserRead> =>
+  send('POST', '/app-users', u, AppUserReadSchema)
+export const updateAppUser = (userId: string, patch: AppUserUpdate): Promise<AppUserRead> =>
+  send('PATCH', `/app-users/${userId}`, patch, AppUserReadSchema)
+export const deleteAppUser = (userId: string) => send('DELETE', `/app-users/${userId}`, undefined)
+
 export type { VehicleRead, DriverRead, EventRead, ReportRead, BotUserRead, BotAuthorizationRead }
+export type { CompanyRead, AppUserRead }

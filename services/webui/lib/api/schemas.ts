@@ -171,6 +171,64 @@ export const BotAuthorizationReadSchema = z.object({
 })
 export type BotAuthorizationRead = z.infer<typeof BotAuthorizationReadSchema>
 
+// ───────────────────────── Companies + app users (system-admin only) ─────────────────────────
+
+export const CompanyReadSchema = z.object({
+  company_id: z.string(),
+  name: z.string(),
+  is_active: z.boolean(),
+  created_at: z.string(),
+})
+export type CompanyRead = z.infer<typeof CompanyReadSchema>
+
+export interface CompanyCreate {
+  name: string
+}
+export interface CompanyUpdate {
+  name?: string
+  is_active?: boolean
+}
+
+// Per-company settings (Drive + feature flags). The raw credentials blob is never
+// returned by reads - only `gdrive_configured` tells the UI whether it is set.
+export const CompanySettingsReadSchema = z.object({
+  company_id: z.string(),
+  gdrive_folder_id: z.string().nullish(),
+  gdrive_configured: z.boolean(),
+  feature_flags: z.record(z.unknown()),
+})
+export type CompanySettingsRead = z.infer<typeof CompanySettingsReadSchema>
+
+export interface CompanySettingsUpdate {
+  gdrive_folder_id?: string | null
+  gdrive_credentials_json?: string | null // write-only; never read back
+  feature_flags?: Record<string, unknown> | null
+}
+
+export const AppUserReadSchema = z.object({
+  user_id: z.string(),
+  email: z.string(),
+  role: z.string(), // admin | company_admin
+  company_id: z.string().nullish(),
+  is_active: z.boolean(),
+  name: z.string().nullish(),
+  created_at: z.string(),
+})
+export type AppUserRead = z.infer<typeof AppUserReadSchema>
+
+export interface AppUserCreate {
+  email: string
+  password: string
+  role: string
+  company_id?: string | null
+  name?: string | null
+}
+export interface AppUserUpdate {
+  password?: string
+  is_active?: boolean
+  name?: string | null
+}
+
 // ───────────────────────── UI view models ─────────────────────────
 // Component-facing shapes. Fields the backend does not provide are nullable
 // and render as "—" (tracked in API_ALIGNMENT.md gaps C1/C2).

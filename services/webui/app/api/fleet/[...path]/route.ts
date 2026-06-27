@@ -1,25 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { cookies } from 'next/headers'
 import { authOptions } from '@/lib/auth'
+import { buildCallerContext } from '@/lib/callerContext'
 
 // Server-only Fleet API base (never exposed to the browser).
 const FLEET_BASE = process.env.FLEET_API_URL ?? process.env.NEXT_PUBLIC_FLEET_API_URL ?? 'http://localhost:8000'
 const INTERNAL_TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? ''
 
-// The admin console always acts as the admin caller; ownership scope is enforced server-side.
-const CALLER_CONTEXT = JSON.stringify({ role: 'admin' })
-
 async function forward(req: NextRequest, path: string[]) {
-  // Admin-only: every Fleet call is gated by the NextAuth session.
+  // Every Fleet call is gated by the NextAuth session.
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  // Caller context is derived from the session: a company_admin is locked to its own
+  // company; a system admin is scoped to the active company chosen in the switcher.
+  const active = (await cookies()).get('active_company_id')?.value
+  const callerContext = buildCallerContext(session.user, active)
 
   const search = req.nextUrl.search
   const url = `${FLEET_BASE}/${path.join('/')}${search}`
 
   const headers: Record<string, string> = {
     'X-Internal-Token': INTERNAL_TOKEN,
-    'X-Caller-Context': CALLER_CONTEXT,
+    'X-Caller-Context': callerContext,
   }
   const contentType = req.headers.get('content-type')
   if (contentType) headers['Content-Type'] = contentType

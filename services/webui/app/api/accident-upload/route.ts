@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { cookies } from 'next/headers'
 import { authOptions } from '@/lib/auth'
+import { buildCallerContext } from '@/lib/callerContext'
 import { randomUUID } from 'crypto'
 
 // Server-only Fleet API base (never exposed to the browser); Fleet owns storage.
@@ -20,9 +22,13 @@ export async function POST(req: NextRequest) {
   upload.append('key', key)
   upload.append('file', file, file.name)
 
+  // /files now resolves the target company from the caller context (per-tenant Drive).
+  const active = (await cookies()).get('active_company_id')?.value
+  const callerContext = buildCallerContext(session.user, active)
+
   const res = await fetch(`${FLEET_BASE}/files`, {
     method: 'POST',
-    headers: { 'X-Internal-Token': INTERNAL_TOKEN },
+    headers: { 'X-Internal-Token': INTERNAL_TOKEN, 'X-Caller-Context': callerContext },
     body: upload,
     cache: 'no-store',
   })

@@ -1,12 +1,13 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Menu, Search, Bell } from 'lucide-react'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useDrivers } from '@/hooks/useDrivers'
 import { useEvents } from '@/hooks/useEvents'
+import { useCompanies } from '@/hooks/useCompanies'
 import { sortEvents, openCount } from '@/lib/events'
 import { initials, fmtDate } from '@/lib/domain'
 import { SEVERITY_META, EVENT_TYPE_LABEL } from '@/components/meta'
@@ -27,11 +28,49 @@ function useTitle(): [string, string] {
     'maintenance-types': ['סוגי טיפול', 'קטלוג מחזורי טיפול לרכבים'],
     config: ['הגדרות מערכת', 'עריכת ספי התראה ותחזוקה'],
     health: ['מצב מערכת', 'זמינות שירותי הצד השלישי בזמן אמת'],
-    chat: ['צ׳אט ועוזר חכם', 'שתי מערכות שיחה נפרדות'],
-    assistant: ['עוזר כללי', 'עוזר Ollama ללא גישה לנתונים'],
     upload: ['העלאת מסמכים', 'ערוץ קליטה דרך הקונסולה'],
   }
   return map[seg] ?? ['ניהול צי רכב', '']
+}
+
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return ''
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+  return m ? decodeURIComponent(m[1]) : ''
+}
+
+// System-admin company switcher: selecting a company sets the `active_company_id`
+// cookie (cleared for "all"), which the Fleet proxy reads into X-Caller-Context.
+function CompanySwitcher() {
+  const router = useRouter()
+  const { companies } = useCompanies()
+  const [active, setActive] = useState(() => getCookie('active_company_id'))
+
+  const onChange = (value: string) => {
+    setActive(value === 'all' ? '' : value)
+    document.cookie =
+      value === 'all'
+        ? 'active_company_id=; path=/; max-age=0; samesite=lax'
+        : `active_company_id=${encodeURIComponent(value)}; path=/; max-age=31536000; samesite=lax`
+    router.refresh()
+  }
+
+  return (
+    <select
+      aria-label="בחירת חברה פעילה"
+      value={active || 'all'}
+      onChange={(e) => onChange(e.target.value)}
+      className="bg-bg border border-control rounded-[9px] text-[13px] text-ink outline-none focus:border-accent"
+      style={{ padding: '9px 12px', maxWidth: 200 }}
+    >
+      <option value="all">כל החברות</option>
+      {companies.map((c) => (
+        <option key={c.company_id} value={c.company_id}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 export function Topbar({ onToggle }: { onToggle: () => void }) {
@@ -39,7 +78,9 @@ export function Topbar({ onToggle }: { onToggle: () => void }) {
   const { data: session } = useSession()
   const { events } = useEvents()
   const [notifOpen, setNotifOpen] = useState(false)
+  const role = session?.user?.role
   const name = session?.user?.name ?? 'אבי כהן'
+  const roleLabel = role === 'company_admin' ? 'מנהל חברה' : 'מנהל מערכת'
 
   const open = sortEvents(events.filter((e) => e.status === 'open')).slice(0, 6)
   const openTotal = openCount(events)
@@ -63,6 +104,7 @@ export function Topbar({ onToggle }: { onToggle: () => void }) {
         <div className="text-[11.5px] text-faint">{sub}</div>
       </div>
       <div className="flex-1" />
+      {role === 'admin' && <CompanySwitcher />}
       <div className="relative flex items-center">
         <Search size={15} className="absolute right-[11px] text-dim" />
         <input
@@ -147,7 +189,7 @@ export function Topbar({ onToggle }: { onToggle: () => void }) {
         </div>
         <div className="leading-[1.25]">
           <div className="text-[13px] font-bold">{name}</div>
-          <div className="text-[11px] text-faint">מנהל מערכת</div>
+          <div className="text-[11px] text-faint">{roleLabel}</div>
         </div>
       </div>
     </header>

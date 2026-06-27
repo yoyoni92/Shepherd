@@ -10,9 +10,11 @@ import { plate as plateGuard, nonNegInt } from '@/lib/validation'
 import { VEHICLE_TYPES, VEHICLE_TYPE_LABEL } from '@/lib/vehicleTypes'
 import type { UiVehicle, VehicleCreate } from '@/lib/api/schemas'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { SortChips, nextDir, type SortState } from '@/components/SortChips'
 import { VehicleCard } from '@/components/VehicleCard'
 import { EntityFormModal, type FieldDef, type FormValues } from '@/components/EntityFormModal'
+import { MaintenanceTypesPanel } from '@/components/MaintenanceTypesPanel'
 
 type VKey = 'plate' | 'title' | 'insurance' | 'license' | 'km' | 'customer'
 
@@ -106,27 +108,38 @@ export default function VehiclesPage() {
   }
 
   return (
-    <div className="animate-fade-up">
-      <div className="flex items-center justify-between gap-4 mb-[18px] flex-wrap">
-        <SortChips fields={FIELDS} sort={sort} onSort={(k) => setSort((s) => nextDir(s, k))} />
-        <Button onClick={() => setForm({ mode: 'add' })}>
-          <Plus size={16} strokeWidth={2.4} />
-          הוסף רכב
-        </Button>
-      </div>
+    <Tabs defaultValue="vehicles" className="animate-fade-up">
+      <TabsList className="mb-[18px]">
+        <TabsTrigger value="vehicles">רכבים</TabsTrigger>
+        <TabsTrigger value="maintenance-types">סוגי טיפול</TabsTrigger>
+      </TabsList>
 
-      <div className="grid gap-[15px]" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(330px,1fr))' }}>
-        {sorted.map((v) => (
-          <VehicleCard
-            key={v.id}
-            v={v}
-            driverName={v.driverId ? driverById[v.driverId] : undefined}
-            customerName={v.customerId ? customerById[v.customerId] : undefined}
-            onEdit={() => setForm({ mode: 'edit', v })}
-            onRemove={() => remove(v.id)}
-          />
-        ))}
-      </div>
+      <TabsContent value="vehicles">
+        <div className="flex items-center justify-between gap-4 mb-[18px] flex-wrap">
+          <SortChips fields={FIELDS} sort={sort} onSort={(k) => setSort((s) => nextDir(s, k))} />
+          <Button onClick={() => setForm({ mode: 'add' })}>
+            <Plus size={16} strokeWidth={2.4} />
+            הוסף רכב
+          </Button>
+        </div>
+
+        <div className="grid gap-[15px]" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(330px,1fr))' }}>
+          {sorted.map((v) => (
+            <VehicleCard
+              key={v.id}
+              v={v}
+              driverName={v.driverId ? driverById[v.driverId] : undefined}
+              customerName={v.customerId ? customerById[v.customerId] : undefined}
+              onEdit={() => setForm({ mode: 'edit', v })}
+              onRemove={() => remove(v.id)}
+            />
+          ))}
+        </div>
+      </TabsContent>
+
+      <TabsContent value="maintenance-types">
+        <MaintenanceTypesPanel />
+      </TabsContent>
 
       {form && (
         <EntityFormModal
@@ -138,6 +151,6 @@ export default function VehiclesPage() {
           onClose={() => setForm(null)}
         />
       )}
-    </div>
+    </Tabs>
   )
 }
