@@ -212,6 +212,8 @@ export const AppUserReadSchema = z.object({
   company_id: z.string().nullish(),
   is_active: z.boolean(),
   name: z.string().nullish(),
+  is_system_admin: z.boolean(),
+  phone_number: z.string().nullable(),
   created_at: z.string(),
 })
 export type AppUserRead = z.infer<typeof AppUserReadSchema>
@@ -222,11 +224,15 @@ export interface AppUserCreate {
   role: string
   company_id?: string | null
   name?: string | null
+  is_system_admin?: boolean
+  phone_number?: string | null
 }
 export interface AppUserUpdate {
   password?: string
   is_active?: boolean
   name?: string | null
+  is_system_admin?: boolean
+  phone_number?: string | null
 }
 
 // ───────────────────────── UI view models ─────────────────────────

@@ -11,8 +11,48 @@ describe('useAppUsers', () => {
   it('lists app users (no password_hash leaks)', async () => {
     const { result } = renderHook(() => useAppUsers(), { wrapper: QueryClientWrapper })
     await waitFor(() => expect(result.current.users.length).toBeGreaterThan(0))
-    expect(result.current.users[0]).toMatchObject({ user_id: 'au1', email: 'admin@fleetops.io', role: 'admin' })
+    expect(result.current.users[0]).toMatchObject({
+      user_id: 'au1',
+      email: 'admin@fleetops.io',
+      role: 'admin',
+      is_system_admin: true,
+      phone_number: '+972500000000',
+    })
+    expect(result.current.users[1]).toMatchObject({ is_system_admin: false, phone_number: null })
     expect(Object.keys(result.current.users[0])).not.toContain('password_hash')
+  })
+
+  it('creates a system admin (no company, phone) with is_system_admin in the payload', async () => {
+    let createdBody: Record<string, unknown> | null = null
+    server.use(
+      http.post(`${FLEET}/app-users`, async ({ request }) => {
+        createdBody = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json(
+          { user_id: 'au100', is_active: true, created_at: '2026-06-26T00:00:00Z', ...createdBody },
+          { status: 201 },
+        )
+      }),
+    )
+    const { result } = renderHook(() => useAppUsers(), { wrapper: QueryClientWrapper })
+    await waitFor(() => expect(result.current.users.length).toBeGreaterThan(0))
+    await act(async () => {
+      await result.current.add({
+        email: 'sa@fleetops.io',
+        password: 'pw',
+        role: 'admin',
+        company_id: null,
+        is_system_admin: true,
+        phone_number: '+972511111111',
+      })
+    })
+    await waitFor(() =>
+      expect(createdBody).toMatchObject({
+        role: 'admin',
+        company_id: null,
+        is_system_admin: true,
+        phone_number: '+972511111111',
+      }),
+    )
   })
 
   it('creates a company_admin, resets password, toggles active and deletes', async () => {
@@ -22,11 +62,11 @@ describe('useAppUsers', () => {
     server.use(
       http.post(`${FLEET}/app-users`, async ({ request }) => {
         createdBody = (await request.json()) as Record<string, unknown>
-        return HttpResponse.json({ user_id: 'au99', is_active: true, created_at: '2026-06-26T00:00:00Z', ...createdBody }, { status: 201 })
+        return HttpResponse.json({ user_id: 'au99', is_active: true, is_system_admin: false, phone_number: null, created_at: '2026-06-26T00:00:00Z', ...createdBody }, { status: 201 })
       }),
       http.patch(`${FLEET}/app-users/:id`, async ({ params, request }) => {
         patchedBody = (await request.json()) as Record<string, unknown>
-        return HttpResponse.json({ user_id: params.id, email: 'e@x.io', role: 'company_admin', company_id: 'co1', is_active: true, name: null, created_at: '2026-06-26T00:00:00Z', ...patchedBody })
+        return HttpResponse.json({ user_id: params.id, email: 'e@x.io', role: 'company_admin', company_id: 'co1', is_active: true, name: null, is_system_admin: false, phone_number: null, created_at: '2026-06-26T00:00:00Z', ...patchedBody })
       }),
       http.delete(`${FLEET}/app-users/:id`, () => {
         deleted = true

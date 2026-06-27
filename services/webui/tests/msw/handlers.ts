@@ -63,8 +63,8 @@ const COMPANIES = [
 ]
 
 const APP_USERS = [
-  { user_id: 'au1', email: 'admin@fleetops.io', role: 'admin', company_id: null, is_active: true, name: 'מנהל', created_at: '2026-01-01T00:00:00Z' },
-  { user_id: 'au2', email: 'ca@co1.io', role: 'company_admin', company_id: 'co1', is_active: true, name: 'מנהל חברה', created_at: '2026-01-02T00:00:00Z' },
+  { user_id: 'au1', email: 'admin@fleetops.io', role: 'admin', company_id: null, is_active: true, name: 'מנהל', is_system_admin: true, phone_number: '+972500000000', created_at: '2026-01-01T00:00:00Z' },
+  { user_id: 'au2', email: 'ca@co1.io', role: 'company_admin', company_id: 'co1', is_active: true, name: 'מנהל חברה', is_system_admin: false, phone_number: null, created_at: '2026-01-02T00:00:00Z' },
 ]
 
 const CONFIG = [
@@ -189,11 +189,11 @@ export const handlers = [
   http.get(`${FLEET}/app-users`, () => HttpResponse.json(APP_USERS)),
   http.post(`${FLEET}/app-users`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>
-    return HttpResponse.json({ user_id: 'au99', is_active: true, created_at: '2026-06-26T00:00:00Z', ...body }, { status: 201 })
+    return HttpResponse.json({ user_id: 'au99', is_active: true, is_system_admin: false, phone_number: null, created_at: '2026-06-26T00:00:00Z', ...body }, { status: 201 })
   }),
   http.patch(`${FLEET}/app-users/:id`, async ({ params, request }) => {
     const body = (await request.json()) as Record<string, unknown>
-    return HttpResponse.json({ user_id: params.id, email: 'e@x.io', role: 'company_admin', company_id: 'co1', is_active: true, name: null, created_at: '2026-06-26T00:00:00Z', ...body })
+    return HttpResponse.json({ user_id: params.id, email: 'e@x.io', role: 'company_admin', company_id: 'co1', is_active: true, name: null, is_system_admin: false, phone_number: null, created_at: '2026-06-26T00:00:00Z', ...body })
   }),
   http.delete(`${FLEET}/app-users/:id`, () => new HttpResponse(null, { status: 204 })),
 

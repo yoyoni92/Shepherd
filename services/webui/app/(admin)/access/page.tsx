@@ -25,6 +25,8 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const [name, setName] = useState('')
   const [role, setRole] = useState<'admin' | 'company_admin'>('company_admin')
   const [companyId, setCompanyId] = useState('')
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -34,9 +36,14 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
     setName('')
     setRole('company_admin')
     setCompanyId('')
+    setIsSystemAdmin(false)
+    setPhoneNumber('')
     setErr(null)
     onClose()
   }
+
+  // A system admin has no company and is always role=admin.
+  const effectiveRole = isSystemAdmin ? 'admin' : role
 
   const submit = async () => {
     setErr(null)
@@ -44,7 +51,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
       setErr('יש להזין דוא״ל וסיסמה')
       return
     }
-    if (role === 'company_admin' && !companyId) {
+    if (!isSystemAdmin && effectiveRole === 'company_admin' && !companyId) {
       setErr('יש לבחור חברה למנהל חברה')
       return
     }
@@ -53,9 +60,11 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
       await add({
         email: email.trim(),
         password: password.trim(),
-        role,
+        role: effectiveRole,
         name: name.trim() || null,
-        company_id: role === 'company_admin' ? companyId : null,
+        company_id: isSystemAdmin || effectiveRole !== 'company_admin' ? null : companyId,
+        is_system_admin: isSystemAdmin,
+        phone_number: phoneNumber.trim() || null,
       })
       close()
     } catch {
@@ -98,22 +107,42 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
               style={fieldStyle}
             />
           </div>
+          <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSystemAdmin}
+              onChange={(e) => setIsSystemAdmin(e.target.checked)}
+            />
+            מנהל מערכת
+          </label>
           <div className="flex flex-col gap-2">
-            <label className="text-[12px] font-semibold text-faint">תפקיד</label>
-            <div className="flex gap-2">
-              <Button variant={role === 'admin' ? 'primary' : 'secondary'} size="sm" onClick={() => setRole('admin')}>
-                מנהל מערכת
-              </Button>
-              <Button
-                variant={role === 'company_admin' ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setRole('company_admin')}
-              >
-                מנהל חברה
-              </Button>
-            </div>
+            <label className="text-[12px] font-semibold text-faint">טלפון (אופציונלי)</label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className="text-[13px] rounded-md px-2 py-2 ltr"
+              style={fieldStyle}
+            />
           </div>
-          {role === 'company_admin' && (
+          {!isSystemAdmin && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[12px] font-semibold text-faint">תפקיד</label>
+              <div className="flex gap-2">
+                <Button variant={role === 'admin' ? 'primary' : 'secondary'} size="sm" onClick={() => setRole('admin')}>
+                  מנהל מערכת
+                </Button>
+                <Button
+                  variant={role === 'company_admin' ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setRole('company_admin')}
+                >
+                  מנהל חברה
+                </Button>
+              </div>
+            </div>
+          )}
+          {!isSystemAdmin && role === 'company_admin' && (
             <div className="flex flex-col gap-2">
               <label className="text-[12px] font-semibold text-faint">חברה</label>
               <select
@@ -209,7 +238,15 @@ function UserRow({
     <tr style={{ borderBottom: '1px solid var(--line)' }}>
       <td className="ltr" style={{ padding: '10px 16px' }}>{user.email}</td>
       <td style={{ padding: '10px 16px' }}>{user.name ?? '—'}</td>
-      <td style={{ padding: '10px 16px', color: 'var(--muted)' }}>{ROLE_LABEL[user.role] ?? user.role}</td>
+      <td className="ltr" style={{ padding: '10px 16px', color: 'var(--muted)' }}>{user.phone_number ?? '—'}</td>
+      <td style={{ padding: '10px 16px', color: 'var(--muted)' }}>
+        <div className="flex items-center gap-2">
+          <span>{ROLE_LABEL[user.role] ?? user.role}</span>
+          {user.is_system_admin && (
+            <Badge style={{ color: '#c4b5fd', background: 'rgba(167,139,250,.14)' }}>מנהל מערכת</Badge>
+          )}
+        </div>
+      </td>
       <td style={{ padding: '10px 16px' }}>
         <Badge
           style={{
@@ -261,7 +298,7 @@ export default function AccessPage() {
           <table className="w-full text-[13px]" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                {['דוא״ל', 'שם', 'תפקיד', 'סטטוס', 'פעולות'].map((h) => (
+                {['דוא״ל', 'שם', 'טלפון', 'תפקיד', 'סטטוס', 'פעולות'].map((h) => (
                   <th key={h} className="text-right text-[11px] font-bold text-faint" style={{ padding: '10px 16px' }}>
                     {h}
                   </th>
