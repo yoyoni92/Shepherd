@@ -73,7 +73,7 @@ function CompanySwitcher() {
   )
 }
 
-export function Topbar({ onToggle }: { onToggle: () => void }) {
+export function Topbar({ onToggle, actAs }: { onToggle: () => void; actAs?: { company_id: string } | null }) {
   const [title, sub] = useTitle()
   const { data: session } = useSession()
   const { events } = useEvents()
@@ -104,7 +104,7 @@ export function Topbar({ onToggle }: { onToggle: () => void }) {
         <div className="text-[11.5px] text-faint">{sub}</div>
       </div>
       <div className="flex-1" />
-      {role === 'admin' && <CompanySwitcher />}
+      {role === 'admin' && !actAs && <CompanySwitcher />}
       <div className="relative flex items-center">
         <Search size={15} className="absolute right-[11px] text-dim" />
         <input

@@ -1,8 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, Settings, FolderOpen, KeyRound } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { Plus, Settings, FolderOpen, KeyRound, UserCog, TriangleAlert } from 'lucide-react'
 import { useCompanies } from '@/hooks/useCompanies'
 import { useCompanySettings } from '@/hooks/useCompanySettings'
+import { fetchCompanySettings } from '@/lib/api/fleet'
+import { setActAsCookies } from '@/lib/actAs'
 import type { CompanyRead, CompanySettingsUpdate } from '@/lib/api/schemas'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -241,7 +244,75 @@ function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | nu
   )
 }
 
-function CompanyRow({ company, onSettings, onToggle, onDelete }: { company: CompanyRead; onSettings: () => void; onToggle: () => void; onDelete: () => void }) {
+// One-time acknowledgement before a system admin enters a tenant's company-admin
+// console. Confirming fetches the company's feature flags, sets the act-as cookies,
+// records an audit `start`, then hard-navigates to /dashboard as that company admin.
+function ActAsDialog({ company, onClose }: { company: CompanyRead | null; onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const enter = async () => {
+    if (!company) return
+    setErr(null)
+    setBusy(true)
+    try {
+      const settings = await fetchCompanySettings(company.company_id)
+      setActAsCookies({
+        company_id: company.company_id,
+        name: company.name,
+        feature_flags: settings.feature_flags ?? {},
+      })
+      try {
+        await fetch('/api/impersonation-audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_id: company.company_id, action: 'start' }),
+        })
+      } catch {
+        /* best-effort - entering is not blocked by an audit failure */
+      }
+      window.location.assign('/dashboard')
+    } catch {
+      setErr('כניסה לחברה נכשלה')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={!!company} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent style={{ maxWidth: 440 }}>
+        <div className="p-6 flex flex-col gap-4">
+          <DialogTitle className="text-[16px] font-bold flex items-center gap-2">
+            <UserCog size={17} style={{ color: '#fbbf24' }} />
+            כניסה כמנהל חברה · {company?.name}
+          </DialogTitle>
+          <div
+            className="flex items-start gap-2.5 rounded-lg text-[12.5px]"
+            style={{ padding: 12, background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.3)', color: '#fbbf24' }}
+          >
+            <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+            <span>
+              הפעולות אמיתיות - כל שינוי שתבצע/י יחול על נתוני החברה ויירשם ביומן הביקורת.
+            </span>
+          </div>
+          {err && <p className="text-[12px]" style={{ color: '#f87171' }}>{err}</p>}
+          <div className="flex gap-2 justify-end mt-1">
+            <DialogClose asChild>
+              <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
+                ביטול
+              </Button>
+            </DialogClose>
+            <Button size="sm" disabled={busy} onClick={enter}>
+              {busy ? 'נכנס…' : 'כניסה'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CompanyRow({ company, canActAs, onSettings, onActAs, onToggle, onDelete }: { company: CompanyRead; canActAs: boolean; onSettings: () => void; onActAs: () => void; onToggle: () => void; onDelete: () => void }) {
   return (
     <tr style={{ borderBottom: '1px solid var(--line)' }}>
       <td style={{ padding: '10px 16px' }} className="font-bold">{company.name}</td>
@@ -261,6 +332,11 @@ function CompanyRow({ company, onSettings, onToggle, onDelete }: { company: Comp
       <td style={{ padding: '10px 16px', color: 'var(--muted)' }}>{fmtDate(company.created_at)}</td>
       <td style={{ padding: '10px 16px' }}>
         <div className="flex gap-2">
+          {canActAs && (
+            <Button variant="secondary" size="sm" onClick={onActAs}>
+              <UserCog size={14} /> כניסה כמנהל חברה
+            </Button>
+          )}
           <Button variant="secondary" size="sm" onClick={onSettings}>
             <Settings size={14} /> הגדרות
           </Button>
@@ -278,8 +354,11 @@ function CompanyRow({ company, onSettings, onToggle, onDelete }: { company: Comp
 
 export default function CompaniesPage() {
   const { companies, update, remove } = useCompanies()
+  const { data: session } = useSession()
+  const canActAs = session?.user?.role === 'admin'
   const [addOpen, setAddOpen] = useState(false)
   const [settingsCompany, setSettingsCompany] = useState<CompanyRead | null>(null)
+  const [actAsCompany, setActAsCompany] = useState<CompanyRead | null>(null)
 
   return (
     <div className="animate-fade-up">
@@ -312,7 +391,9 @@ export default function CompaniesPage() {
                 <CompanyRow
                   key={c.company_id}
                   company={c}
+                  canActAs={canActAs}
                   onSettings={() => setSettingsCompany(c)}
+                  onActAs={() => setActAsCompany(c)}
                   onToggle={() => update({ id: c.company_id, patch: { is_active: !c.is_active } })}
                   onDelete={() => remove(c.company_id)}
                 />
@@ -324,6 +405,7 @@ export default function CompaniesPage() {
 
       <AddCompanyDialog open={addOpen} onClose={() => setAddOpen(false)} />
       <CompanySettingsDialog company={settingsCompany} onClose={() => setSettingsCompany(null)} />
+      <ActAsDialog company={actAsCompany} onClose={() => setActAsCompany(null)} />
     </div>
   )
 }

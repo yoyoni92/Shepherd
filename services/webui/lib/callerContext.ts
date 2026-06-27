@@ -4,7 +4,21 @@
 
 export type CallerUser = { role: string; company_id: string | null }
 
-export function buildCallerContext(user: CallerUser, activeCompanyId?: string): string {
+// Optional act-as: a system admin operating a tenant's company-admin console. The
+// target company id + the operator's user id (carried as `impersonator`, exactly
+// like F6/the bot) are only honored when the session role is `admin`.
+export type ActAs = { companyId: string; operatorId: string }
+
+export function buildCallerContext(user: CallerUser, activeCompanyId?: string, actAs?: ActAs): string {
+  // Act-as overrides the normal admin/switcher logic: forge a company_admin context
+  // scoped to the target company, tagged with the operator as the impersonator.
+  if (actAs && user.role === 'admin') {
+    return JSON.stringify({
+      role: 'company_admin',
+      company_id: actAs.companyId,
+      impersonator: actAs.operatorId,
+    })
+  }
   if (user.role === 'company_admin') {
     return JSON.stringify({ role: 'company_admin', company_id: user.company_id })
   }

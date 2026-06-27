@@ -49,6 +49,28 @@ describe('filterNav (Feature 5: attendance feature flag)', () => {
   })
 })
 
+describe('filterNav while acting-as (Feature 8)', () => {
+  // Acting-as renders the nav as a company_admin gated by the ACT-AS company's flags
+  // (not the operator's session flags). The Sidebar passes role='company_admin'.
+  it('hides the system-only tabs when acting-as', () => {
+    const hrefs = filterNav(NAV, 'company_admin', { attendance: true }).map((i) => i.href)
+    for (const sys of ['/companies', '/access', '/config', '/health']) {
+      expect(hrefs).not.toContain(sys)
+    }
+  })
+
+  it('shows attendance when the act-as company has the flag on', () => {
+    const hrefs = filterNav(NAV, 'company_admin', { attendance: true }).map((i) => i.href)
+    expect(hrefs).toContain('/attendance')
+  })
+
+  it('hides attendance when the act-as company has the flag off', () => {
+    const hrefs = filterNav(NAV, 'company_admin', { attendance: false }).map((i) => i.href)
+    expect(hrefs).not.toContain('/attendance')
+    expect(hrefs).toContain('/dashboard')
+  })
+})
+
 describe('NAV top-level structure (Feature 4 consolidation)', () => {
   const hrefs = NAV.map((i) => i.href)
 

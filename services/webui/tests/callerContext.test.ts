@@ -19,4 +19,21 @@ describe('buildCallerContext', () => {
   it('treats the "all" sentinel as cross-company (no company_id)', () => {
     expect(JSON.parse(buildCallerContext({ role: 'admin', company_id: null }, 'all'))).toEqual({ role: 'admin' })
   })
+
+  it('forges a company_admin + impersonator context when a system admin acts-as', () => {
+    const ctx = JSON.parse(
+      buildCallerContext({ role: 'admin', company_id: null }, 'all', { companyId: 'coX', operatorId: 'op9' }),
+    )
+    expect(ctx).toEqual({ role: 'company_admin', company_id: 'coX', impersonator: 'op9' })
+  })
+
+  it('ignores act-as for a company_admin session (only a system admin may act-as)', () => {
+    const ctx = JSON.parse(
+      buildCallerContext({ role: 'company_admin', company_id: 'co1' }, undefined, {
+        companyId: 'coX',
+        operatorId: 'op9',
+      }),
+    )
+    expect(ctx).toEqual({ role: 'company_admin', company_id: 'co1' })
+  })
 })

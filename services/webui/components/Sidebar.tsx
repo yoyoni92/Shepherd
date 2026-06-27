@@ -12,13 +12,18 @@ import { useHealth } from '@/hooks/useHealth'
 import { openCount } from '@/lib/events'
 import { summarizeHealth, type Overall } from '@/lib/health'
 import { filterNav, NAV } from '@/lib/nav'
+import type { ActAsState } from '@/lib/actAs'
 
 const HEALTH_DOT: Record<Overall, string> = { ok: '#34d399', degraded: '#fbbf24', down: '#f87171' }
 
-export function Sidebar({ collapsed }: { collapsed: boolean }) {
+export function Sidebar({ collapsed, actAs }: { collapsed: boolean; actAs?: ActAsState | null }) {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const nav = filterNav(NAV, session?.user?.role, session?.user?.feature_flags)
+  // While acting-as, render the nav as the tenant's company_admin: system tabs hidden,
+  // attendance gated by the ACT-AS company's flags (not the operator's session flags).
+  const role = actAs ? 'company_admin' : session?.user?.role
+  const flags = actAs ? actAs.feature_flags : session?.user?.feature_flags
+  const nav = filterNav(NAV, role, flags)
   const { vehicles } = useVehicles()
   const { drivers } = useDrivers()
   const { customers } = useCustomers()
