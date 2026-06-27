@@ -223,13 +223,101 @@ function ResetPasswordDialog({ user, onClose }: { user: AppUserRead; onClose: ()
   )
 }
 
+function EditUserDialog({ user, onClose }: { user: AppUserRead; onClose: () => void }) {
+  const { update } = useAppUsers()
+  const [name, setName] = useState(user.name ?? '')
+  const [phoneNumber, setPhoneNumber] = useState(user.phone_number ?? '')
+  const [isSystemAdmin, setIsSystemAdmin] = useState(user.is_system_admin)
+  const [isActive, setIsActive] = useState(user.is_active)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const submit = async () => {
+    setErr(null)
+    setBusy(true)
+    try {
+      await update({
+        id: user.user_id,
+        patch: {
+          name: name.trim() || null,
+          phone_number: phoneNumber.trim() || null,
+          is_system_admin: isSystemAdmin,
+          is_active: isActive,
+        },
+      })
+      onClose()
+    } catch {
+      setErr('עדכון המשתמש נכשל')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent style={{ maxWidth: 460 }}>
+        <div className="p-6 flex flex-col gap-4">
+          <DialogTitle className="text-[16px] font-bold">עריכת משתמש גישה</DialogTitle>
+          <p className="text-[13px] text-faint">
+            <span className="ltr">{user.email}</span> · {ROLE_LABEL[user.role] ?? user.role}
+          </p>
+          <div className="flex flex-col gap-2">
+            <label className="text-[12px] font-semibold text-faint">שם</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="text-[13px] rounded-md px-2 py-2"
+              style={fieldStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[12px] font-semibold text-faint">טלפון</label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className="text-[13px] rounded-md px-2 py-2 ltr"
+              style={fieldStyle}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSystemAdmin}
+              onChange={(e) => setIsSystemAdmin(e.target.checked)}
+            />
+            מנהל מערכת
+          </label>
+          <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            פעיל
+          </label>
+          <p className="text-[11px] text-faint">תפקיד וחברה נקבעים ביצירה ואינם ניתנים לשינוי כאן.</p>
+          {err && <p className="text-[12px]" style={{ color: '#f87171' }}>{err}</p>}
+          <div className="flex gap-2 justify-end mt-2">
+            <DialogClose asChild>
+              <Button variant="secondary" size="sm" onClick={onClose}>
+                ביטול
+              </Button>
+            </DialogClose>
+            <Button size="sm" disabled={busy} onClick={submit}>
+              {busy ? 'שומר…' : 'שמירה'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function UserRow({
   user,
+  onEdit,
   onReset,
   onToggle,
   onDelete,
 }: {
   user: AppUserRead
+  onEdit: () => void
   onReset: () => void
   onToggle: () => void
   onDelete: () => void
@@ -259,6 +347,9 @@ function UserRow({
       </td>
       <td style={{ padding: '10px 16px' }}>
         <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={onEdit}>
+            ערוך
+          </Button>
           <Button variant="secondary" size="sm" onClick={onReset}>
             איפוס סיסמה
           </Button>
@@ -278,6 +369,7 @@ export default function AccessPage() {
   const { users, update, remove } = useAppUsers()
   const [addOpen, setAddOpen] = useState(false)
   const [resetUser, setResetUser] = useState<AppUserRead | null>(null)
+  const [editUser, setEditUser] = useState<AppUserRead | null>(null)
 
   return (
     <div className="animate-fade-up">
@@ -310,6 +402,7 @@ export default function AccessPage() {
                 <UserRow
                   key={u.user_id}
                   user={u}
+                  onEdit={() => setEditUser(u)}
                   onReset={() => setResetUser(u)}
                   onToggle={() => update({ id: u.user_id, patch: { is_active: !u.is_active } })}
                   onDelete={() => remove(u.user_id)}
@@ -321,6 +414,7 @@ export default function AccessPage() {
       </Card>
 
       <AddUserDialog open={addOpen} onClose={() => setAddOpen(false)} />
+      {editUser && <EditUserDialog user={editUser} onClose={() => setEditUser(null)} />}
       {resetUser && <ResetPasswordDialog user={resetUser} onClose={() => setResetUser(null)} />}
     </div>
   )
