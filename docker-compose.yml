@@ -43,6 +43,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
+      # Secret Fleet API signs the app-user JWT with (POST /auth/login). Without it
+      # login 500s, so it must be set here and stay consistent across restarts.
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-jwt-secret}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
       # Google Drive storage (Fleet API owns uploads).
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gdrive-sa.json
