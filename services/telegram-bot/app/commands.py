@@ -28,6 +28,14 @@ ADMIN_COMMANDS = [
     ("admin_maintenance", "תחזוקה"),
     ("doc_scan", "סריקת מסמך"),
 ]
+# The platform operator's own cross-company commands. Passed via role="system_admin"
+# (a sysadmin's whoami role is "admin", so the caller signals this context explicitly).
+SYSADMIN_COMMANDS = [
+    ("menu", "תפריט"),
+    ("sa_overview", "סקירת מערכת"),
+    ("sa_debug", "מצב דיבאג"),
+    ("sa_live", "לקוח חי"),
+]
 
 
 async def apply(
@@ -37,7 +45,9 @@ async def apply(
 
     Drivers see clock-in/out only when their company's attendance flag is on.
     """
-    if role == "admin":
+    if role == "system_admin":
+        cmds = SYSADMIN_COMMANDS
+    elif role == "admin":
         cmds = ADMIN_COMMANDS
     elif attendance_enabled:
         cmds = DRIVER_COMMANDS

@@ -307,6 +307,9 @@ async def _exit(ctx: Ctx) -> None:
         return
     await audit(ctx, imp, "stop", detail="exit live session")
     await sessions.exit_impersonation(ctx.chat_id)
+    # Reset the per-chat ☰ command menu from the persona's list back to the operator's,
+    # otherwise it stays stuck on the impersonated driver/admin commands.
+    await commands.apply(ctx.bot, ctx.chat_id, "system_admin")
     # Drop any reply keyboard the persona left up (e.g. accident share-location) before
     # the inline system-admin menu, which would otherwise sit on top of a stale keyboard.
     await send(ctx, texts.SA_EXITED, reply_markup=keyboards.remove())

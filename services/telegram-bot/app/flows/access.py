@@ -11,6 +11,7 @@ from app.tg import send
 async def menu(ctx: Ctx, route: str | None) -> None:
     # System Admin, not impersonating: the operator's own cross-company menu.
     if ctx.is_system_admin and not ctx.impersonation:
+        await commands.apply(ctx.bot, ctx.chat_id, "system_admin")
         await send(ctx, texts.SYSADMIN_MENU_TITLE, reply_markup=keyboards.sysadmin_menu())
         return
     await commands.apply(ctx.bot, ctx.chat_id, ctx.role, ctx.attendance_enabled)

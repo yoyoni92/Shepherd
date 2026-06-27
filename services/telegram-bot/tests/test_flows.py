@@ -24,6 +24,12 @@ def keyboard_removed(bot) -> bool:
     )
 
 
+def command_words(bot) -> list[str]:
+    """Slash-command words of the last ☰ command menu the bot set (set_my_commands)."""
+    calls = bot.set_my_commands.call_args_list
+    return [c.command for c in calls[-1].args[0]] if calls else []
+
+
 def menu_callbacks(bot) -> list[str]:
     """Callback strings of the last inline keyboard the bot sent (the role menu)."""
     for call in bot.send_message.call_args_list:
@@ -469,6 +475,8 @@ async def test_system_admin_menu_shown(store, bot, fleet, mock_api):
     await dispatch({"chat_id": 60, "sender_id": 60, "text": "hi"}, bot, fleet)
     assert texts.SYSADMIN_MENU_TITLE in sent_texts(bot)
     assert menu_callbacks(bot) == ["sa_overview", "sa_debug", "sa_live"]
+    # The ☰ command menu is the operator's own list, not a leftover persona list.
+    assert command_words(bot) == ["menu", "sa_overview", "sa_debug", "sa_live"]
 
 
 async def test_overview_uses_system_admin_context(store, bot, fleet, mock_api):
@@ -584,6 +592,8 @@ async def test_exit_posts_stop_audit_and_clears(store, bot, fleet, mock_api):
     # A reply keyboard the persona left up (e.g. accident share-location) is removed
     # so the system-admin menu doesn't sit on top of a stale bottom keyboard.
     assert keyboard_removed(bot)
+    # The ☰ command menu is reset from the persona's list back to the operator's.
+    assert command_words(bot) == ["menu", "sa_overview", "sa_debug", "sa_live"]
 
 
 async def test_impersonated_driver_call_carries_impersonator(store, bot, fleet, mock_api):
