@@ -22,6 +22,10 @@ SEED_NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 # so seed + tests are deterministic. Every seeded domain row belongs to it.
 DEFAULT_COMPANY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000c0")
 
+# Playground - the built-in, non-customer sandbox for system-admin Debug mode.
+# is_internal=true keeps it out of customer lists + the system overview.
+PLAYGROUND_COMPANY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
+
 
 def stable_uuid(namespace: str, key) -> uuid.UUID:
     return uuid.uuid5(SEED_NS, f"{namespace}:{key}")
@@ -431,16 +435,21 @@ def _seed_app_users(conn):
     # System admin (no company) - credentials default to the webui .env.example values.
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@fleetops.io")
     admin_password = os.environ.get("ADMIN_PASSWORD", "shepherd")
+    admin_phone = os.environ.get("ADMIN_PHONE", "+972500000000")
     conn.execute(
         text("""
-            INSERT INTO app_users (id, email, password_hash, role, company_id, name)
-            VALUES (:id, :email, :hash, 'admin', NULL, 'System Admin')
+            INSERT INTO app_users (
+                id, email, password_hash, role, company_id, name,
+                is_system_admin, phone_number
+            )
+            VALUES (:id, :email, :hash, 'admin', NULL, 'System Admin', true, :phone)
             ON CONFLICT (email) DO NOTHING
         """),
         {
             "id": stable_uuid("app_user", admin_email),
             "email": admin_email,
             "hash": hash_password(admin_password),
+            "phone": admin_phone,
         },
     )
     # Demo company_admin bound to the Default Company.
@@ -459,10 +468,75 @@ def _seed_app_users(conn):
     )
 
 
+def _seed_playground(conn):
+    """Built-in sandbox company (is_internal) with attendance ON + mock drivers/vehicles.
+
+    Drive stays unconfigured. Idempotent via fixed ids / ON CONFLICT.
+    """
+    conn.execute(
+        text("""
+            INSERT INTO companies (company_id, name, is_internal)
+            VALUES (:id, 'Playground', true)
+            ON CONFLICT (company_id) DO NOTHING
+        """),
+        {"id": PLAYGROUND_COMPANY_ID},
+    )
+    # Attendance ON so the sandbox surfaces every flow; Drive left empty.
+    conn.execute(
+        text("""
+            INSERT INTO company_settings (company_id, feature_flags)
+            VALUES (:id, '{"attendance": true}'::jsonb)
+            ON CONFLICT (company_id) DO NOTHING
+        """),
+        {"id": PLAYGROUND_COMPANY_ID},
+    )
+    for i in range(1, 4):
+        conn.execute(
+            text("""
+                INSERT INTO drivers (
+                    driver_id, company_id, full_name, phone_number, license_number, status
+                )
+                VALUES (:id, :company_id, :name, :phone, :lic, 'active')
+                ON CONFLICT (driver_id) DO NOTHING
+            """),
+            {
+                "id": stable_uuid("pg_driver", i),
+                "company_id": PLAYGROUND_COMPANY_ID,
+                "name": f"Playground Driver {i}",
+                "phone": f"+9725900000{i:02d}",
+                "lic": f"PG-DRV-{i:05d}",
+            },
+        )
+    for i in range(1, 4):
+        conn.execute(
+            text("""
+                INSERT INTO vehicles (
+                    vehicle_id, company_id, licensing_plate, nickname,
+                    allowed_driver, vendor, model, current_km, driver_id
+                ) VALUES (
+                    :id, :company_id, :plate, :nick,
+                    'all_drivers', :vendor, :model, :current_km, :driver_id
+                )
+                ON CONFLICT (vehicle_id) DO NOTHING
+            """),
+            {
+                "id": stable_uuid("pg_vehicle", i),
+                "company_id": PLAYGROUND_COMPANY_ID,
+                "plate": f"PG-{i:04d}",
+                "nick": f"Playground-{i}",
+                "vendor": VENDORS[i % len(VENDORS)],
+                "model": MODELS[i % len(MODELS)],
+                "current_km": 10000 * i,
+                "driver_id": stable_uuid("pg_driver", i),
+            },
+        )
+
+
 def seed(engine):
     with engine.connect() as conn:
         _seed_companies(conn)
         _seed_company_settings(conn)
+        _seed_playground(conn)
         _seed_drivers(conn)
         _seed_customers(conn)
         _seed_maintenance_types(conn)

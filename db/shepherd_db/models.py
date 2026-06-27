@@ -264,6 +264,9 @@ class Company(Base):
     )
     name = mapped_column(Text, nullable=False)
     is_active = mapped_column(Boolean, nullable=False, server_default="true")
+    # Built-in, non-customer company (e.g. the system-admin Playground sandbox). Kept out
+    # of customer-facing lists and the system overview.
+    is_internal = mapped_column(Boolean, nullable=False, server_default="false")
     created_at = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -810,6 +813,46 @@ class AppUser(Base):
     )
     is_active = mapped_column(Boolean, nullable=False, server_default="true")
     name = mapped_column(Text, nullable=True)
+    # Flags the platform operator (System Admin). Linked to Telegram via phone + chat id
+    # so the bot can recognise the operator at whoami/enroll (system-admin path wins).
+    is_system_admin = mapped_column(Boolean, nullable=False, server_default="false")
+    phone_number = mapped_column(Text, nullable=True)
+    telegram_chat_id = mapped_column(BigInteger, nullable=True, unique=True)
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class ImpersonationAudit(Base):
+    """Accountability trail for System-Admin Customer-Live impersonation.
+
+    One row per audited action: session start/stop and confirmed writes performed while
+    the operator acts as a real customer's admin/driver. Written by fleet-api.
+    """
+
+    __tablename__ = "impersonation_audit"
+
+    id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    operator_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("app_users.id"),
+        nullable=False,
+    )
+    company_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id"),
+        nullable=False,
+    )
+    effective_role = mapped_column(Text, nullable=False)
+    effective_id = mapped_column(Text, nullable=True)
+    action = mapped_column(Text, nullable=False)  # e.g. start | stop | write
+    detail = mapped_column(Text, nullable=True)
     created_at = mapped_column(
         DateTime(timezone=True),
         nullable=False,

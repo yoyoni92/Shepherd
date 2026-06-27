@@ -20,6 +20,9 @@ class CallerContext(BaseModel):
     # ponytail: presence (not the role) drives tenant scoping; admin+company_id = the
     # system-admin "acting within a company" case, company_admin always carries it (Feature 2).
     company_id: str | None = None
+    # System-admin impersonation (Feature 6): the operator app_user id while acting as
+    # someone else. Set by the bot in Customer-Live mode so writes can be audited.
+    impersonator: str | None = None
 
     @model_validator(mode="after")
     def _ids_match_role(self) -> CallerContext:
