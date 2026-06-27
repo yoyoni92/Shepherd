@@ -1,9 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileText, Pencil } from 'lucide-react'
 import { useAttendance } from '@/hooks/useAttendance'
+import { useAttendanceSettings } from '@/hooks/useAttendanceSettings'
 import { aggregate, summarize, employeeStatus, buildCsv, monthOptions, type AttendanceDay } from '@/lib/attendance'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Avatar } from '@/components/Avatar'
 import { ATT_STATUS_META } from '@/components/meta'
 import { AttendanceEditModal } from '@/components/AttendanceEditModal'
@@ -11,7 +14,129 @@ import { AttendanceEditModal } from '@/components/AttendanceEditModal'
 const GRID = '2fr 88px 116px 116px 86px 78px 108px 64px'
 const MONTHS = monthOptions(3)
 
+const timeFieldStyle = {
+  background: 'var(--panel-2, #0f172a)',
+  color: 'var(--accent, #60a5fa)',
+  border: '1px solid var(--line)',
+} as const
+
+// הגדרות tab: the company-scoped clock-in window (relocated from system הגדרות in Feature 7).
+function AttendanceConfigPanel() {
+  const { settings, loading, save } = useAttendanceSettings()
+  const [enabled, setEnabled] = useState(false)
+  const [start, setStart] = useState('07:00')
+  const [end, setEnd] = useState('17:00')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [ok, setOk] = useState(false)
+
+  useEffect(() => {
+    if (!settings) return
+    setEnabled(settings.enabled)
+    setStart(settings.start || '07:00')
+    setEnd(settings.end || '17:00')
+  }, [settings])
+
+  const submit = async () => {
+    setErr(null)
+    setOk(false)
+    setBusy(true)
+    try {
+      await save({ enabled, start, end })
+      setOk(true)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'שמירת ההגדרות נכשלה')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) return <p className="text-faint text-sm">טוען…</p>
+
+  return (
+    <Card style={{ padding: '8px 22px 16px', maxWidth: 620 }}>
+      <div className="flex items-center gap-5 border-b border-divider" style={{ padding: '18px 0' }}>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14.5px] font-bold mb-[3px]">חלון דיווח נוכחות</div>
+          <div className="text-[12px] text-faint">
+            כאשר מופעל, דיווח כניסה/יציאה דרך הבוט ייחסם מחוץ לטווח השעות. כבוי = כל שעה מותרת.
+          </div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => {
+              setEnabled(e.target.checked)
+              setOk(false)
+            }}
+            style={{ width: 16, height: 16 }}
+          />
+          <span className="text-[13px]">{enabled ? 'מופעל' : 'כבוי'}</span>
+        </label>
+      </div>
+
+      <div className="flex items-center gap-5" style={{ padding: '18px 0', opacity: enabled ? 1 : 0.5 }}>
+        <div className="flex-1 text-[13px] text-faint">טווח שעות מותר</div>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            value={start}
+            disabled={!enabled}
+            onChange={(e) => {
+              setStart(e.target.value)
+              setOk(false)
+            }}
+            className="ltr rounded-lg text-[14px]"
+            style={{ ...timeFieldStyle, padding: '6px 8px' }}
+          />
+          <span className="text-faint">-</span>
+          <input
+            type="time"
+            value={end}
+            disabled={!enabled}
+            onChange={(e) => {
+              setEnd(e.target.value)
+              setOk(false)
+            }}
+            className="ltr rounded-lg text-[14px]"
+            style={{ ...timeFieldStyle, padding: '6px 8px' }}
+          />
+        </div>
+      </div>
+
+      {err && <p className="text-[12px] pt-3" style={{ color: '#f87171' }}>{err}</p>}
+      {ok && <p className="text-[12px] pt-3" style={{ color: '#86efac' }}>ההגדרות נשמרו ✓</p>}
+
+      <div className="flex justify-start pt-[18px]">
+        <Button onClick={submit} disabled={busy}>
+          {busy ? 'שומר…' : 'שמירת חלון דיווח'}
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
 export default function AttendancePage() {
+  return (
+    <Tabs defaultValue="records" className="animate-fade-up">
+      <TabsList className="mb-[18px]">
+        <TabsTrigger value="records">נוכחות</TabsTrigger>
+        <TabsTrigger value="config">הגדרות</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="records">
+        <AttendanceRecords />
+      </TabsContent>
+
+      <TabsContent value="config">
+        <AttendanceConfigPanel />
+      </TabsContent>
+    </Tabs>
+  )
+}
+
+function AttendanceRecords() {
   const [idx, setIdx] = useState(MONTHS.length - 1)
   const [editId, setEditId] = useState<string | null>(null)
   const current = MONTHS[idx]
@@ -48,7 +173,7 @@ export default function AttendancePage() {
   ]
 
   return (
-    <div className="animate-fade-up">
+    <div>
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <div className="flex items-center gap-1 bg-panel border border-control rounded-[10px]" style={{ padding: 5 }}>
           <button

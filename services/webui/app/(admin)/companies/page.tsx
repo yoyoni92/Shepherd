@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, Settings } from 'lucide-react'
+import { Plus, Settings, FolderOpen, KeyRound } from 'lucide-react'
 import { useCompanies } from '@/hooks/useCompanies'
 import { useCompanySettings } from '@/hooks/useCompanySettings'
 import type { CompanyRead, CompanySettingsUpdate } from '@/lib/api/schemas'
@@ -75,11 +75,61 @@ function AddCompanyDialog({ open, onClose }: { open: boolean; onClose: () => voi
   )
 }
 
+// Per-company attendance enable: writes feature_flags.attendance via the existing
+// /companies/{id}/settings. Lazily fetches the company's settings for its current state.
+function AttendanceToggle({ companyId }: { companyId: string }) {
+  const { settings, save } = useCompanySettings(companyId)
+  const [busy, setBusy] = useState(false)
+  const ready = !!settings
+  const on = settings?.feature_flags?.attendance === true
+
+  const toggle = async () => {
+    if (!settings) return
+    setBusy(true)
+    try {
+      await save({ feature_flags: { ...settings.feature_flags, attendance: !on } })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label="נוכחות"
+      disabled={!ready || busy}
+      onClick={toggle}
+      className="relative inline-flex items-center rounded-full transition-colors"
+      style={{
+        width: 38,
+        height: 22,
+        background: on ? 'rgba(59,130,246,.9)' : 'var(--panel-2, #0f172a)',
+        border: '1px solid var(--line)',
+        cursor: ready && !busy ? 'pointer' : 'default',
+        opacity: ready ? 1 : 0.5,
+      }}
+    >
+      <span
+        className="absolute rounded-full transition-all"
+        style={{
+          width: 14,
+          height: 14,
+          top: 3,
+          // RTL: the knob slides toward the start (right) when on.
+          right: on ? 3 : 19,
+          background: on ? '#fff' : 'var(--muted)',
+        }}
+      />
+    </button>
+  )
+}
+
 function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | null; onClose: () => void }) {
   const { settings, save } = useCompanySettings(company?.company_id ?? null)
   const [folderId, setFolderId] = useState('')
   const [creds, setCreds] = useState('')
-  const [attendance, setAttendance] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
@@ -96,7 +146,6 @@ function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | nu
   useEffect(() => {
     if (!settings) return
     setFolderId(settings.gdrive_folder_id ?? '')
-    setAttendance(settings.feature_flags?.attendance === true)
     setCreds('')
   }, [settings])
 
@@ -106,7 +155,6 @@ function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | nu
     setBusy(true)
     const patch: CompanySettingsUpdate = {
       gdrive_folder_id: folderId.trim() || null,
-      feature_flags: { attendance },
     }
     if (creds.trim()) patch.gdrive_credentials_json = creds.trim()
     try {
@@ -122,46 +170,62 @@ function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | nu
 
   return (
     <Dialog open={!!company} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent style={{ maxWidth: 480 }}>
-        <div className="p-6 flex flex-col gap-4">
-          <DialogTitle className="text-[16px] font-bold">הגדרות · {company?.name}</DialogTitle>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-[12px] font-semibold text-faint">מזהה תיקיית Google Drive</label>
-            <input
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-              className="text-[13px] rounded-md px-2 py-2"
-              style={fieldStyle}
-            />
+      <DialogContent style={{ maxWidth: 500 }}>
+        <div className="p-6 flex flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <DialogTitle className="text-[16px] font-bold">הגדרות חברה · {company?.name}</DialogTitle>
+            <p className="text-[12px] text-faint">חיבור Google Drive לאחסון מסמכים שהבוט מעלה.</p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-[12px] font-semibold text-faint">
-              פרטי חשבון שירות (JSON)
-              {settings?.gdrive_configured && (
-                <span className="mr-2 text-[11px]" style={{ color: '#86efac' }}>מוגדר ✓</span>
-              )}
-            </label>
-            <textarea
-              value={creds}
-              onChange={(e) => setCreds(e.target.value)}
-              rows={4}
-              placeholder={settings?.gdrive_configured ? 'הדבק/י JSON חדש כדי להחליף' : 'הדבק/י את ה-JSON'}
-              className="text-[12px] rounded-md px-2 py-2 font-mono"
-              style={fieldStyle}
-            />
-          </div>
+          <section className="flex flex-col gap-4 rounded-lg" style={{ ...fieldStyle, padding: 16 }}>
+            <div className="flex items-center gap-2 text-[13px] font-bold">
+              <FolderOpen size={15} style={{ color: 'var(--accent, #60a5fa)' }} />
+              <span>Google Drive</span>
+            </div>
 
-          <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-            <input type="checkbox" checked={attendance} onChange={(e) => setAttendance(e.target.checked)} />
-            <span>נוכחות מופעלת</span>
-          </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-semibold text-faint">מזהה תיקייה (Folder ID)</label>
+              <input
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                dir="ltr"
+                placeholder="1A2b3C..."
+                className="text-[13px] rounded-md px-2 py-2"
+                style={{ ...fieldStyle, background: 'var(--bg, #0b1220)' }}
+              />
+              <p className="text-[11px] text-faint">המזהה מכתובת התיקייה ב-Drive (אחרי ‎/folders/‎).</p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="flex items-center gap-2 text-[12px] font-semibold text-faint">
+                <KeyRound size={13} />
+                <span>פרטי חשבון שירות (JSON)</span>
+                {settings?.gdrive_configured && (
+                  <span
+                    className="text-[11px] font-bold rounded-full px-2 py-0.5"
+                    style={{ color: '#86efac', background: 'rgba(134,239,172,.12)' }}
+                  >
+                    מוגדר ✓
+                  </span>
+                )}
+              </label>
+              <textarea
+                value={creds}
+                onChange={(e) => setCreds(e.target.value)}
+                rows={4}
+                dir="ltr"
+                placeholder={settings?.gdrive_configured ? 'הדבק/י JSON חדש כדי להחליף' : 'הדבק/י את ה-JSON'}
+                className="text-[12px] rounded-md px-2 py-2 font-mono"
+                style={{ ...fieldStyle, background: 'var(--bg, #0b1220)' }}
+              />
+              <p className="text-[11px] text-faint">נשמר באופן מאובטח ואינו מוצג שוב לאחר השמירה.</p>
+            </div>
+          </section>
 
           {err && <p className="text-[12px]" style={{ color: '#f87171' }}>{err}</p>}
           {ok && <p className="text-[12px]" style={{ color: '#86efac' }}>ההגדרות נשמרו ✓</p>}
 
-          <div className="flex gap-2 justify-end mt-2">
+          <div className="flex gap-2 justify-end">
             <DialogClose asChild>
               <Button variant="secondary" size="sm" onClick={onClose}>
                 סגור
@@ -180,7 +244,7 @@ function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | nu
 function CompanyRow({ company, onSettings, onToggle, onDelete }: { company: CompanyRead; onSettings: () => void; onToggle: () => void; onDelete: () => void }) {
   return (
     <tr style={{ borderBottom: '1px solid var(--line)' }}>
-      <td style={{ padding: '10px 16px' }}>{company.name}</td>
+      <td style={{ padding: '10px 16px' }} className="font-bold">{company.name}</td>
       <td style={{ padding: '10px 16px' }}>
         <Badge
           style={{
@@ -190,6 +254,9 @@ function CompanyRow({ company, onSettings, onToggle, onDelete }: { company: Comp
         >
           {company.is_active ? 'פעילה' : 'מושבתת'}
         </Badge>
+      </td>
+      <td style={{ padding: '10px 16px' }}>
+        <AttendanceToggle companyId={company.company_id} />
       </td>
       <td style={{ padding: '10px 16px', color: 'var(--muted)' }}>{fmtDate(company.created_at)}</td>
       <td style={{ padding: '10px 16px' }}>
@@ -233,7 +300,7 @@ export default function CompaniesPage() {
           <table className="w-full text-[13px]" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                {['שם', 'סטטוס', 'נוצרה', 'פעולות'].map((h) => (
+                {['שם', 'סטטוס', 'נוכחות', 'נוצרה', 'פעולות'].map((h) => (
                   <th key={h} className="text-right text-[11px] font-bold text-faint" style={{ padding: '10px 16px' }}>
                     {h}
                   </th>

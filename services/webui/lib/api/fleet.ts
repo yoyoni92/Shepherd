@@ -8,6 +8,7 @@ import {
   KpiDailyReadSchema,
   CustomerReadSchema,
   AttendanceRecordReadSchema,
+  AttendanceSettingsSchema,
   MaintenanceTypeReadSchema,
   BotUserReadSchema,
   BotAuthorizationReadSchema,
@@ -35,6 +36,7 @@ import {
   type BotUserRead,
   type BotAuthorizationRead,
   type AccidentCreate,
+  type AttendanceSettings,
 } from './schemas'
 
 // Browser calls the same-origin Next proxy (`app/api/fleet/[...path]`), which injects the
@@ -125,6 +127,12 @@ export const patchAttendanceDay = (
   day: string,
   body: { clock_in?: string | null; clock_out?: string | null; status: string },
 ) => send('PATCH', `/attendance/${driverId}/${day}`, body, AttendanceRecordReadSchema)
+
+// Attendance settings (company-scoped clock-in window; managed in the Attendance Configuration tab).
+export const fetchAttendanceSettings = (): Promise<AttendanceSettings> =>
+  get('/attendance/settings', AttendanceSettingsSchema)
+export const updateAttendanceSettings = (s: AttendanceSettings): Promise<AttendanceSettings> =>
+  send('PUT', '/attendance/settings', s, AttendanceSettingsSchema)
 
 // Config: API returns a list of {config_key, config_value, description}; expose as a record.
 export async function fetchConfig(): Promise<Record<string, unknown>> {

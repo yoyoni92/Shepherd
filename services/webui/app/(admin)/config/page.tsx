@@ -34,76 +34,6 @@ function seed(config: Record<string, unknown> | undefined): Record<string, numbe
   return out
 }
 
-function AttendanceWindowCard() {
-  const { config, save, saving } = useConfig()
-  const [enabled, setEnabled] = useState(false)
-  const [start, setStart] = useState('07:00')
-  const [end, setEnd] = useState('17:00')
-
-  useEffect(() => {
-    if (!config) return
-    const e = config['attendance_window_enabled']
-    setEnabled(e === true || e === 'true')
-    if (config['attendance_window_start']) setStart(String(config['attendance_window_start']))
-    if (config['attendance_window_end']) setEnd(String(config['attendance_window_end']))
-  }, [config])
-
-  const saveAll = () => {
-    save({ key: 'attendance_window_enabled', value: enabled })
-    save({ key: 'attendance_window_start', value: start })
-    save({ key: 'attendance_window_end', value: end })
-  }
-
-  return (
-    <Card style={{ padding: '8px 22px 16px', marginTop: 18 }}>
-      <div className="flex items-center gap-5 border-b border-divider" style={{ padding: '18px 0' }}>
-        <div className="flex-1 min-w-0">
-          <div className="text-[14.5px] font-bold mb-[3px]">חלון דיווח נוכחות</div>
-          <div className="text-[12px] text-faint">
-            כאשר מופעל, דיווח כניסה/יציאה דרך הבוט ייחסם מחוץ לטווח השעות. כבוי = כל שעה מותרת.
-          </div>
-        </div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-            style={{ width: 16, height: 16 }}
-          />
-          <span className="text-[13px]">{enabled ? 'מופעל' : 'כבוי'}</span>
-        </label>
-      </div>
-      <div className="flex items-center gap-5" style={{ padding: '18px 0', opacity: enabled ? 1 : 0.5 }}>
-        <div className="flex-1 text-[13px] text-faint">טווח שעות מותר</div>
-        <div className="flex items-center gap-2">
-          <input
-            type="time"
-            value={start}
-            disabled={!enabled}
-            onChange={(e) => setStart(e.target.value)}
-            className="ltr bg-bg border border-control rounded-lg text-[14px] text-accent"
-            style={{ padding: '6px 8px' }}
-          />
-          <span className="text-faint">—</span>
-          <input
-            type="time"
-            value={end}
-            disabled={!enabled}
-            onChange={(e) => setEnd(e.target.value)}
-            className="ltr bg-bg border border-control rounded-lg text-[14px] text-accent"
-            style={{ padding: '6px 8px' }}
-          />
-        </div>
-      </div>
-      <div className="flex justify-start pt-[18px]">
-        <Button onClick={saveAll} disabled={saving}>
-          שמירת חלון דיווח
-        </Button>
-      </div>
-    </Card>
-  )
-}
-
 export default function ConfigPage() {
   const { config, loading, save, saving } = useConfig()
   const [values, setValues] = useState<Record<string, number>>(() => seed(undefined))
@@ -167,7 +97,6 @@ export default function ConfigPage() {
           </Button>
         </div>
       </Card>
-      <AttendanceWindowCard />
     </div>
   )
 }

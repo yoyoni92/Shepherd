@@ -39,9 +39,13 @@ describe('filterNav (Feature 5: attendance feature flag)', () => {
     expect(hrefs).toContain('/attendance')
   })
 
-  it('always shows Attendance to a system admin (they manage every company)', () => {
-    const hrefs = filterNav(NAV, 'admin', { attendance: false }).map((i) => i.href)
-    expect(hrefs).toContain('/attendance')
+  it('hides Attendance from a system admin (Feature 7: operators do not run attendance)', () => {
+    const off = filterNav(NAV, 'admin', { attendance: false }).map((i) => i.href)
+    expect(off).not.toContain('/attendance')
+    // Even if a flag leaks through, a system admin never sees the attendance item.
+    const on = filterNav(NAV, 'admin', { attendance: true }).map((i) => i.href)
+    expect(on).not.toContain('/attendance')
+    expect(on).toContain('/companies') // system-only tabs remain
   })
 })
 

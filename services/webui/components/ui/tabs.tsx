@@ -3,7 +3,14 @@ import * as React from 'react'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { cn } from '@/lib/utils'
 
-export const Tabs = TabsPrimitive.Root
+// Default to RTL so tabbed pages inherit the app's direction. Radix Tabs.Root
+// otherwise defaults to LTR, which flips the layout of content inside the tabs
+// (sort chips, justify-between headers) within this RTL app.
+export const Tabs = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>
+>(({ dir = 'rtl', ...props }, ref) => <TabsPrimitive.Root ref={ref} dir={dir} {...props} />)
+Tabs.displayName = 'Tabs'
 
 export const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,

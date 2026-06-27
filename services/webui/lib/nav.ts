@@ -23,7 +23,8 @@ export type NavItem = {
   badge?: 'vehicles' | 'drivers' | 'customers' | 'events'
   statusDot?: boolean
   allowedRoles?: string[]
-  // Gated behind a company feature flag for company_admins; system admins always see it.
+  // Gated behind a company feature flag: shown only to a company_admin whose active
+  // company has the flag on. Never shown to a system admin (no company context).
   featureFlag?: string
   children?: NavItem[]
 }
@@ -51,8 +52,9 @@ export function filterByRole<T extends { allowedRoles?: string[] }>(items: T[], 
 }
 
 // Full nav filter: role gating, then per-company feature flags. A flag-gated item is
-// kept for a system admin (they manage every company) but hidden from a company_admin
-// whose active company has the flag off (Feature 5: attendance is opt-in).
+// shown only to a company_admin whose active company has the flag on (Feature 5:
+// attendance is opt-in). A system admin runs the console, not attendance, so flag-gated
+// items are hidden from role=admin (Feature 7).
 export function filterNav<T extends { allowedRoles?: string[]; featureFlag?: string }>(
   items: T[],
   role?: string,
@@ -60,7 +62,7 @@ export function filterNav<T extends { allowedRoles?: string[]; featureFlag?: str
 ): T[] {
   return filterByRole(items, role).filter((item) => {
     if (!item.featureFlag) return true
-    if (role === 'admin') return true
+    if (role === 'admin') return false
     return featureFlags?.[item.featureFlag] === true
   })
 }

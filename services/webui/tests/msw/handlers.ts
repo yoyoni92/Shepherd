@@ -136,6 +136,15 @@ export const handlers = [
 
   http.get(`${FLEET}/kpi/daily`, () => HttpResponse.json(KPI_DAILY)),
 
+  // Attendance settings (company-scoped window) - must precede the :month read below
+  http.get(`${FLEET}/attendance/settings`, () =>
+    HttpResponse.json({ enabled: false, start: '07:00', end: '17:00' }),
+  ),
+  http.put(`${FLEET}/attendance/settings`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json(body)
+  }),
+
   // Attendance: month read returns one stored record for d1; PATCH echoes the upsert
   http.get(`${FLEET}/attendance/:month`, ({ params }) =>
     HttpResponse.json([
