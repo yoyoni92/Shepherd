@@ -1,0 +1,5 @@
+# deploy/.gitignore
+# Filled, secret-bearing copies. Never commit. Track only the *.example templates.
+.env
+config.toml
+secrets/
