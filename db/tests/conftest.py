@@ -39,3 +39,13 @@ def conn(pg_engine):
         connection.begin()
         yield connection
         connection.rollback()
+
+
+@pytest.fixture
+def company_id(conn):
+    """A tenant to satisfy the NOT NULL company_id on every domain table."""
+    from sqlalchemy import text
+
+    return conn.execute(
+        text("INSERT INTO companies (name) VALUES ('Test Co') RETURNING company_id")
+    ).scalar()

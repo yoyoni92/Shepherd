@@ -374,7 +374,6 @@ async def test_admin_fleet_summary(sim, rec, mock_api):
                 {
                     "total_km_7d": 1200,
                     "avg_km_per_driver_7d": 300,
-                    "maintenance_due_count": 2,
                     "docs_expiring_count": 1,
                 }
             ],
@@ -487,6 +486,82 @@ async def test_admin_maintenance_log_invalid_km(sim, rec, mock_api):
     await sim.tap(ADMIN_CHAT, "ml_type_שמן")
     await sim.text(ADMIN_CHAT, "abc")
     assert texts.MAINT_KM_INVALID in rec.sent_texts()
+
+
+# ============================ Update KM ============================
+
+
+async def test_driver_km_update(sim, rec, mock_api):
+    as_driver(mock_api)
+    mock_api.get(f"{FLEET}/vehicles").mock(
+        return_value=httpx.Response(
+            200, json=[{"vehicle_id": "v1", "licensing_plate": "11", "current_km": 50000}]
+        )
+    )
+    route = mock_api.post(f"{FLEET}/km").mock(
+        return_value=httpx.Response(200, json={"km_update_id": "k1", "maintenance_event_created": False})
+    )
+    await sim.tap(DRIVER_CHAT, "km_update")
+    assert texts.KM_UPDATE_PROMPT.format(current=50000) in rec.sent_texts()
+    await sim.text(DRIVER_CHAT, "55000")
+    assert body_of(route) == {"vehicle_id": "v1", "km": 55000, "source": "telegram"}
+    assert texts.KM_UPDATE_DONE in rec.sent_texts()
+    assert rec.dice_count() == 1
+
+
+async def test_driver_km_update_below_current_local(sim, rec, mock_api):
+    as_driver(mock_api)
+    mock_api.get(f"{FLEET}/vehicles").mock(
+        return_value=httpx.Response(
+            200, json=[{"vehicle_id": "v1", "licensing_plate": "11", "current_km": 50000}]
+        )
+    )
+    route = mock_api.post(f"{FLEET}/km").mock(return_value=httpx.Response(200, json={}))
+    await sim.tap(DRIVER_CHAT, "km_update")
+    await sim.text(DRIVER_CHAT, "40000")
+    assert texts.KM_BELOW_CURRENT in rec.sent_texts()
+    assert not route.called  # bot rejected locally, never hit the API
+
+
+async def test_driver_km_update_no_vehicle(sim, rec, mock_api):
+    as_driver(mock_api)
+    mock_api.get(f"{FLEET}/vehicles").mock(return_value=httpx.Response(200, json=[]))
+    await sim.tap(DRIVER_CHAT, "km_update")
+    assert texts.NO_VEHICLE in rec.sent_texts()
+
+
+async def test_admin_km_update_picks_vehicle(sim, rec, mock_api):
+    as_admin(mock_api)
+    mock_api.get(f"{FLEET}/vehicles").mock(
+        return_value=httpx.Response(
+            200, json=[{"vehicle_id": "v1", "licensing_plate": "11", "current_km": 50000}]
+        )
+    )
+    route = mock_api.post(f"{FLEET}/km").mock(
+        return_value=httpx.Response(200, json={"km_update_id": "k1", "maintenance_event_created": False})
+    )
+    await sim.tap(ADMIN_CHAT, "km_update")
+    assert texts.KM_PICK_VEHICLE in rec.sent_texts()
+    await sim.tap(ADMIN_CHAT, "km_veh_v1")
+    await sim.text(ADMIN_CHAT, "60000")
+    assert body_of(route) == {"vehicle_id": "v1", "km": 60000, "source": "telegram"}
+    assert texts.KM_UPDATE_DONE in rec.sent_texts()
+
+
+async def test_admin_km_update_api_rejects_high(sim, rec, mock_api):
+    as_admin(mock_api)
+    mock_api.get(f"{FLEET}/vehicles").mock(
+        return_value=httpx.Response(
+            200, json=[{"vehicle_id": "v1", "licensing_plate": "11", "current_km": 50000}]
+        )
+    )
+    mock_api.post(f"{FLEET}/km").mock(
+        return_value=httpx.Response(422, json={"detail": "km_increment_too_large"})
+    )
+    await sim.tap(ADMIN_CHAT, "km_update")
+    await sim.tap(ADMIN_CHAT, "km_veh_v1")
+    await sim.text(ADMIN_CHAT, "999999")
+    assert texts.KM_TOO_HIGH in rec.sent_texts()
 
 
 async def test_admin_doc_scan_vehicle_license(sim, rec, mock_api, monkeypatch):

@@ -107,6 +107,15 @@ def test_km_update_triggers_maintenance_event(client):
     assert r.json()["maintenance_event_created"] is True
 
 
+def test_km_update_dedups_open_maintenance_event(client):
+    """A second km report past the threshold does not open a second maintenance_due."""
+    vehicle_id, _ = _make_vehicle(client, next_maintenance_km=10000)
+    first = client.post("/km", json={"vehicle_id": vehicle_id, "km": 9600, "source": "admin_ui"}, headers=admin_headers())
+    assert first.json()["maintenance_event_created"] is True
+    second = client.post("/km", json={"vehicle_id": vehicle_id, "km": 9700, "source": "admin_ui"}, headers=admin_headers())
+    assert second.json()["maintenance_event_created"] is False
+
+
 def test_km_update_no_trigger_below_buffer(client):
     driver_id = _make_driver(client)
     vehicle_id, _ = _make_vehicle(client, driver_id=driver_id, next_maintenance_km=10000)
@@ -117,3 +126,40 @@ def test_km_update_no_trigger_below_buffer(client):
     )
     assert r.status_code == 200
     assert r.json()["maintenance_event_created"] is False
+
+
+def _post_km(client, vehicle_id, km):
+    return client.post(
+        "/km", json={"vehicle_id": vehicle_id, "km": km, "source": "telegram"},
+        headers=admin_headers(),
+    )
+
+
+def test_km_update_rejects_below_current(client):
+    vehicle_id, _ = _make_vehicle(client)
+    assert _post_km(client, vehicle_id, 20000).status_code == 200
+    r = _post_km(client, vehicle_id, 19000)
+    assert r.status_code == 422
+    assert r.json()["detail"] == "km_below_current"
+
+
+def test_km_update_rejects_large_increment(client):
+    vehicle_id, _ = _make_vehicle(client)
+    assert _post_km(client, vehicle_id, 20000).status_code == 200
+    r = _post_km(client, vehicle_id, 20000 + 10001)  # default cap is 10000
+    assert r.status_code == 422
+    assert r.json()["detail"] == "km_increment_too_large"
+
+
+def test_km_update_allows_within_increment(client):
+    vehicle_id, _ = _make_vehicle(client)
+    assert _post_km(client, vehicle_id, 20000).status_code == 200
+    assert _post_km(client, vehicle_id, 29000).status_code == 200  # +9000, under cap
+
+
+def test_km_update_honors_custom_threshold(client):
+    client.put("/config/km_max_increment", json={"config_value": 100}, headers=admin_headers())
+    vehicle_id, _ = _make_vehicle(client)
+    assert _post_km(client, vehicle_id, 20000).status_code == 200
+    assert _post_km(client, vehicle_id, 20050).status_code == 200  # +50, under custom cap
+    assert _post_km(client, vehicle_id, 20200).status_code == 422  # +200, over custom cap

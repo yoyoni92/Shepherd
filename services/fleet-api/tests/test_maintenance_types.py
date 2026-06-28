@@ -37,6 +37,35 @@ def test_validation_rejects_bad_input(client):
     assert client.post("/maintenance-types", headers=H(), json={"name": _name(), "interval_km": 0, "steps": ["קטן"]}).status_code == 422
 
 
+def test_dual_and_time_only_intervals(client):
+    # km + months together ("whichever first")
+    both = client.post(
+        "/maintenance-types",
+        headers=H(),
+        json={"name": _name(), "interval_km": 15000, "interval_months": 12, "steps": ["שנתי"]},
+    )
+    assert both.status_code == 201
+    assert both.json()["interval_km"] == 15000
+    assert both.json()["interval_months"] == 12
+
+    # time-only (no km)
+    time_only = client.post(
+        "/maintenance-types",
+        headers=H(),
+        json={"name": _name(), "interval_months": 24, "steps": ["דו-שנתי"]},
+    )
+    assert time_only.status_code == 201
+    assert time_only.json()["interval_km"] is None
+    assert time_only.json()["interval_months"] == 24
+
+
+def test_rejects_when_no_interval(client):
+    resp = client.post("/maintenance-types", headers=H(), json={"name": _name(), "steps": ["קטן"]})
+    assert resp.status_code == 422
+    bad_months = client.post("/maintenance-types", headers=H(), json={"name": _name(), "interval_months": 0, "steps": ["קטן"]})
+    assert bad_months.status_code == 422
+
+
 def test_delete_blocked_when_in_use(client):
     mt = client.post("/maintenance-types", headers=H(), json={"name": _name(), "interval_km": 10000, "steps": ["קטן", "גדול"]}).json()
     plate = str(uuid.uuid4().int % 100_000_000).zfill(8)

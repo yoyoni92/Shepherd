@@ -170,6 +170,15 @@ MAINT_KM_PROMPT = 'הזן/י ק"מ בעת השירות:'
 MAINT_KM_INVALID = '⚠️ ערך ק"מ לא תקין. נסה/י שוב.'
 MAINT_LOGGED = "✅ אירוע התחזוקה נרשם."
 
+# Update KM
+KM_UPDATE_BTN = '🔢 עדכון ק"מ'
+KM_PICK_VEHICLE = "בחר/י רכב"
+KM_UPDATE_PROMPT = 'ק"מ נוכחי: {current}\nהזן/י קריאת ק"מ חדשה:'
+KM_UPDATE_INVALID = '⚠️ ערך ק"מ לא תקין. נסה/י שוב.'
+KM_BELOW_CURRENT = '⚠️ הקריאה נמוכה מהק"מ הנוכחי. הזן/י ערך גבוה יותר.'
+KM_TOO_HIGH = '⚠️ הקפיצה בק"מ גבוהה מדי. בדוק/י את הערך ונסה/י שוב.'
+KM_UPDATE_DONE = '✅ קריאת הק"מ עודכנה.'
+
 # Document scan (admin, vision)
 DOC_SCAN_PICK_TYPE = "📄 בחר/י סוג מסמך לסריקה:"
 DOC_TYPE_VEHICLE_LICENSE = "🚗 רישיון רכב"

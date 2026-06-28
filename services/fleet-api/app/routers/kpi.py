@@ -16,7 +16,6 @@ def _to_read(k) -> KpiDailyRead:
         total_km_7d=k.total_km_7d,
         avg_km_per_driver_7d=k.avg_km_per_driver_7d,
         avg_days_between_maintenance=k.avg_days_between_maintenance,
-        maintenance_due_count=k.maintenance_due_count,
         docs_expiring_count=k.docs_expiring_count,
         top_customer_id=k.top_customer_id,
         top_customer_km=k.top_customer_km,

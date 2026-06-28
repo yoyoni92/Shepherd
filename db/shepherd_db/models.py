@@ -5,6 +5,7 @@ import enum
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -345,8 +346,9 @@ class Customer(TenantMixin, Base):
 
 
 class MaintenanceType(TenantMixin, Base):
-    """Admin-defined maintenance cycle: an ordered list of service step labels plus a
-    fixed km interval. Vehicles reference one; next_maintenance() advances through `steps`."""
+    """Admin-defined maintenance cycle: an ordered list of service step labels plus a km
+    interval and/or a month interval (at least one). Vehicles reference one; the service
+    is due by km, by date, or whichever comes first. next_maintenance() advances `steps`."""
 
     __tablename__ = "maintenance_types"
 
@@ -357,7 +359,8 @@ class MaintenanceType(TenantMixin, Base):
     )
     name = mapped_column(Text, nullable=False)
     description = mapped_column(Text, nullable=True)
-    interval_km = mapped_column(Integer, nullable=False)
+    interval_km = mapped_column(Integer, nullable=True)
+    interval_months = mapped_column(Integer, nullable=True)
     steps = mapped_column(JSONB, nullable=False)  # ordered list of unique step labels
     created_ts = mapped_column(
         DateTime(timezone=True),
@@ -365,7 +368,13 @@ class MaintenanceType(TenantMixin, Base):
         server_default=text("now()"),
     )
 
-    __table_args__ = (UniqueConstraint("company_id", "name"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "name"),
+        CheckConstraint(
+            "interval_km IS NOT NULL OR interval_months IS NOT NULL",
+            name="maintenance_types_interval_present",
+        ),
+    )
 
 
 class Vehicle(TenantMixin, Base):
@@ -392,6 +401,7 @@ class Vehicle(TenantMixin, Base):
     last_maintenance_type = mapped_column(Text, nullable=True)
     last_maintenance_km = mapped_column(Integer, nullable=True)
     next_maintenance_km = mapped_column(Integer, nullable=True)
+    next_maintenance_date = mapped_column(Date, nullable=True)
     next_maintenance_type = mapped_column(Text, nullable=True)
     current_km = mapped_column(Integer, nullable=True)
     driver_id = mapped_column(
@@ -649,7 +659,6 @@ class KpiDaily(Base):
     total_km_7d = mapped_column(Integer, nullable=True)
     avg_km_per_driver_7d = mapped_column(Numeric, nullable=True)
     avg_days_between_maintenance = mapped_column(Numeric, nullable=True)
-    maintenance_due_count = mapped_column(Integer, nullable=True)
     docs_expiring_count = mapped_column(Integer, nullable=True)
     top_customer_id = mapped_column(
         UUID(as_uuid=True),

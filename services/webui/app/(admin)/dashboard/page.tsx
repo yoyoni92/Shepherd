@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { readActAsClient } from '@/lib/actAs'
-import { Route, Gauge, CalendarClock, Wrench, FileText, Building2, type LucideIcon } from 'lucide-react'
+import { Route, Gauge, CalendarClock, FileText, Building2, type LucideIcon } from 'lucide-react'
 import { useKpis } from '@/hooks/useKpis'
 import { useCustomers } from '@/hooks/useCustomers'
 import { useEvents } from '@/hooks/useEvents'
@@ -32,7 +32,6 @@ const TILE_META: Record<KpiTileKey, TileMeta> = {
   fleetKm7d: { label: 'ק״מ השבוע', Icon: Route, color: '#60a5fa', bg: 'rgba(59,130,246,.12)', goodWhenUp: true, fmt: KM },
   avgKmPerDriver: { label: 'ממוצע ק״מ לנהג', Icon: Gauge, color: '#34d399', bg: 'rgba(52,211,153,.12)', goodWhenUp: true, fmt: KM },
   maintCadence: { label: 'ימים בין טיפולים', Icon: CalendarClock, color: '#a78bfa', bg: 'rgba(167,139,250,.12)', goodWhenUp: true, fmt: DAYS },
-  maintDue: { label: 'טיפולים נדרשים', Icon: Wrench, color: '#fb923c', bg: 'rgba(251,146,60,.12)', goodWhenUp: false, fmt: INT },
   docsExpiring: { label: 'מסמכים פגי תוקף', Icon: FileText, color: '#fbbf24', bg: 'rgba(251,191,36,.12)', goodWhenUp: false, fmt: INT },
   topCustomer: { label: 'לקוח מוביל בק״מ', Icon: Building2, color: '#f472b6', bg: 'rgba(244,114,182,.12)', goodWhenUp: true, fmt: KM },
 }

@@ -191,6 +191,25 @@ def get_maintenance_buffer(session: Session, company_id: UUID | None = None) -> 
     return int(cfg.config_value) if cfg is not None else 500
 
 
+def get_km_max_increment(session: Session, company_id: UUID | None = None) -> int:
+    """Max KM a single update may add over current_km (typo guard). Per-company config."""
+    cfg = session.get(SystemConfig, (company_id, "km_max_increment"))
+    return int(cfg.config_value) if cfg is not None else 10000
+
+
+def _has_open_maintenance_due(session: Session, vehicle_id: UUID) -> bool:
+    """True if the vehicle already has an unresolved maintenance_due event."""
+    return session.scalar(
+        select(Event.event_id)
+        .where(
+            Event.vehicle_id == vehicle_id,
+            Event.event_type == "maintenance_due",
+            Event.status == "open",
+        )
+        .limit(1)
+    ) is not None
+
+
 def update_km(
     session: Session,
     vehicle_id: UUID,
@@ -214,7 +233,9 @@ def update_km(
     triggered = False
     if vehicle.next_maintenance_km is not None:
         buffer = get_maintenance_buffer(session, vehicle.company_id)
-        if km >= vehicle.next_maintenance_km - buffer:
+        # One open maintenance_due per cycle: skip if the cron or a prior km report
+        # already opened one (resolved by create_care on the next service).
+        if km >= vehicle.next_maintenance_km - buffer and not _has_open_maintenance_due(session, vehicle_id):
             event = Event(
                 vehicle_id=vehicle_id,
                 event_type="maintenance_due",
@@ -223,6 +244,7 @@ def update_km(
                 source_type="km_updates",
                 source_id=km_update.km_update_id,
                 company_id=vehicle.company_id,
+                payload_json={"trigger": "km"},
             )
             session.add(event)
             triggered = True
@@ -282,22 +304,43 @@ def create_care(session: Session, data: dict) -> VehicleCare:
     session.add(care)
     session.flush()
 
-    # Cycle is data-driven: read the assigned maintenance type's steps + interval.
+    # Cycle is data-driven: read the assigned maintenance type's km + month intervals.
     mtype = vehicle.maintenance_type
     steps = mtype.steps if mtype else [care.maintenance_type]
     interval_km = mtype.interval_km if mtype else 10_000
-    nm = next_maintenance(care.maintenance_type, steps, last_km=care.km_at_service, interval_km=interval_km)
+    interval_months = mtype.interval_months if mtype else None
+    nm = next_maintenance(
+        care.maintenance_type,
+        steps,
+        last_km=care.km_at_service,
+        interval_km=interval_km,
+        last_date=care.service_date,
+        interval_months=interval_months,
+    )
 
     vehicle.last_maintenance_date = care.service_date
     vehicle.last_maintenance_type = care.maintenance_type
     vehicle.last_maintenance_km = care.km_at_service
     vehicle.next_maintenance_km = nm["next_km"]
+    vehicle.next_maintenance_date = nm["next_date"]
     vehicle.next_maintenance_type = nm["next_type"]
+
+    # Cycle reset: resolve any open maintenance_due event so the next due (km or
+    # time, whichever first) can emit a fresh one.
+    for ev in session.scalars(
+        select(Event).where(
+            Event.vehicle_id == care.vehicle_id,
+            Event.event_type == "maintenance_due",
+            Event.status == "open",
+        )
+    ):
+        ev.status = "resolved"
 
     session.commit()
     session.refresh(care)
     # attach computed next values for the response
     care._next_km = nm["next_km"]
+    care._next_date = nm["next_date"]
     care._next_type = nm["next_type"]
     return care
 

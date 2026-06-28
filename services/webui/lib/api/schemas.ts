@@ -44,14 +44,16 @@ export const MaintenanceTypeReadSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullish(),
-  interval_km: z.number(),
+  interval_km: z.number().nullish(),
+  interval_months: z.number().nullish(),
   steps: z.array(z.string()),
 })
 
 export const MaintenanceTypeCreateSchema = z.object({
   name: z.string(),
   description: z.string().nullish(),
-  interval_km: z.number(),
+  interval_km: z.number().optional(),
+  interval_months: z.number().optional(),
   steps: z.array(z.string()),
 })
 
@@ -96,7 +98,6 @@ export const KpiDailyReadSchema = z.object({
   total_km_7d: numish,
   avg_km_per_driver_7d: numish,
   avg_days_between_maintenance: numish,
-  maintenance_due_count: numish,
   docs_expiring_count: numish,
   top_customer_id: z.string().nullish(),
   top_customer_km: numish,
@@ -272,7 +273,8 @@ export interface UiMaintenanceType {
   id: string
   name: string
   description: string | null
-  intervalKm: number
+  intervalKm: number | null
+  intervalMonths: number | null
   steps: string[]
 }
 

@@ -31,6 +31,7 @@ def driver_menu(attendance_enabled: bool = True) -> InlineKeyboardMarkup:
         [("🔧 דיווח תקלה", "vehicle_issue")],
         [("🚨 דיווח תאונה", "accident_start")],
         [("✏️ עדכון פרטים", "update_details")],
+        [(texts.KM_UPDATE_BTN, "km_update")],
         [("📊 דוח נוכחות", "attendance_csv"), ("🚗 הרכב שלי", "my_vehicle")],
     ]
     return _inline(rows)
@@ -43,6 +44,7 @@ def admin_menu() -> InlineKeyboardMarkup:
             [("📢 שידור הודעה", "admin_broadcast")],
             [("🚗 סיכום צי", "admin_summary")],
             [("✏️ עדכון נהג", "admin_update_driver")],
+            [(texts.KM_UPDATE_BTN, "km_update")],
             [("🔧 תחזוקה", "admin_maintenance")],
             [("📄 סריקת מסמך", "doc_scan")],
         ]

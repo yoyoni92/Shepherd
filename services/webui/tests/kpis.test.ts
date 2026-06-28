@@ -7,7 +7,6 @@ const row = (over: Partial<KpiDailyRead> = {}): KpiDailyRead => ({
   total_km_7d: 0,
   avg_km_per_driver_7d: 0,
   avg_days_between_maintenance: 0,
-  maintenance_due_count: 0,
   docs_expiring_count: 0,
   top_customer_id: null,
   top_customer_km: 0,
@@ -17,27 +16,24 @@ const row = (over: Partial<KpiDailyRead> = {}): KpiDailyRead => ({
 })
 
 describe('deriveKpiTiles', () => {
-  it('maps the six tiles from the latest row', () => {
+  it('maps the tiles from the latest row', () => {
     const tiles = deriveKpiTiles([
-      row({ total_km_7d: 1200, avg_km_per_driver_7d: 300, avg_days_between_maintenance: 45, maintenance_due_count: 3, docs_expiring_count: 2, top_customer_km: 800 }),
+      row({ total_km_7d: 1200, avg_km_per_driver_7d: 300, avg_days_between_maintenance: 45, docs_expiring_count: 2, top_customer_km: 800 }),
     ])
     expect(tiles.map((t) => t.key)).toEqual([...KPI_TILE_KEYS])
     expect(tiles.find((t) => t.key === 'fleetKm7d')?.value).toBe(1200)
-    expect(tiles.find((t) => t.key === 'maintDue')?.value).toBe(3)
+    expect(tiles.find((t) => t.key === 'docsExpiring')?.value).toBe(2)
     expect(tiles.find((t) => t.key === 'topCustomer')?.value).toBe(800)
   })
 
   it('computes trend vs yesterday', () => {
     const tiles = deriveKpiTiles([
-      row({ total_km_7d: 1200, maintenance_due_count: 1 }),
-      row({ total_km_7d: 1000, maintenance_due_count: 4 }),
+      row({ total_km_7d: 1200 }),
+      row({ total_km_7d: 1000 }),
     ])
     const km = tiles.find((t) => t.key === 'fleetKm7d')!
     expect(km.delta).toBe(200)
     expect(km.trend).toBe('up')
-    const due = tiles.find((t) => t.key === 'maintDue')!
-    expect(due.delta).toBe(-3)
-    expect(due.trend).toBe('down')
   })
 
   it('has null trend with a single row', () => {

@@ -54,8 +54,8 @@ describe('toUiCustomer', () => {
 
 describe('toUiMaintenanceType', () => {
   it('maps the catalog fields', () => {
-    const m: MaintenanceTypeRead = { id: 'mt1', name: 'קטן ואז גדול', description: 'x', interval_km: 10000, steps: ['קטן', 'גדול'] }
-    expect(toUiMaintenanceType(m)).toEqual({ id: 'mt1', name: 'קטן ואז גדול', description: 'x', intervalKm: 10000, steps: ['קטן', 'גדול'] })
+    const m: MaintenanceTypeRead = { id: 'mt1', name: 'קטן ואז גדול', description: 'x', interval_km: 10000, interval_months: 12, steps: ['קטן', 'גדול'] }
+    expect(toUiMaintenanceType(m)).toEqual({ id: 'mt1', name: 'קטן ואז גדול', description: 'x', intervalKm: 10000, intervalMonths: 12, steps: ['קטן', 'גדול'] })
     expect(toUiMaintenanceType({ id: 'm', name: 'n', interval_km: 5000, steps: ['א'] }).description).toBeNull()
   })
 })

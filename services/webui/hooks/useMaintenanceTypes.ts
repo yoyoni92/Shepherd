@@ -7,7 +7,7 @@ import {
   deleteMaintenanceType,
 } from '@/lib/api/fleet'
 import { toUiMaintenanceType } from '@/lib/adapters'
-import type { MaintenanceTypeCreate, MaintenanceTypeRead, UiMaintenanceType } from '@/lib/api/schemas'
+import type { MaintenanceTypeCreate, UiMaintenanceType } from '@/lib/api/schemas'
 
 const KEY = ['maintenance-types']
 
@@ -19,7 +19,7 @@ export function useMaintenanceTypes() {
 
   const add = useMutation({ mutationFn: (m: MaintenanceTypeCreate) => createMaintenanceType(m), onSuccess: invalidate })
   const update = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<MaintenanceTypeRead> }) => updateMaintenanceType(id, patch),
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<MaintenanceTypeCreate> }) => updateMaintenanceType(id, patch),
     onSuccess: invalidate,
   })
   const remove = useMutation({ mutationFn: (id: string) => deleteMaintenanceType(id), onSuccess: invalidate })

@@ -6,7 +6,6 @@ export const KPI_TILE_KEYS = [
   'fleetKm7d',
   'avgKmPerDriver',
   'maintCadence',
-  'maintDue',
   'docsExpiring',
   'topCustomer',
 ] as const
@@ -25,7 +24,6 @@ const COLUMN: Record<KpiTileKey, (r: KpiDailyRead) => number | null> = {
   fleetKm7d: (r) => r.total_km_7d,
   avgKmPerDriver: (r) => r.avg_km_per_driver_7d,
   maintCadence: (r) => r.avg_days_between_maintenance,
-  maintDue: (r) => r.maintenance_due_count,
   docsExpiring: (r) => r.docs_expiring_count,
   topCustomer: (r) => r.top_customer_km,
 }

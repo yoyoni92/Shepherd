@@ -16,6 +16,7 @@ DRIVER_COMMANDS = [
     ("vehicle_issue", "דיווח תקלה"),
     ("accident_start", "דיווח תאונה"),
     ("update_details", "עדכון פרטים"),
+    ("km_update", 'עדכון ק"מ'),
     ("attendance_csv", "דוח נוכחות"),
     ("my_vehicle", "הרכב שלי"),
 ]
@@ -25,6 +26,7 @@ ADMIN_COMMANDS = [
     ("admin_broadcast", "שידור הודעה"),
     ("admin_summary", "סיכום צי"),
     ("admin_update_driver", "עדכון נהג"),
+    ("km_update", 'עדכון ק"מ'),
     ("admin_maintenance", "תחזוקה"),
     ("doc_scan", "סריקת מסמך"),
 ]

@@ -279,6 +279,12 @@ events (expiries, maintenance due) are never proactively pushed at all.
 **Outcome**: one reliable, auditable path from event to alert - no missed expiries, no scattered
 notification code - and a foundation the mobile app's push notifications can reuse.
 
+**Producers already in place**: `maintenance_due` events are emitted today on the KM path
+(`fleet-api/app/repo.py` `update_km`) and, with the dual-interval maintenance feature, on a daily
+pg_cron sweep for the time-based ("every X km or every Y months, whichever first") due date. Both
+land in the `events` table with `notified=false` and reach only the events feed / dashboard - no one
+is pushed yet. This pipeline is what turns those existing producers into actual admin notifications.
+
 ---
 
 ### Drive-files RAG

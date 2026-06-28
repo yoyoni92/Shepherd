@@ -39,7 +39,8 @@ export function toUiMaintenanceType(m: MaintenanceTypeRead): UiMaintenanceType {
     id: m.id,
     name: m.name,
     description: m.description ?? null,
-    intervalKm: m.interval_km,
+    intervalKm: m.interval_km ?? null,
+    intervalMonths: m.interval_months ?? null,
     steps: m.steps,
   }
 }

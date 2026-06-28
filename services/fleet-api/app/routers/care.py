@@ -31,5 +31,6 @@ def log_care(body: VehicleCareCreate, session: Db, caller: Caller) -> VehicleCar
         care_id=care.care_id,
         vehicle_id=care.vehicle_id,
         next_maintenance_km=care._next_km,
+        next_maintenance_date=care._next_date,
         next_maintenance_type=care._next_type,
     )

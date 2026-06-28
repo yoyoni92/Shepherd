@@ -11,7 +11,7 @@ DECLARE
 BEGIN
   INSERT INTO kpi_daily (
     snapshot_date, company_id, total_km_7d, avg_km_per_driver_7d, avg_days_between_maintenance,
-    maintenance_due_count, docs_expiring_count, top_customer_id, top_customer_km,
+    docs_expiring_count, top_customer_id, top_customer_km,
     top_customer_vehicle_count, computed_ts
   )
   WITH cfg AS (
@@ -47,12 +47,6 @@ BEGIN
       FROM vehicle_care
     ) g WHERE gap IS NOT NULL GROUP BY company_id
   ),
-  maint AS (
-    SELECT company_id, COUNT(*)::int AS n FROM vehicles
-    WHERE current_km IS NOT NULL AND next_maintenance_km IS NOT NULL
-      AND current_km >= next_maintenance_km
-    GROUP BY company_id
-  ),
   docs AS (
     SELECT v.company_id, COUNT(*)::int AS n FROM vehicles v
     JOIN cfg ON cfg.company_id = v.company_id
@@ -71,7 +65,6 @@ BEGIN
          COALESCE(totals.total_km, 0),
          COALESCE(totals.total_km, 0)::numeric / NULLIF(drv.n, 0),
          gaps.avg_gap,
-         COALESCE(maint.n, 0),
          COALESCE(docs.n, 0),
          topc.customer_id,
          topc.km,
@@ -82,14 +75,12 @@ BEGIN
   LEFT JOIN totals ON totals.company_id = c.company_id
   LEFT JOIN drv ON drv.company_id = c.company_id
   LEFT JOIN gaps ON gaps.company_id = c.company_id
-  LEFT JOIN maint ON maint.company_id = c.company_id
   LEFT JOIN docs ON docs.company_id = c.company_id
   LEFT JOIN topc ON topc.company_id = c.company_id
   ON CONFLICT (snapshot_date, company_id) DO UPDATE SET
     total_km_7d = EXCLUDED.total_km_7d,
     avg_km_per_driver_7d = EXCLUDED.avg_km_per_driver_7d,
     avg_days_between_maintenance = EXCLUDED.avg_days_between_maintenance,
-    maintenance_due_count = EXCLUDED.maintenance_due_count,
     docs_expiring_count = EXCLUDED.docs_expiring_count,
     top_customer_id = EXCLUDED.top_customer_id,
     top_customer_km = EXCLUDED.top_customer_km,
@@ -106,11 +97,36 @@ BEGIN
 END;
 $fn$ LANGUAGE plpgsql;
 
+-- Time-based maintenance trigger. The KM path emits maintenance_due inline on a km
+-- report; the clock has no such trigger, so this daily sweep emits one for vehicles
+-- whose next_maintenance_date has arrived (within the per-company warning buffer,
+-- default 30 days), unless an open maintenance_due event already exists for the
+-- vehicle (one open event per cycle - create_care resolves it on the next service).
+CREATE OR REPLACE FUNCTION emit_time_maintenance_due() RETURNS void AS $fn$
+BEGIN
+  INSERT INTO events (vehicle_id, company_id, event_type, severity, message,
+                      source_type, status, payload_json)
+  SELECT v.vehicle_id, v.company_id, 'maintenance_due', 'warning', 'Maintenance due soon',
+         'scheduler', 'open', '{"trigger": "time"}'::jsonb
+  FROM vehicles v
+  WHERE v.next_maintenance_date IS NOT NULL
+    AND current_date >= v.next_maintenance_date - COALESCE(
+      (SELECT (config_value #>> '{}')::int FROM system_config s
+       WHERE s.company_id = v.company_id AND s.config_key = 'maintenance_time_buffer_days'), 30)
+    AND NOT EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.vehicle_id = v.vehicle_id
+        AND e.event_type = 'maintenance_due'
+        AND e.status = 'open');
+END;
+$fn$ LANGUAGE plpgsql;
+
 DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron') THEN
     CREATE EXTENSION IF NOT EXISTS pg_cron;
     PERFORM cron.schedule('kpi-daily', '0 3 * * *', 'SELECT refresh_kpi_daily()');
+    PERFORM cron.schedule('maintenance-time-due', '30 3 * * *', 'SELECT emit_time_maintenance_due()');
     PERFORM cron.schedule('bot-access-cleanup', '*/5 * * * *', 'SELECT cleanup_expired_bot_access()');
   END IF;
 END

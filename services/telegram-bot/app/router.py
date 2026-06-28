@@ -29,6 +29,7 @@ CALLBACK_MAP: dict[str, tuple[str, str]] = {
     "doc_scan": ("doc_scan", "cmd_doc_scan"),
     "maint_overdue": ("maintenance", "cmd_maint_overdue"),
     "maint_log": ("maintenance", "cmd_maint_log"),
+    "km_update": ("km_update", "cmd_km_update"),
     # System admin (Feature 6)
     "sa_overview": ("sysadmin", "overview"),
     "sa_debug": ("sysadmin", "debug_menu"),
@@ -46,6 +47,7 @@ FLOW_TO_FEATURE: dict[str, str] = {
     "broadcast": "broadcast",
     "update_driver": "update_driver",
     "maint_log": "maintenance",
+    "km_update": "km_update",
     "doc_scan": "doc_scan",
     "sa_live": "sysadmin",
 }
@@ -139,6 +141,13 @@ def active_route(ctx: Ctx) -> str | None:
             return "maint_log_type"
         if step == "awaiting_km" and text:
             return "maint_log_km"
+        return None
+
+    if flow == "km_update":
+        if step == "awaiting_vehicle" and cb and cb.startswith("km_veh_"):
+            return "km_update_vehicle"
+        if step == "awaiting_km" and text:
+            return "km_update_value"
         return None
 
     if flow == "sa_live":

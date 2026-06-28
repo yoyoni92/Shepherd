@@ -4,6 +4,17 @@ import type { UiMaintenanceType } from '@/lib/api/schemas'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
+const years = (y: number) => (y === 1 ? 'שנה' : y === 2 ? 'שנתיים' : `${y} שנים`)
+
+/** "כל X" subtitle: km and/or time, joined by "או" (years when months divide by 12). */
+function intervalText(m: UiMaintenanceType): string {
+  const parts: string[] = []
+  if (m.intervalKm != null) parts.push(`${m.intervalKm.toLocaleString()} ק״מ`)
+  if (m.intervalMonths != null)
+    parts.push(m.intervalMonths % 12 === 0 ? years(m.intervalMonths / 12) : `${m.intervalMonths} חודשים`)
+  return parts.join(' או ')
+}
+
 export function MaintenanceTypeCard({
   m,
   vehicleCount,
@@ -29,7 +40,7 @@ export function MaintenanceTypeCard({
             <div className="text-[15.5px] font-bold truncate">{m.name}</div>
             <div className="text-[12px] text-faint flex items-center gap-1.5">
               <Truck size={12} />
-              {vehicleCount} רכבים · כל {m.intervalKm.toLocaleString()} ק״מ
+              {vehicleCount} רכבים · כל {intervalText(m)}
             </div>
           </div>
         </div>

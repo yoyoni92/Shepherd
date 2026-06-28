@@ -17,7 +17,8 @@ interface Field {
 const FIELDS: Field[] = [
   { key: 'license_expiring_days', label: 'התראת תוקף רישוי', desc: 'ימים מראש להתראה על רישוי רכב פג', unit: 'ימים', step: 1 },
   { key: 'insurance_expiring_days', label: 'התראת תוקף ביטוח', desc: 'ימים מראש להתראה על ביטוח פג', unit: 'ימים', step: 1 },
-  { key: 'maintenance_km_buffer', label: 'מרווח התראת טיפול', desc: 'ק״מ לפני הטיפול הבא שבו מופקת התראה', unit: 'ק״מ', step: 100 },
+  { key: 'maintenance_km_buffer', label: 'מרווח התראת טיפול (ק״מ)', desc: 'ק״מ לפני הטיפול הבא שבו מופקת התראה', unit: 'ק״מ', step: 100 },
+  { key: 'maintenance_time_buffer_days', label: 'מרווח התראת טיפול (זמן)', desc: 'ימים לפני מועד הטיפול הבא שבו מופקת התראה', unit: 'ימים', step: 1 },
   { key: 'km_max_increment', label: 'עליית ק״מ מרבית לעדכון', desc: 'עלייה מרבית בק״מ המותרת בעדכון בודד (הגנה מפני טעות הקלדה)', unit: 'ק״מ', step: 1000 },
   { key: 'image_confidence_min', label: 'סף ביטחון לזיהוי מסמך', desc: 'מתחת לערך זה (0–1) מסמך עובר לבדיקה', unit: '', step: 0.05, max: 1 },
 ]
@@ -26,6 +27,7 @@ const DEFAULTS: Record<string, number> = {
   license_expiring_days: 30,
   insurance_expiring_days: 30,
   maintenance_km_buffer: 1000,
+  maintenance_time_buffer_days: 30,
   km_max_increment: 10000,
   image_confidence_min: 0.7,
 }

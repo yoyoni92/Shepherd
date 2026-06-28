@@ -16,7 +16,12 @@ export function MaintenanceTypeForm({
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
-  const [intervalKm, setIntervalKm] = useState(initial ? String(initial.intervalKm) : '')
+  const [intervalKm, setIntervalKm] = useState(initial?.intervalKm != null ? String(initial.intervalKm) : '')
+  // Months stored canonically; show years when the stored value divides evenly by 12.
+  const initMonths = initial?.intervalMonths ?? null
+  const initYears = initMonths != null && initMonths % 12 === 0
+  const [timeValue, setTimeValue] = useState(initMonths != null ? String(initYears ? initMonths / 12 : initMonths) : '')
+  const [timeUnit, setTimeUnit] = useState<'months' | 'years'>(initYears ? 'years' : 'months')
   const [steps, setSteps] = useState<string[]>(initial?.steps.length ? [...initial.steps] : [''])
   const [error, setError] = useState<string | null>(null)
 
@@ -34,13 +39,23 @@ export function MaintenanceTypeForm({
 
   const submit = () => {
     const cleanSteps = steps.map((s) => s.trim()).filter(Boolean)
-    const km = Number(intervalKm)
+    const km = intervalKm.trim() ? Number(intervalKm) : undefined
+    const rawTime = timeValue.trim() ? Number(timeValue) : undefined
+    const months = rawTime != null ? rawTime * (timeUnit === 'years' ? 12 : 1) : undefined
     if (!name.trim()) return setError('שם חובה')
-    if (!intervalKm.trim() || !Number.isInteger(km) || km <= 0) return setError('מרווח ק״מ חייב להיות מספר שלם חיובי')
+    if (km != null && (!Number.isInteger(km) || km <= 0)) return setError('מרווח ק״מ חייב להיות מספר שלם חיובי')
+    if (rawTime != null && (!Number.isInteger(rawTime) || rawTime <= 0)) return setError('מרווח הזמן חייב להיות מספר שלם חיובי')
+    if (km == null && months == null) return setError('יש להגדיר מרווח ק״מ ו/או מרווח זמן')
     if (cleanSteps.length === 0) return setError('יש להגדיר לפחות שלב טיפול אחד')
     if (new Set(cleanSteps).size !== cleanSteps.length) return setError('שמות השלבים חייבים להיות ייחודיים')
     setError(null)
-    onSubmit({ name: name.trim(), description: description.trim() || undefined, interval_km: km, steps: cleanSteps })
+    onSubmit({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      interval_km: km,
+      interval_months: months,
+      steps: cleanSteps,
+    })
   }
 
   const inputCls = 'bg-bg border border-control rounded-[8px] text-[13.5px] text-ink outline-none focus:border-accent w-full'
@@ -70,16 +85,38 @@ export function MaintenanceTypeForm({
           <label className="block text-[12px] font-semibold text-muted mb-[6px] mt-4">תיאור</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputCls} style={{ padding: '9px 11px' }} />
 
-          <label className="block text-[12px] font-semibold text-muted mb-[6px] mt-4">
-            מרווח ק״מ בין טיפולים<span className="text-danger"> *</span>
-          </label>
+          <div className="text-[11px] text-faint mt-4 mb-1">הגדר מרווח ק״מ, מרווח זמן, או שניהם (הטיפול יידרש לפי המוקדם מביניהם).</div>
+
+          <label className="block text-[12px] font-semibold text-muted mb-[6px]">מרווח ק״מ בין טיפולים</label>
           <input
             type="number"
             value={intervalKm}
             onChange={(e) => setIntervalKm(e.target.value)}
+            placeholder="למשל: 15000"
             className={`${inputCls} ltr text-left`}
             style={{ padding: '9px 11px' }}
           />
+
+          <label className="block text-[12px] font-semibold text-muted mb-[6px] mt-4">מרווח זמן בין טיפולים</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={timeValue}
+              onChange={(e) => setTimeValue(e.target.value)}
+              placeholder="למשל: 1"
+              className={`${inputCls} ltr text-left`}
+              style={{ padding: '9px 11px' }}
+            />
+            <select
+              value={timeUnit}
+              onChange={(e) => setTimeUnit(e.target.value as 'months' | 'years')}
+              className={inputCls}
+              style={{ padding: '9px 11px', width: 'auto' }}
+            >
+              <option value="months">חודשים</option>
+              <option value="years">שנים</option>
+            </select>
+          </div>
 
           <div className="flex items-center justify-between mt-5 mb-2">
             <label className="text-[12px] font-semibold text-muted">

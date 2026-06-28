@@ -36,8 +36,8 @@ const CUSTOMERS = [
 ]
 
 const KPI_DAILY = [
-  { snapshot_date: '2026-06-19', total_km_7d: 1200, avg_km_per_driver_7d: 300, avg_days_between_maintenance: 45, maintenance_due_count: 2, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 800, top_customer_vehicle_count: 2, computed_ts: '2026-06-19T03:00:00Z' },
-  { snapshot_date: '2026-06-18', total_km_7d: 1000, avg_km_per_driver_7d: 250, avg_days_between_maintenance: 45, maintenance_due_count: 4, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 700, top_customer_vehicle_count: 2, computed_ts: '2026-06-18T03:00:00Z' },
+  { snapshot_date: '2026-06-19', total_km_7d: 1200, avg_km_per_driver_7d: 300, avg_days_between_maintenance: 45, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 800, top_customer_vehicle_count: 2, computed_ts: '2026-06-19T03:00:00Z' },
+  { snapshot_date: '2026-06-18', total_km_7d: 1000, avg_km_per_driver_7d: 250, avg_days_between_maintenance: 45, docs_expiring_count: 3, top_customer_id: 'c1', top_customer_km: 700, top_customer_vehicle_count: 2, computed_ts: '2026-06-18T03:00:00Z' },
 ]
 
 const ACCIDENTS = [

@@ -22,6 +22,7 @@ def _to_read(m) -> MaintenanceTypeRead:
         name=m.name,
         description=m.description,
         interval_km=m.interval_km,
+        interval_months=m.interval_months,
         steps=m.steps,
     )
 

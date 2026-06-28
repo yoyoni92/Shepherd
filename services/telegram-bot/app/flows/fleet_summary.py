@@ -24,7 +24,6 @@ async def fleet_summary(ctx: Ctx, route: str | None) -> None:
         "",
         f'ק"מ ב-7 ימים: {val("total_km_7d")}',
         f'ממוצע ק"מ לנהג: {val("avg_km_per_driver_7d")}',
-        f"תחזוקות לביצוע: {val('maintenance_due_count')}",
         f"מסמכים שעומדים לפוג: {val('docs_expiring_count')}",
     ]
     await send(ctx, "\n".join(lines))

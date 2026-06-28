@@ -10,6 +10,7 @@ from app.flows.broadcast import broadcast
 from app.flows.clock import clock
 from app.flows.doc_scan import doc_scan
 from app.flows.fleet_summary import fleet_summary
+from app.flows.km_update import km_update
 from app.flows.maintenance import maintenance
 from app.flows.my_vehicle import my_vehicle
 from app.flows.sysadmin import sysadmin
@@ -32,6 +33,7 @@ FEATURES = {
     "broadcast": broadcast,
     "update_driver": update_driver,
     "maintenance": maintenance,
+    "km_update": km_update,
     "doc_scan": doc_scan,
     "sysadmin": sysadmin,
 }

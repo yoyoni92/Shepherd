@@ -5,81 +5,88 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, DataError
 
 
-def test_vehicle_uuid_pk_default(conn):
+def test_vehicle_uuid_pk_default(conn, company_id):
     result = conn.execute(
-        text("INSERT INTO vehicles (licensing_plate) VALUES ('TEST-001') RETURNING vehicle_id")
+        text("INSERT INTO vehicles (company_id, licensing_plate) VALUES (:co, 'TEST-001') RETURNING vehicle_id"),
+        {"co": company_id},
     )
     vid = result.scalar()
     assert vid is not None
     uuid.UUID(str(vid))
 
 
-def test_licensing_plate_unique(conn):
-    conn.execute(text("INSERT INTO vehicles (licensing_plate) VALUES ('DUPE-PLATE')"))
+def test_licensing_plate_unique(conn, company_id):
+    conn.execute(
+        text("INSERT INTO vehicles (company_id, licensing_plate) VALUES (:co, 'DUPE-PLATE')"),
+        {"co": company_id},
+    )
     with pytest.raises(IntegrityError):
-        conn.execute(text("INSERT INTO vehicles (licensing_plate) VALUES ('DUPE-PLATE')"))
+        conn.execute(
+            text("INSERT INTO vehicles (company_id, licensing_plate) VALUES (:co, 'DUPE-PLATE')"),
+            {"co": company_id},
+        )
 
 
-def test_fk_orphan_vehicle_driver_rejects(conn):
+def test_fk_orphan_vehicle_driver_rejects(conn, company_id):
     fake_id = uuid.uuid4()
     with pytest.raises(IntegrityError):
         conn.execute(
             text(
-                "INSERT INTO vehicles (licensing_plate, driver_id)"
-                " VALUES (:plate, :driver_id)"
+                "INSERT INTO vehicles (company_id, licensing_plate, driver_id)"
+                " VALUES (:co, :plate, :driver_id)"
             ),
-            {"plate": "FK-TEST-001", "driver_id": fake_id},
+            {"co": company_id, "plate": "FK-TEST-001", "driver_id": fake_id},
         )
 
 
-def test_enum_column_rejects_invalid_value(conn):
+def test_enum_column_rejects_invalid_value(conn, company_id):
     # ponytail: enum rejection is DataError, not IntegrityError in PostgreSQL
     with pytest.raises((IntegrityError, DataError)):
         conn.execute(
             text(
-                "INSERT INTO vehicles (licensing_plate, vehicle_type)"
-                " VALUES (:plate, :vt)"
+                "INSERT INTO vehicles (company_id, licensing_plate, vehicle_type)"
+                " VALUES (:co, :plate, :vt)"
             ),
-            {"plate": "ENUM-TEST-001", "vt": "nope"},
+            {"co": company_id, "plate": "ENUM-TEST-001", "vt": "nope"},
         )
 
 
-def test_driver_phone_unique(conn):
+def test_driver_phone_unique(conn, company_id):
     conn.execute(
-        text("INSERT INTO drivers (full_name, phone_number) VALUES (:name, :phone)"),
-        {"name": "Driver One", "phone": "+972501234567"},
+        text("INSERT INTO drivers (company_id, full_name, phone_number) VALUES (:co, :name, :phone)"),
+        {"co": company_id, "name": "Driver One", "phone": "+972501234567"},
     )
     with pytest.raises(IntegrityError):
         conn.execute(
-            text("INSERT INTO drivers (full_name, phone_number) VALUES (:name, :phone)"),
-            {"name": "Driver Two", "phone": "+972501234567"},
+            text("INSERT INTO drivers (company_id, full_name, phone_number) VALUES (:co, :name, :phone)"),
+            {"co": company_id, "name": "Driver Two", "phone": "+972501234567"},
         )
 
 
-def test_channel_identities_composite_unique(conn):
+def test_channel_identities_composite_unique(conn, company_id):
     conn.execute(
         text(
-            "INSERT INTO channel_identities (channel, external_id, phone_number)"
-            " VALUES (:ch, :ext, :phone)"
+            "INSERT INTO channel_identities (company_id, channel, external_id, phone_number)"
+            " VALUES (:co, :ch, :ext, :phone)"
         ),
-        {"ch": "telegram", "ext": "12345", "phone": "+972501111111"},
+        {"co": company_id, "ch": "telegram", "ext": "12345", "phone": "+972501111111"},
     )
     with pytest.raises(IntegrityError):
         conn.execute(
             text(
-                "INSERT INTO channel_identities (channel, external_id, phone_number)"
-                " VALUES (:ch, :ext, :phone)"
+                "INSERT INTO channel_identities (company_id, channel, external_id, phone_number)"
+                " VALUES (:co, :ch, :ext, :phone)"
             ),
-            {"ch": "telegram", "ext": "12345", "phone": "+972502222222"},
+            {"co": company_id, "ch": "telegram", "ext": "12345", "phone": "+972502222222"},
         )
 
 
-def test_vehicle_care_driver_id_nullable(conn):
+def test_vehicle_care_driver_id_nullable(conn, company_id):
     result = conn.execute(
         text(
-            "INSERT INTO vehicles (licensing_plate) VALUES (:plate) RETURNING vehicle_id"
+            "INSERT INTO vehicles (company_id, licensing_plate) VALUES (:co, :plate) RETURNING vehicle_id"
         ),
-        {"plate": "CARE-TEST-001"},
+        {"co": company_id, "plate": "CARE-TEST-001"},
     )
     vehicle_id = result.scalar()
 
@@ -87,10 +94,10 @@ def test_vehicle_care_driver_id_nullable(conn):
     conn.execute(
         text(
             "INSERT INTO vehicle_care"
-            " (vehicle_id, service_date, maintenance_type, km_at_service)"
-            " VALUES (:vid, '2024-01-01', 'small', 10000)"
+            " (company_id, vehicle_id, service_date, maintenance_type, km_at_service)"
+            " VALUES (:co, :vid, '2024-01-01', 'small', 10000)"
         ),
-        {"vid": vehicle_id},
+        {"co": company_id, "vid": vehicle_id},
     )
 
     # Non-existent driver_id must raise
@@ -99,8 +106,8 @@ def test_vehicle_care_driver_id_nullable(conn):
         conn.execute(
             text(
                 "INSERT INTO vehicle_care"
-                " (vehicle_id, service_date, maintenance_type, km_at_service, driver_id)"
-                " VALUES (:vid, '2024-01-01', 'small', 10000, :did)"
+                " (company_id, vehicle_id, service_date, maintenance_type, km_at_service, driver_id)"
+                " VALUES (:co, :vid, '2024-01-01', 'small', 10000, :did)"
             ),
-            {"vid": vehicle_id, "did": fake_driver},
+            {"co": company_id, "vid": vehicle_id, "did": fake_driver},
         )

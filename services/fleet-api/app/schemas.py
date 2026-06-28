@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from shepherd_db.models import VehicleTypeEnum
 
@@ -63,6 +63,7 @@ class VehicleRead(BaseModel):
     driver_id: UUID | None = None
     customer_id: UUID | None = None
     next_maintenance_km: int | None = None
+    next_maintenance_date: date | None = None
     next_maintenance_type: str | None = None
     last_maintenance_type: str | None = None
     last_maintenance_km: int | None = None
@@ -193,7 +194,8 @@ class VehicleCareCreate(BaseModel):
 class VehicleCareRead(BaseModel):
     care_id: UUID
     vehicle_id: UUID
-    next_maintenance_km: int
+    next_maintenance_km: int | None = None
+    next_maintenance_date: date | None = None
     next_maintenance_type: str
 
 
@@ -283,14 +285,15 @@ class ConfigUpdate(BaseModel):
 class MaintenanceTypeCreate(BaseModel):
     name: str
     description: str | None = None
-    interval_km: int
+    interval_km: int | None = None
+    interval_months: int | None = None
     steps: list[str]
 
-    @field_validator("interval_km")
+    @field_validator("interval_km", "interval_months")
     @classmethod
-    def _interval_positive(cls, v: int) -> int:
-        if v <= 0:
-            raise ValueError("interval_km must be a positive number")
+    def _interval_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("interval must be a positive number")
         return v
 
     @field_validator("steps")
@@ -298,31 +301,41 @@ class MaintenanceTypeCreate(BaseModel):
     def _steps(cls, v: list[str]) -> list[str]:
         return _validate_steps(v)
 
+    @model_validator(mode="after")
+    def _at_least_one_interval(self):
+        if self.interval_km is None and self.interval_months is None:
+            raise ValueError("at least one of interval_km or interval_months is required")
+        return self
+
 
 class MaintenanceTypeUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     interval_km: int | None = None
+    interval_months: int | None = None
     steps: list[str] | None = None
 
-    @field_validator("interval_km")
+    @field_validator("interval_km", "interval_months")
     @classmethod
     def _interval_positive(cls, v: int | None) -> int | None:
         if v is not None and v <= 0:
-            raise ValueError("interval_km must be a positive number")
+            raise ValueError("interval must be a positive number")
         return v
 
     @field_validator("steps")
     @classmethod
     def _steps(cls, v: list[str] | None) -> list[str] | None:
         return _validate_steps(v) if v is not None else v
+    # ponytail: the "at least one interval" invariant on PATCH is enforced by the DB
+    # CHECK (can't validate here without the existing row); clearing both -> 409/500.
 
 
 class MaintenanceTypeRead(BaseModel):
     id: UUID
     name: str
     description: str | None = None
-    interval_km: int
+    interval_km: int | None = None
+    interval_months: int | None = None
     steps: list[str]
 
 
@@ -524,7 +537,6 @@ class KpiDailyRead(BaseModel):
     total_km_7d: int | None = None
     avg_km_per_driver_7d: Decimal | None = None
     avg_days_between_maintenance: Decimal | None = None
-    maintenance_due_count: int | None = None
     docs_expiring_count: int | None = None
     top_customer_id: UUID | None = None
     top_customer_km: int | None = None

@@ -33,6 +33,18 @@ def update_km(body: KmUpdateRequest, session: Db, caller: Caller) -> KmUpdateRes
         is_owner = True
     assert_permitted(caller.role, Action.KM_UPDATE, is_owner=is_owner)
 
+    # Validate against the existing reading (skip when none recorded yet - first reading is free).
+    if vehicle.current_km is not None:
+        if body.km < vehicle.current_km:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="km_below_current"
+            )
+        threshold = repo.get_km_max_increment(session, vehicle.company_id)
+        if body.km - vehicle.current_km > threshold:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="km_increment_too_large"
+            )
+
     driver_id = UUID(caller.driver_id) if caller.role == Role.driver and caller.driver_id else None
     km_id, triggered = repo.update_km(session, body.vehicle_id, body.km, driver_id=driver_id, source=body.source)
     return KmUpdateResponse(km_update_id=km_id, maintenance_event_created=triggered)

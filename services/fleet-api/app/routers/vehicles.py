@@ -25,6 +25,7 @@ def _to_read(v) -> VehicleRead:
         driver_id=v.driver_id,
         customer_id=v.customer_id,
         next_maintenance_km=v.next_maintenance_km,
+        next_maintenance_date=v.next_maintenance_date,
         next_maintenance_type=v.next_maintenance_type,
         last_maintenance_type=v.last_maintenance_type,
         last_maintenance_km=v.last_maintenance_km,
