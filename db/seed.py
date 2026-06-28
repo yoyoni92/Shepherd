@@ -73,6 +73,12 @@ MAINTENANCE_TYPES = [
 VENDORS = ["Toyota", "Ford", "Hyundai", "Kia", "Volkswagen"]
 MODELS = ["Corolla", "Transit", "Tucson", "Sportage", "Caddy"]
 
+# Named default system admins (no company; recognised by the bot via normalized phone).
+SYSTEM_ADMINS = [
+    {"name": "Yehonatan Dahan", "email": "yehonatan.dahan@fleetops.io", "phone": "0503363355"},
+    {"name": "Yosef Gabay", "email": "yosef.gabay@fleetops.io", "phone": "0528588058"},
+]
+
 
 def _seed_companies(conn):
     conn.execute(
@@ -452,6 +458,26 @@ def _seed_app_users(conn):
             "phone": admin_phone,
         },
     )
+    # Named default system admins - same default password as the catch-all admin above;
+    # idempotent on email. The bot recognises them by their (normalized) phone number.
+    for sa in SYSTEM_ADMINS:
+        conn.execute(
+            text("""
+                INSERT INTO app_users (
+                    id, email, password_hash, role, company_id, name,
+                    is_system_admin, phone_number
+                )
+                VALUES (:id, :email, :hash, 'admin', NULL, :name, true, :phone)
+                ON CONFLICT (email) DO NOTHING
+            """),
+            {
+                "id": stable_uuid("app_user", sa["email"]),
+                "email": sa["email"],
+                "hash": hash_password(admin_password),
+                "name": sa["name"],
+                "phone": sa["phone"],
+            },
+        )
     # Demo company_admin bound to the Default Company.
     conn.execute(
         text("""
