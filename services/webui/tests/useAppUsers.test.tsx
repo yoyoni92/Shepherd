@@ -13,7 +13,7 @@ describe('useAppUsers', () => {
     await waitFor(() => expect(result.current.users.length).toBeGreaterThan(0))
     expect(result.current.users[0]).toMatchObject({
       user_id: 'au1',
-      email: 'admin@fleetops.io',
+      email: 'admin@shepherd.ai',
       role: 'admin',
       is_system_admin: true,
       phone_number: '+972500000000',
@@ -37,7 +37,7 @@ describe('useAppUsers', () => {
     await waitFor(() => expect(result.current.users.length).toBeGreaterThan(0))
     await act(async () => {
       await result.current.add({
-        email: 'sa@fleetops.io',
+        email: 'sa@shepherd.ai',
         password: 'pw',
         role: 'admin',
         company_id: null,

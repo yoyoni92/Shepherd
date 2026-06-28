@@ -19,7 +19,7 @@ from tests.conftest import (
 
 
 def _make_system_admin(client, phone: str) -> str:
-    email = f"op-{uuid.uuid4().hex[:8]}@fleetops.io"
+    email = f"op-{uuid.uuid4().hex[:8]}@shepherd.ai"
     r = client.post(
         "/app-users",
         headers=superadmin_headers(),
@@ -163,7 +163,7 @@ def test_overview_excludes_internal_company(client, pg_engine):
 def test_list_company_admins_scoped(client):
     company_a = _new_company(client, f"Co-A {uuid.uuid4().hex[:6]}")
     company_b = _new_company(client, f"Co-B {uuid.uuid4().hex[:6]}")
-    email_a = f"ca-{uuid.uuid4().hex[:8]}@fleetops.io"
+    email_a = f"ca-{uuid.uuid4().hex[:8]}@shepherd.ai"
     client.post(
         "/app-users",
         headers=superadmin_headers(),
@@ -173,7 +173,7 @@ def test_list_company_admins_scoped(client):
         "/app-users",
         headers=superadmin_headers(),
         json={
-            "email": f"cb-{uuid.uuid4().hex[:8]}@fleetops.io",
+            "email": f"cb-{uuid.uuid4().hex[:8]}@shepherd.ai",
             "password": "pw",
             "role": "company_admin",
             "company_id": company_b,

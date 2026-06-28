@@ -439,7 +439,7 @@ def _seed_company_settings(conn):
 
 def _seed_app_users(conn):
     # System admin (no company) - credentials default to the webui .env.example values.
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@fleetops.io")
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@shepherd.ai")
     admin_password = os.environ.get("ADMIN_PASSWORD", "shepherd")
     admin_phone = os.environ.get("ADMIN_PHONE", "+972500000000")
     conn.execute(
@@ -486,8 +486,8 @@ def _seed_app_users(conn):
             ON CONFLICT (email) DO NOTHING
         """),
         {
-            "id": stable_uuid("app_user", "company@fleetops.io"),
-            "email": "company@fleetops.io",
+            "id": stable_uuid("app_user", "company@shepherd.ai"),
+            "email": "company@shepherd.ai",
             "hash": hash_password("shepherd"),
             "company_id": DEFAULT_COMPANY_ID,
         },

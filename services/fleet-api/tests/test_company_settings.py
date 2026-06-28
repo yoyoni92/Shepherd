@@ -190,7 +190,7 @@ def test_login_includes_company_feature_flags(client):
         headers=superadmin_headers(),
         json={"feature_flags": {"attendance": True}},
     )
-    email = f"ca-{uuid.uuid4().hex[:8]}@fleetops.io"
+    email = f"ca-{uuid.uuid4().hex[:8]}@shepherd.ai"
     created = client.post(
         "/app-users",
         headers=superadmin_headers(),
@@ -209,7 +209,7 @@ def test_login_includes_company_feature_flags(client):
 
 
 def test_login_system_admin_has_empty_flags(client):
-    email = f"sa-{uuid.uuid4().hex[:8]}@fleetops.io"
+    email = f"sa-{uuid.uuid4().hex[:8]}@shepherd.ai"
     client.post(
         "/app-users",
         headers=superadmin_headers(),

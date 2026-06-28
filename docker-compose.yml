@@ -78,7 +78,7 @@ services:
       # Public: rendered as the plain t.me/<bot> link on the driver card. NEXT_PUBLIC_*
       # is inlined at build time, so a non-default bot name needs a rebuild.
       NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fleetops.io}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@shepherd.ai}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-shepherd}
       # Server-only: the Fleet proxy injects the internal token. Not exposed to the browser.
       FLEET_API_URL: http://fleet-api:8000

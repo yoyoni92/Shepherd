@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 // Login -> navigate every section -> no crash.
 test('login and navigate all sections without error', async ({ page }) => {
   await page.goto('/')
-  await page.fill('input[type="email"]', process.env.ADMIN_EMAIL ?? 'admin@fleetops.io')
+  await page.fill('input[type="email"]', process.env.ADMIN_EMAIL ?? 'admin@shepherd.ai')
   await page.fill('input[type="password"]', process.env.ADMIN_PASSWORD ?? 'shepherd')
   await page.click('button:has-text("כניסה למערכת")')
   await expect(page).toHaveURL('/dashboard')

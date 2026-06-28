@@ -92,7 +92,7 @@ robust to the Hebrew labels:
   /companies,/access,/health,/config,/vehicles,/drivers,/bot; has no top-level
   /maintenance-types,/accidents,/chat; maintenance-types is a tab under Vehicles and
   accidents a tab under Events.
-- `company-admin.spec.ts` - company@fleetops.io: sidebar hides the system-only sections,
+- `company-admin.spec.ts` - company@shepherd.ai: sidebar hides the system-only sections,
   keeps /vehicles,/drivers,/bot; navigating to /companies is redirected to /dashboard
   (middleware role gate); their company vehicles load without error.
 - `helpers.ts` - shared NextAuth login driver + seeded-user constants.

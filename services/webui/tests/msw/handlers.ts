@@ -63,7 +63,7 @@ const COMPANIES = [
 ]
 
 const APP_USERS = [
-  { user_id: 'au1', email: 'admin@fleetops.io', role: 'admin', company_id: null, is_active: true, name: 'מנהל', is_system_admin: true, phone_number: '+972500000000', created_at: '2026-01-01T00:00:00Z' },
+  { user_id: 'au1', email: 'admin@shepherd.ai', role: 'admin', company_id: null, is_active: true, name: 'מנהל', is_system_admin: true, phone_number: '+972500000000', created_at: '2026-01-01T00:00:00Z' },
   { user_id: 'au2', email: 'ca@co1.io', role: 'company_admin', company_id: 'co1', is_active: true, name: 'מנהל חברה', is_system_admin: false, phone_number: null, created_at: '2026-01-02T00:00:00Z' },
 ]
 

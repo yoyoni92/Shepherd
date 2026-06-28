@@ -2,8 +2,8 @@ import { expect, type Page, type Locator } from '@playwright/test'
 
 // Seeded app users (db/seed.py `_seed_app_users`): a system admin with no company
 // and a company_admin bound to the Default Company. Passwords default to `shepherd`.
-export const ADMIN = { email: 'admin@fleetops.io', password: 'shepherd' }
-export const COMPANY_ADMIN = { email: 'company@fleetops.io', password: 'shepherd' }
+export const ADMIN = { email: 'admin@shepherd.ai', password: 'shepherd' }
+export const COMPANY_ADMIN = { email: 'company@shepherd.ai', password: 'shepherd' }
 
 // Drive the real NextAuth credentials form (POST /auth/login via the Fleet proxy)
 // and wait for the post-login redirect to /dashboard.
