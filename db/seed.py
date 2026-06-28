@@ -8,8 +8,11 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import create_engine, text
 
+from shepherd_config import get_config
 from shepherd_db.logic import next_maintenance
 from shepherd_db.security import hash_password
+
+from provisioning import provision_company
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -78,6 +81,25 @@ SYSTEM_ADMINS = [
     {"name": "Yehonatan Dahan", "email": "yehonatan.dahan@shepherd.ai", "phone": "0503363355"},
     {"name": "Yosef Gabay", "email": "yosef.gabay@shepherd.ai", "phone": "0528588058"},
 ]
+
+
+def _schema_for(conn, company_id, cfg) -> str:
+    """The company's schema_name (data), falling back to the shared schema."""
+    shared = cfg.database.shared_schema
+    row = conn.execute(
+        text("SELECT schema_name FROM company_settings WHERE company_id = :id"),
+        {"id": company_id},
+    ).scalar()
+    return row or shared
+
+
+def _use_schema(conn, schema: str) -> None:
+    # Tenant inserts resolve to <schema>; companies/enum types fall back to public.
+    conn.exec_driver_sql(f'SET search_path TO "{schema}", public')
+
+
+def _use_public(conn) -> None:
+    conn.exec_driver_sql("SET search_path TO public")
 
 
 def _seed_companies(conn):
@@ -424,17 +446,23 @@ def _seed_channel_identities(conn):
         )
 
 
-def _seed_company_settings(conn):
-    # The Default Company starts with attendance OFF (empty feature_flags) and Drive
-    # unconfigured (null folder + credentials). System admin configures these per company.
-    # schema_name sentinel: plan-02 provisioning overwrites this with the real schema name.
+def _seed_company_settings(conn, cfg=None):
+    # schema_name comes from config (data). Default Company -> its configured schema.
+    # If no config (test env without config.toml), fall back to sentinel.
+    if cfg is not None:
+        schema = next(
+            (c.schema_name for c in cfg.companies if c.slug == "default"),
+            cfg.database.shared_schema,
+        )
+    else:
+        schema = "__pending__"
     conn.execute(
         text("""
             INSERT INTO company_settings (company_id, schema_name, feature_flags)
-            VALUES (:id, '__pending__', '{}'::jsonb)
-            ON CONFLICT (company_id) DO NOTHING
+            VALUES (:id, :schema, '{}'::jsonb)
+            ON CONFLICT (company_id) DO UPDATE SET schema_name = EXCLUDED.schema_name
         """),
-        {"id": DEFAULT_COMPANY_ID},
+        {"id": DEFAULT_COMPANY_ID, "schema": schema},
     )
 
 
@@ -495,7 +523,7 @@ def _seed_app_users(conn):
     )
 
 
-def _seed_playground(conn):
+def _seed_playground(conn, cfg=None):
     """Built-in sandbox company (is_internal) with attendance ON + mock drivers/vehicles.
 
     Drive stays unconfigured. Idempotent via fixed ids / ON CONFLICT.
@@ -509,15 +537,18 @@ def _seed_playground(conn):
         {"id": PLAYGROUND_COMPANY_ID},
     )
     # Attendance ON so the sandbox surfaces every flow; Drive left empty.
-    # schema_name sentinel: plan-02 provisioning overwrites this with the real schema name.
+    # schema_name from config (shared schema); falls back to sentinel when no config.
+    shared_schema = cfg.database.shared_schema if cfg is not None else "__pending__"
     conn.execute(
         text("""
             INSERT INTO company_settings (company_id, schema_name, feature_flags)
-            VALUES (:id, '__pending__', '{"attendance": true}'::jsonb)
-            ON CONFLICT (company_id) DO NOTHING
+            VALUES (:id, :schema, '{"attendance": true}'::jsonb)
+            ON CONFLICT (company_id) DO UPDATE SET schema_name = EXCLUDED.schema_name
         """),
-        {"id": PLAYGROUND_COMPANY_ID},
+        {"id": PLAYGROUND_COMPANY_ID, "schema": shared_schema},
     )
+    if cfg is not None:
+        _use_schema(conn, _schema_for(conn, PLAYGROUND_COMPANY_ID, cfg))
     for i in range(1, 4):
         conn.execute(
             text("""
@@ -558,13 +589,33 @@ def _seed_playground(conn):
                 "driver_id": stable_uuid("pg_driver", i),
             },
         )
+    if cfg is not None:
+        _use_public(conn)
 
 
 def seed(engine):
+    # ponytail: tests without config get public-only routing; production (db-init)
+    # always has SHEPHERD_CONFIG so provisioning and schema routing run.
+    try:
+        cfg = get_config()
+    except FileNotFoundError:
+        cfg = None
+
+    if cfg is not None:
+        for schema in {c.schema_name for c in cfg.companies}:
+            provision_company(engine, schema, shared_schema=cfg.database.shared_schema)
+
     with engine.connect() as conn:
+        # ---- public rows (no schema routing) ----
         _seed_companies(conn)
-        _seed_company_settings(conn)
-        _seed_playground(conn)
+        _seed_company_settings(conn, cfg)
+        _seed_playground(conn, cfg)            # company + settings rows (public) + playground tenant rows
+        _seed_system_config(conn)              # system_config is public
+        _seed_channel_identities(conn)         # channel_identities is public
+        _seed_app_users(conn)                  # app_users is public
+        # ---- Default Company tenant rows, under its schema ----
+        if cfg is not None:
+            _use_schema(conn, _schema_for(conn, DEFAULT_COMPANY_ID, cfg))
         _seed_drivers(conn)
         _seed_customers(conn)
         _seed_maintenance_types(conn)
@@ -575,13 +626,12 @@ def seed(engine):
         _seed_vehicle_care(conn)
         _seed_reports(conn)
         _seed_events(conn)
-        _seed_system_config(conn)
-        _seed_channel_identities(conn)
-        _seed_app_users(conn)
+        if cfg is not None:
+            _use_public(conn)
         conn.commit()
 
 
 if __name__ == "__main__":
-    engine = create_engine(DATABASE_URL)
+    engine = create_engine(get_config().database.url)
     seed(engine)
     print("Seed complete.")

@@ -9,6 +9,7 @@ packages = [{ include = "shepherd_db" }]
 python = "^3.12"
 sqlalchemy = "^2.0"
 psycopg = {extras = ["binary"], version = "^3.1"}
+shepherd-config = { path = "../libs/shepherd_config", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

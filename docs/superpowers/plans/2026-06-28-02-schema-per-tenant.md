@@ -391,7 +391,7 @@ second company sharing a schema name is a no-op."
 
 Steps:
 
-- [ ] 1. Write the failing test `db/tests/test_build_provisions.py`:
+- [x] 1. Write the failing test `db/tests/test_build_provisions.py`:
 
 ```python
 """build() creates only public tables in public, then provisions each config schema
@@ -443,12 +443,12 @@ def test_build_keeps_tenant_tables_out_of_public_and_provisions_config_schema(en
     assert "drivers" in set(insp.get_table_names(schema="co_default"))
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd db && poetry run pytest tests/test_build_provisions.py -q`
   Expected: `assert 'drivers' not in public_tables` fails (today `create_all` creates every table
   in public).
 
-- [ ] 3. Minimal impl `db/create_schema.py`:
+- [x] 3. Minimal impl `db/create_schema.py`:
 
 ```python
 #!/usr/bin/env python3
@@ -495,10 +495,10 @@ if __name__ == "__main__":
   resolves because db-init and the test fixtures put `db/` on `sys.path` (existing pattern in
   `conftest.apply_schema`).
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd db && poetry run pytest tests/test_build_provisions.py -q`
 
-- [ ] 5. Update `db/seed.py` so tenant rows land in the company's schema. Replace the imports and
+- [x] 5. Update `db/seed.py` so tenant rows land in the company's schema. Replace the imports and
   add a search_path helper + per-company seeding. At the top, after the existing imports:
 
 ```python
@@ -602,10 +602,10 @@ def seed(engine):
   every `[[company]]` entry is the ceiling, not built here. When a config schema equals the shared
   schema, search_path routing is a no-op and behaviour matches today.
 
-- [ ] 6. Run the db test suite (ensure seed still imports/parses and existing db tests are green):
+- [x] 6. Run the db test suite (ensure seed still imports/parses and existing db tests are green):
   `cd db && poetry run pytest -q`
 
-- [ ] 7. Commit:
+- [x] 7. Commit:
 
 ```
 git add db/create_schema.py db/seed.py db/tests/test_build_provisions.py
