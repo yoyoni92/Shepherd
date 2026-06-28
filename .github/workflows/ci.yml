@@ -1,19 +1,21 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (a new PR push supersedes the previous one).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Image push authenticates to Docker Hub with repo secrets, not GITHUB_TOKEN, so read is enough.
+permissions:
+  contents: read
 
 jobs:
-  libs:
+  detect:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: libs
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pipx install poetry
-      - run: poetry install
-      - run: poetry run pytest -q
-  # Per-service jobs (fleet-api, telegram-bot, webui) added as each is built.
