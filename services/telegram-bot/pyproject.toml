@@ -14,6 +14,7 @@ psycopg-pool = "^3.2"
 openai = "^1.50"
 google-genai = "^1.0"
 pydantic-settings = "^2.5"
+shepherd-config = { path = "../../libs/shepherd_config", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

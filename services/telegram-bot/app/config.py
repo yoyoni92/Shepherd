@@ -1,6 +1,7 @@
 """Environment-backed settings for the Telegram bot."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from shepherd_config import get_config
 
 
 class Settings(BaseSettings):
@@ -23,3 +24,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+try:
+    _cfg = get_config()
+except FileNotFoundError:
+    _cfg = None  # ponytail: no config.toml in some envs (unit tests) -> keep env defaults
+if _cfg is not None:
+    settings.database_url = _cfg.database.url
+    settings.fleet_api_url = _cfg.services.fleet_api_url

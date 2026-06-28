@@ -10,8 +10,26 @@ import pytest
 import respx
 from app import sessions
 from app.fleet import FleetClient
+from shepherd_config import get_config
 
 FLEET = "http://fleet-api:8000"
+
+
+@pytest.fixture(autouse=True)
+def _reset_config_overlay():
+    """Restore the two overlaid config fields and clear LRU cache after each test.
+
+    Tests that call importlib.reload(app.config) create a new settings object;
+    this fixture ensures subsequent tests see the original default values.
+    """
+    import app.config as _config
+
+    saved_db = _config.settings.database_url
+    saved_fleet = _config.settings.fleet_api_url
+    yield
+    get_config.cache_clear()
+    _config.settings.database_url = saved_db
+    _config.settings.fleet_api_url = saved_fleet
 
 
 @pytest.fixture
