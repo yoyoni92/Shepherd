@@ -126,11 +126,14 @@ export const AttendanceRecordReadSchema = z.object({
   status: z.string(), // present | late | leave | absent
 })
 
-// Per-company attendance clock-in window (mirrors fleet-api AttendanceSettings).
+// Per-company attendance window + working-day rules (mirrors fleet-api AttendanceSettings).
 export const AttendanceSettingsSchema = z.object({
   enabled: z.boolean(),
   start: z.string(), // HH:MM
   end: z.string(), // HH:MM
+  work_days: z.array(z.number()), // 0=Sun..6=Sat
+  chag_working: z.boolean(),
+  erev_chag_working: z.boolean(),
 })
 export type AttendanceSettings = z.infer<typeof AttendanceSettingsSchema>
 

@@ -67,9 +67,11 @@ export function AttendanceEditModal({ month, employee, monthLabel, onPatch, onCl
                 style={{ gridTemplateColumns: '3px 1.4fr 1fr 1fr 1.2fr 64px', gap: 10, padding: '7px 0' }}
               >
                 <div style={{ minWidth: 3, width: 3, height: 30, borderRadius: 3, background: STATUS_ACCENT[d.status] }} />
-                <div>
+                <div className="min-w-0">
                   <div className="text-[13px] font-semibold ltr">{d.dateLabel}</div>
-                  <div className="text-[10.5px] text-faint">יום {d.weekday}</div>
+                  <div className="text-[10.5px] text-faint truncate">
+                    {d.note ? d.note : `יום ${d.weekday}`}
+                  </div>
                 </div>
                 <input
                   type="time"

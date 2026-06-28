@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Avatar } from '@/components/Avatar'
-import { ATT_STATUS_META } from '@/components/meta'
+import { ATT_STATUS_META, HOLIDAY_META } from '@/components/meta'
 import { AttendanceEditModal } from '@/components/AttendanceEditModal'
 
 const GRID = '2fr 88px 116px 116px 86px 78px 108px 64px'
@@ -20,12 +20,17 @@ const timeFieldStyle = {
   border: '1px solid var(--line)',
 } as const
 
-// הגדרות tab: the company-scoped clock-in window (relocated from system הגדרות in Feature 7).
+const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+
+// הגדרות tab: the company-scoped clock-in window + working-day rules (relocated in Feature 7).
 function AttendanceConfigPanel() {
   const { settings, loading, save } = useAttendanceSettings()
   const [enabled, setEnabled] = useState(false)
   const [start, setStart] = useState('07:00')
   const [end, setEnd] = useState('17:00')
+  const [workDays, setWorkDays] = useState<number[]>([0, 1, 2, 3, 4])
+  const [chagWorking, setChagWorking] = useState(false)
+  const [erevChagWorking, setErevChagWorking] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
@@ -35,14 +40,29 @@ function AttendanceConfigPanel() {
     setEnabled(settings.enabled)
     setStart(settings.start || '07:00')
     setEnd(settings.end || '17:00')
+    setWorkDays(settings.work_days ?? [0, 1, 2, 3, 4])
+    setChagWorking(settings.chag_working ?? false)
+    setErevChagWorking(settings.erev_chag_working ?? true)
   }, [settings])
+
+  const toggleDay = (d: number) => {
+    setOk(false)
+    setWorkDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)))
+  }
 
   const submit = async () => {
     setErr(null)
     setOk(false)
     setBusy(true)
     try {
-      await save({ enabled, start, end })
+      await save({
+        enabled,
+        start,
+        end,
+        work_days: workDays,
+        chag_working: chagWorking,
+        erev_chag_working: erevChagWorking,
+      })
       setOk(true)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'שמירת ההגדרות נכשלה')
@@ -76,7 +96,7 @@ function AttendanceConfigPanel() {
         </label>
       </div>
 
-      <div className="flex items-center gap-5" style={{ padding: '18px 0', opacity: enabled ? 1 : 0.5 }}>
+      <div className="flex items-center gap-5 border-b border-divider" style={{ padding: '18px 0', opacity: enabled ? 1 : 0.5 }}>
         <div className="flex-1 text-[13px] text-faint">טווח שעות מותר</div>
         <div className="flex items-center gap-2">
           <input
@@ -105,12 +125,77 @@ function AttendanceConfigPanel() {
         </div>
       </div>
 
+      <div className="border-b border-divider" style={{ padding: '18px 0' }}>
+        <div className="text-[14.5px] font-bold mb-[3px]">ימי עבודה</div>
+        <div className="text-[12px] text-faint mb-[12px]">
+          ימים שאינם מסומנים (כולל שבת) לא נספרים כהיעדרות בדוח החודשי.
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {WEEKDAYS.map((name, d) => {
+            const on = workDays.includes(d)
+            return (
+              <button
+                key={d}
+                onClick={() => toggleDay(d)}
+                className="text-[12.5px] font-bold rounded-lg border cursor-pointer"
+                style={{
+                  padding: '7px 13px',
+                  color: on ? 'var(--accent, #60a5fa)' : 'var(--muted, #94a3b8)',
+                  background: on ? 'rgba(96,165,250,.12)' : 'var(--panel-2, #0f172a)',
+                  borderColor: on ? 'var(--accent, #60a5fa)' : 'var(--line)',
+                }}
+              >
+                {name}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-5 border-b border-divider" style={{ padding: '18px 0' }}>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14.5px] font-bold mb-[3px]">חג (יום טוב)</div>
+          <div className="text-[12px] text-faint">כבוי = ימי חג אינם ימי עבודה ולא נספרים בדוח.</div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={chagWorking}
+            onChange={(e) => {
+              setChagWorking(e.target.checked)
+              setOk(false)
+            }}
+            style={{ width: 16, height: 16 }}
+          />
+          <span className="text-[13px]">{chagWorking ? 'יום עבודה' : 'יום מנוחה'}</span>
+        </label>
+      </div>
+
+      <div className="flex items-center gap-5" style={{ padding: '18px 0' }}>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14.5px] font-bold mb-[3px]">ערב חג</div>
+          <div className="text-[12px] text-faint">מופעל = ערבי חג נחשבים ימי עבודה רגילים.</div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={erevChagWorking}
+            onChange={(e) => {
+              setErevChagWorking(e.target.checked)
+              setOk(false)
+            }}
+            style={{ width: 16, height: 16 }}
+          />
+          <span className="text-[13px]">{erevChagWorking ? 'יום עבודה' : 'יום מנוחה'}</span>
+        </label>
+      </div>
+
       {err && <p className="text-[12px] pt-3" style={{ color: '#f87171' }}>{err}</p>}
       {ok && <p className="text-[12px] pt-3" style={{ color: '#86efac' }}>ההגדרות נשמרו ✓</p>}
 
       <div className="flex justify-start pt-[18px]">
         <Button onClick={submit} disabled={busy}>
-          {busy ? 'שומר…' : 'שמירת חלון דיווח'}
+          {busy ? 'שומר…' : 'שמירת הגדרות'}
         </Button>
       </div>
     </Card>
@@ -140,7 +225,7 @@ function AttendanceRecords() {
   const [idx, setIdx] = useState(MONTHS.length - 1)
   const [editId, setEditId] = useState<string | null>(null)
   const current = MONTHS[idx]
-  const { month, loading, patchDay } = useAttendance(current.key)
+  const { month, holidays, loading, patchDay } = useAttendance(current.key)
 
   const label = month?.label ?? current.label
   const employees = month?.employees ?? []
@@ -151,7 +236,7 @@ function AttendanceRecords() {
     patchDay({ employeeId, day, patch })
 
   const exportCsv = () => {
-    const csv = buildCsv(employees, records)
+    const csv = buildCsv(employees, records, holidays)
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -223,6 +308,27 @@ function AttendanceRecords() {
           </Card>
         ))}
       </div>
+
+      {holidays.length > 0 && (
+        <Card className="rounded-[13px] mb-[18px]" style={{ padding: '14px 18px' }}>
+          <div className="text-[12.5px] font-bold text-faint mb-[10px]">חגי ומועדי החודש</div>
+          <div className="flex flex-wrap gap-2">
+            {holidays.map((h) => {
+              const c = HOLIDAY_META[h.kind]
+              return (
+                <span
+                  key={`${h.day}-${h.name}`}
+                  className="text-[11.5px] font-bold rounded-md inline-flex items-center gap-[6px] whitespace-nowrap"
+                  style={{ color: c.color, background: c.bg, padding: '4px 10px' }}
+                >
+                  <span className="ltr opacity-80">{h.dateLabel}</span>
+                  {h.name}
+                </span>
+              )
+            })}
+          </div>
+        </Card>
+      )}
 
       <Card className="overflow-hidden">
         <div

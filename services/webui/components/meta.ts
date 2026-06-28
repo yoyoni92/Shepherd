@@ -1,5 +1,6 @@
 // Presentational colour/label maps for the design's tinted pills.
 import type { EmployeeStatus } from '@/lib/attendance'
+import type { HolidayKind } from '@/lib/holidays'
 import type { AlertSeverity } from '@/lib/alerts'
 
 export interface Meta {
@@ -34,6 +35,14 @@ export const ATT_STATUS_META: Record<EmployeeStatus, Meta> = {
   ok: { color: '#34d399', bg: 'rgba(52,211,153,.12)', label: 'תקין' },
   late: { color: '#fbbf24', bg: 'rgba(251,191,36,.12)', label: 'איחורים' },
   absent: { color: '#f87171', bg: 'rgba(248,113,113,.12)', label: 'היעדרויות' },
+}
+
+// Holiday note pills: חג (no-work) red-toned, ערב חג amber, fasts violet, festive/minor blue.
+export const HOLIDAY_META: Record<HolidayKind, Meta> = {
+  chag: { color: '#f87171', bg: 'rgba(248,113,113,.12)', label: 'חג' },
+  erev: { color: '#fbbf24', bg: 'rgba(251,191,36,.12)', label: 'ערב חג' },
+  fast: { color: '#a78bfa', bg: 'rgba(167,139,250,.12)', label: 'צום' },
+  minor: { color: '#60a5fa', bg: 'rgba(96,165,250,.12)', label: 'מועד' },
 }
 
 export const ALERT_COLOR: Record<AlertSeverity, string> = {

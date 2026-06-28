@@ -139,7 +139,14 @@ export const handlers = [
 
   // Attendance settings (company-scoped window) - must precede the :month read below
   http.get(`${FLEET}/attendance/settings`, () =>
-    HttpResponse.json({ enabled: false, start: '07:00', end: '17:00' }),
+    HttpResponse.json({
+      enabled: false,
+      start: '07:00',
+      end: '17:00',
+      work_days: [0, 1, 2, 3, 4],
+      chag_working: false,
+      erev_chag_working: true,
+    }),
   ),
   http.put(`${FLEET}/attendance/settings`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>

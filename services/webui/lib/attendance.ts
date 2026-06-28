@@ -1,5 +1,7 @@
 // Attendance domain types. Employees are drivers (id is the driver UUID); the webui
 // generates the weekday skeleton and overlays records fetched from the Fleet API.
+import type { Holiday } from './holidays'
+
 export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent'
 
 export interface AttendanceDay {
@@ -9,7 +11,20 @@ export interface AttendanceDay {
   in: string
   out: string
   status: AttendanceStatus
+  note?: string // holiday name, when the day falls on a מועד
 }
+
+/** Per-company working-day rules that shape which days the skeleton includes. */
+export interface WorkDayConfig {
+  workDays: number[] // weekday numbers that are regular work days (0=Sun..6=Sat)
+  chagWorking: boolean // count Yom Tov (חג) days as working
+  erevChagWorking: boolean // count holiday eves (ערב חג) as working
+  holidays?: Map<number, Holiday> // day-of-month -> holiday note overlay
+}
+
+/** Default: Sun-Thu work, חג off, ערב חג on (mirrors the fleet-api settings defaults). */
+export const DEFAULT_WORK_DAYS: readonly number[] = [0, 1, 2, 3, 4]
+const DEFAULT_CONFIG: WorkDayConfig = { workDays: [...DEFAULT_WORK_DAYS], chagWorking: false, erevChagWorking: true }
 
 export interface Employee {
   id: string
@@ -48,15 +63,27 @@ export function monthOptions(count = 3, today: Date = new Date()): { key: string
   return out
 }
 
-/** Weekday skeleton (Fri/Sat skipped) for each employee; days default to empty 'present'. */
-export function buildMonthSkeleton(monthKey: string, employees: readonly Employee[]): AttendanceMonth {
+/**
+ * Working-day skeleton for each employee; days default to empty 'present'.
+ * Non-working weekdays are skipped, as are חג/ערב חג days when the company marks them
+ * non-working, so holidays never count as 'absent'. Holiday names ride along as `note`.
+ */
+export function buildMonthSkeleton(
+  monthKey: string,
+  employees: readonly Employee[],
+  config: Partial<WorkDayConfig> = {},
+): AttendanceMonth {
+  const { workDays, chagWorking, erevChagWorking, holidays } = { ...DEFAULT_CONFIG, ...config }
   const [y, m] = monthKey.split('-').map(Number)
   const cap = new Date(y, m, 0).getDate()
   const skeleton: AttendanceDay[] = []
   for (let d = 1; d <= cap; d++) {
     const dow = new Date(`${monthKey}-${pad(d)}T00:00:00`).getDay()
-    if (dow === 5 || dow === 6) continue // Fri/Sat weekend
-    skeleton.push({ day: d, dateLabel: `${pad(d)}/${pad(m)}`, weekday: WD[dow], in: '', out: '', status: 'present' })
+    if (!workDays.includes(dow)) continue // weekend / non-working weekday (incl. שבת)
+    const hol = holidays?.get(d)
+    if (hol?.kind === 'chag' && !chagWorking) continue
+    if (hol?.kind === 'erev' && !erevChagWorking) continue
+    skeleton.push({ day: d, dateLabel: `${pad(d)}/${pad(m)}`, weekday: WD[dow], in: '', out: '', status: 'present', note: hol?.name })
   }
   const records: Record<string, AttendanceDay[]> = {}
   for (const e of employees) records[e.id] = skeleton.map((d) => ({ ...d }))
@@ -172,10 +199,11 @@ export function isValidTimeRange(inT: string, outT: string): boolean {
   return Number.isFinite(a) && Number.isFinite(b) && b > a
 }
 
-/** UTF-8 CSV body (no BOM) for the selected month. */
+/** UTF-8 CSV body (no BOM) for the selected month, with an optional חגים section. */
 export function buildCsv(
   employees: readonly Employee[],
   records: Record<string, AttendanceDay[]>,
+  holidays: readonly Holiday[] = [],
 ): string {
   const head = [
     'עובד',
@@ -194,6 +222,10 @@ export function buildCsv(
         .map((x) => `"${x}"`)
         .join(','),
     )
+  }
+  if (holidays.length) {
+    lines.push('', '"חגים ומועדים"', '"תאריך","מועד"')
+    for (const h of holidays) lines.push(`"${h.dateLabel}","${h.name}"`)
   }
   return lines.join('\n')
 }

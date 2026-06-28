@@ -33,6 +33,8 @@ the system-admin per-company attendance enable.
 Backend (TDD) - DOING NOW:
 - [x] **E1** `GET/PUT /attendance/settings` (window keys, MANAGE_ATTENDANCE, scoped to
       caller.company_id; 400 if no company). test_attendance_settings.py; fleet-api 160 passed.
+      Later extended with working-day rules (`work_days`, `chag_working`, `erev_chag_working`)
+      - see `att-holidays-and-workdays.md`.
 
 Webui (frontend-design) - AFTER:
 - [x] **E2** nav: remove נוכחות for role=admin (keep company_admin flag-gated). filterNav now

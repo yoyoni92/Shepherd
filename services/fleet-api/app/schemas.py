@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from shepherd_db.models import VehicleTypeEnum
 
@@ -480,10 +480,14 @@ class AppUserUpdate(BaseModel):
 
 
 class AttendanceSettings(BaseModel):
-    """Per-company attendance clock-in window (stored in system_config)."""
+    """Per-company attendance window + working-day rules (stored in system_config)."""
     enabled: bool = False
     start: str = "00:00"
     end: str = "23:59"
+    # Working-day rules: weekday numbers (0=Sun..6=Sat) plus how חג / ערב חג are treated.
+    work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
+    chag_working: bool = False
+    erev_chag_working: bool = True
 
 
 class AppUserRead(BaseModel):

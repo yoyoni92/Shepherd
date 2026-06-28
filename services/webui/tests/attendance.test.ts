@@ -14,6 +14,14 @@ import {
   type AttendanceDay,
   type Employee,
 } from '@/lib/attendance'
+import type { Holiday } from '@/lib/holidays'
+
+const hol = (day: number, kind: Holiday['kind'], name: string): Holiday => ({
+  day,
+  dateLabel: `${String(day).padStart(2, '0')}/06`,
+  name,
+  kind,
+})
 
 const day = (over: Partial<AttendanceDay>): AttendanceDay => ({
   day: 1,
@@ -115,6 +123,14 @@ describe('buildCsv', () => {
     expect(lines[1]).toContain('דנה לוי')
     expect(lines).toHaveLength(2)
   })
+  it('appends a חגים section when holidays are supplied', () => {
+    const employees: Employee[] = [{ id: '1', name: 'דנה לוי', role: 'נהג' }]
+    const records = { '1': [day({ in: '08:00', out: '17:00' })] }
+    const csv = buildCsv(employees, records, [hol(7, 'chag', 'פסח א׳')])
+    expect(csv).toContain('חגים ומועדים')
+    expect(csv).toContain('פסח א׳')
+    expect(csv).toContain('07/06')
+  })
 })
 
 describe('month helpers', () => {
@@ -132,5 +148,39 @@ describe('month helpers', () => {
     expect(days.length).toBeGreaterThan(0)
     // no Friday/Saturday in the skeleton
     expect(days.every((d) => d.weekday !== 'שישי' && d.weekday !== 'שבת')).toBe(true)
+  })
+})
+
+describe('buildMonthSkeleton working-day rules', () => {
+  const emp: Employee[] = [{ id: 'd1', name: 'A', role: 'נהג' }]
+  const all = [0, 1, 2, 3, 4, 5, 6]
+  const dayOf = (month: ReturnType<typeof buildMonthSkeleton>, d: number) =>
+    month.records['d1'].find((x) => x.day === d)
+
+  it('custom workDays let Friday/Saturday into the skeleton', () => {
+    const month = buildMonthSkeleton('2026-06', emp, { workDays: all })
+    expect(month.records['d1'].some((d) => d.weekday === 'שבת')).toBe(true)
+  })
+
+  it('excludes חג days unless chagWorking is on', () => {
+    const holidays = new Map([[10, hol(10, 'chag', 'פסח א׳')]])
+    const off = buildMonthSkeleton('2026-06', emp, { workDays: all, chagWorking: false, holidays })
+    expect(dayOf(off, 10)).toBeUndefined()
+    const on = buildMonthSkeleton('2026-06', emp, { workDays: all, chagWorking: true, holidays })
+    expect(dayOf(on, 10)?.note).toBe('פסח א׳')
+  })
+
+  it('keeps ערב חג by default but drops it when erevChagWorking is off', () => {
+    const holidays = new Map([[10, hol(10, 'erev', 'ערב פסח')]])
+    const on = buildMonthSkeleton('2026-06', emp, { workDays: all, holidays })
+    expect(dayOf(on, 10)?.note).toBe('ערב פסח')
+    const off = buildMonthSkeleton('2026-06', emp, { workDays: all, erevChagWorking: false, holidays })
+    expect(dayOf(off, 10)).toBeUndefined()
+  })
+
+  it('attaches a note to working days that fall on a minor מועד', () => {
+    const holidays = new Map([[10, hol(10, 'minor', 'חנוכה')]])
+    const month = buildMonthSkeleton('2026-06', emp, { workDays: all, holidays })
+    expect(dayOf(month, 10)?.note).toBe('חנוכה')
   })
 })

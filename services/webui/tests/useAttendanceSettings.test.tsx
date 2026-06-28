@@ -11,7 +11,14 @@ describe('useAttendanceSettings', () => {
   it('reads the company clock-in window', async () => {
     const { result } = renderHook(() => useAttendanceSettings(), { wrapper: QueryClientWrapper })
     await waitFor(() => expect(result.current.settings).toBeDefined())
-    expect(result.current.settings).toEqual({ enabled: false, start: '07:00', end: '17:00' })
+    expect(result.current.settings).toEqual({
+      enabled: false,
+      start: '07:00',
+      end: '17:00',
+      work_days: [0, 1, 2, 3, 4],
+      chag_working: false,
+      erev_chag_working: true,
+    })
   })
 
   it('saves the window and caches the server response (no wiping refetch)', async () => {
@@ -24,12 +31,18 @@ describe('useAttendanceSettings', () => {
     )
     const { result } = renderHook(() => useAttendanceSettings(), { wrapper: QueryClientWrapper })
     await waitFor(() => expect(result.current.settings).toBeDefined())
+    const next = {
+      enabled: true,
+      start: '08:00',
+      end: '18:00',
+      work_days: [0, 1, 2, 3],
+      chag_working: true,
+      erev_chag_working: false,
+    }
     await act(async () => {
-      await result.current.save({ enabled: true, start: '08:00', end: '18:00' })
+      await result.current.save(next)
     })
-    expect(body).toEqual({ enabled: true, start: '08:00', end: '18:00' })
-    await waitFor(() =>
-      expect(result.current.settings).toEqual({ enabled: true, start: '08:00', end: '18:00' }),
-    )
+    expect(body).toEqual(next)
+    await waitFor(() => expect(result.current.settings).toEqual(next))
   })
 })

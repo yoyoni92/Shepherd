@@ -1,15 +1,19 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDrivers } from '@/hooks/useDrivers'
+import { useAttendanceSettings } from '@/hooks/useAttendanceSettings'
 import { fetchAttendanceMonth, patchAttendanceDay } from '@/lib/api/fleet'
 import {
   isValidTimeRange,
   buildMonthSkeleton,
+  DEFAULT_WORK_DAYS,
   type AttendanceDay,
   type AttendanceStatus,
   type Employee,
+  type WorkDayConfig,
 } from '@/lib/attendance'
+import { monthHolidays } from '@/lib/holidays'
 import type { AttendanceRecordRead } from '@/lib/api/schemas'
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -28,8 +32,13 @@ type MutateVars = {
 }
 
 /** Skeleton (weekday calendar) per employee, with stored records overlaid. */
-function buildMonth(monthKey: string, employees: Employee[], records: readonly AttendanceRecordRead[]) {
-  const month = buildMonthSkeleton(monthKey, employees)
+function buildMonth(
+  monthKey: string,
+  employees: Employee[],
+  records: readonly AttendanceRecordRead[],
+  config: Partial<WorkDayConfig>,
+) {
+  const month = buildMonthSkeleton(monthKey, employees, config)
   for (const r of records) {
     const days = month.records[r.driver_id]
     if (!days) continue
@@ -45,12 +54,22 @@ function buildMonth(monthKey: string, employees: Employee[], records: readonly A
 export function useAttendance(monthKey: string) {
   const qc = useQueryClient()
   const { drivers } = useDrivers()
+  const { settings } = useAttendanceSettings()
   const key = ['attendance', monthKey]
   const recordsQuery = useQuery({ queryKey: key, queryFn: () => fetchAttendanceMonth(monthKey) })
   const [patchError, setPatchError] = useState<Error | null>(null)
 
+  const holidays = useMemo(() => monthHolidays(monthKey), [monthKey])
+  const holidayMap = useMemo(() => new Map(holidays.map((h) => [h.day, h])), [holidays])
+  const config: Partial<WorkDayConfig> = {
+    workDays: settings?.work_days ?? [...DEFAULT_WORK_DAYS],
+    chagWorking: settings?.chag_working ?? false,
+    erevChagWorking: settings?.erev_chag_working ?? true,
+    holidays: holidayMap,
+  }
+
   const employees: Employee[] = drivers.map((d) => ({ id: d.id, name: d.name, role: 'נהג' }))
-  const month = buildMonth(monthKey, employees, recordsQuery.data ?? [])
+  const month = buildMonth(monthKey, employees, recordsQuery.data ?? [], config)
 
   const mutation = useMutation({
     mutationFn: ({ driverId, date, body }: MutateVars) => patchAttendanceDay(driverId, date, body),
@@ -87,5 +106,5 @@ export function useAttendance(monthKey: string) {
     })
   }
 
-  return { month, loading: recordsQuery.isLoading, patchDay, patchError }
+  return { month, holidays, loading: recordsQuery.isLoading, patchDay, patchError }
 }

@@ -44,6 +44,20 @@ def _window(session, company_id) -> tuple[bool, str, str]:
     return enabled, start, end
 
 
+def _work_rules(session, company_id) -> tuple[list[int], bool, bool]:
+    """Read the company's working-day rules from system_config (sensible defaults)."""
+    def val(key, default):
+        c = repo.get_config_key(session, key, company_id)
+        return c.config_value if c else default
+
+    work_days = val("attendance_work_days", [0, 1, 2, 3, 4])
+    if not isinstance(work_days, list):
+        work_days = [0, 1, 2, 3, 4]
+    chag = val("attendance_chag_working", False)
+    erev = val("attendance_erev_chag_working", True)
+    return [int(d) for d in work_days], bool(chag), bool(erev)
+
+
 def _outside_window(now: datetime, start: str, end: str) -> bool:
     cur = now.hour * 60 + now.minute
     sh, sm = (int(x) for x in start.split(":"))
@@ -117,8 +131,13 @@ def get_settings(session: Db, caller: Caller) -> AttendanceSettings:
     assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
     if not caller.company_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company context required")
-    enabled, start, end = _window(session, UUID(caller.company_id))
-    return AttendanceSettings(enabled=enabled, start=start, end=end)
+    cid = UUID(caller.company_id)
+    enabled, start, end = _window(session, cid)
+    work_days, chag, erev = _work_rules(session, cid)
+    return AttendanceSettings(
+        enabled=enabled, start=start, end=end,
+        work_days=work_days, chag_working=chag, erev_chag_working=erev,
+    )
 
 
 @router.put(
@@ -134,6 +153,9 @@ def put_settings(body: AttendanceSettings, session: Db, caller: Caller) -> Atten
     repo.set_config(session, "attendance_window_enabled", body.enabled, cid)
     repo.set_config(session, "attendance_window_start", body.start, cid)
     repo.set_config(session, "attendance_window_end", body.end, cid)
+    repo.set_config(session, "attendance_work_days", body.work_days, cid)
+    repo.set_config(session, "attendance_chag_working", body.chag_working, cid)
+    repo.set_config(session, "attendance_erev_chag_working", body.erev_chag_working, cid)
     return body
 
 
