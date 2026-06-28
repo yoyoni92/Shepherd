@@ -1,0 +1,104 @@
+# deploy/docker-compose.prod.yml
+# ponytail: this is docker-compose.yml with `build:` swapped for `image:` and a
+# single env_file for secrets — services, ports, volumes, healthchecks, and
+# depends_on are copied verbatim from the dev compose. Do not redesign them.
+# Run via deploy.sh (docker compose -f docker-compose.prod.yml --env-file .env ...).
+name: shepherd
+services:
+  postgres:
+    image: ${REGISTRY}/shepherd-postgres:${TAG}
+    # pg_cron must be preloaded and pointed at the app DB for the kpi_daily schedule.
+    command: postgres -c shared_preload_libraries=pg_cron -c cron.database_name=${POSTGRES_DB:-shepherd}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shepherd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shepherd}
+      POSTGRES_DB: ${POSTGRES_DB:-shepherd}
+    ports:
+      - "5432:5432"
+    # ponytail: no ./db/roles.sql host mount — the prebuilt shepherd-postgres
+    # image bakes roles.sql into /docker-entrypoint-initdb.d/ (see step 2 below).
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shepherd}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  db-init:
+    image: ${REGISTRY}/shepherd-db-init:${TAG}
+    # Reuses the existing db entrypoint (create_schema + seed + grants + KPI backfill),
+    # baked into the image at /db. Runs once, then exits.
+    command: sh entrypoint.sh
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  fleet-api:
+    image: ${REGISTRY}/shepherd-fleet-api:${TAG}
+    env_file:
+      - .env
+    environment:
+      # Pinned, non-secret container wiring (overrides anything from .env).
+      SHEPHERD_CONFIG: /etc/shepherd/config.toml
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gdrive-sa.json
+    volumes:
+      - ./config.toml:/etc/shepherd/config.toml:ro
+      - ${GDRIVE_SA_KEY_PATH:-./secrets/gdrive-sa.json}:/run/secrets/gdrive-sa.json:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  webui:
+    image: ${REGISTRY}/shepherd-webui:${TAG}
+    env_file:
+      - .env
+    environment:
+      # ponytail: webui stays env-only (no config.toml). Pinned non-secret wiring:
+      # Docker auto-sets HOSTNAME to the container id; Next's standalone server would
+      # bind to it and refuse localhost (breaking the healthcheck). Pin to all ifaces.
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      # Public: rendered as the plain t.me/<bot> link. NEXT_PUBLIC_* is inlined at
+      # build time, so a non-default bot name needs a rebuilt image.
+      NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-ShepherdBot}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # 127.0.0.1, not localhost: inside the container localhost resolves to ::1 (IPv6),
+      # but the standalone server binds IPv4 0.0.0.0 — the probe must hit 127.0.0.1.
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/api/auth/session || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Invite-only Hebrew Telegram bot. aiogram long-polling, so no public HTTPS / tunnel.
+  telegram-bot:
+    image: ${REGISTRY}/shepherd-telegram-bot:${TAG}
+    env_file:
+      - .env
+    environment:
+      SHEPHERD_CONFIG: /etc/shepherd/config.toml
+    volumes:
+      - ./config.toml:/etc/shepherd/config.toml:ro
+    depends_on:
+      fleet-api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
