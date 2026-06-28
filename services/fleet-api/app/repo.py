@@ -678,21 +678,52 @@ def _normalize_phone(p: str) -> str:
     return digits
 
 
+def _registered_schemas(session: Session) -> list[str]:
+    """Distinct schema_names from company_settings, plus the shared schema."""
+    from shepherd_config import get_config
+
+    rows = session.execute(
+        select(CompanySettings.schema_name).distinct()
+    ).scalars().all()
+    # Exclude NULL and '__pending__' (companies awaiting provisioning, same
+    # guard as _resolve_schema in deps.py).
+    schemas = {s for s in rows if s and s != "__pending__"}
+    schemas.add(get_config().database.shared_schema)
+    return sorted(schemas)
+
+
 def find_enrollment_by_phone(session: Session, phone: str):
     """(role, driver_id, expires_at, company_id) for a phone, or None.
 
     An active driver wins (permanent driver role); otherwise a non-expired
-    bot_authorization. The company is resolved alongside (the driver's company for a
-    driver match; the authorization's company otherwise) so enrollment binds the bot
-    user to the right tenant. Phones are normalized both sides; fleets are small so a
-    scan is fine. ponytail: O(n) scan, add a normalized index if a fleet ever gets large.
+    bot_authorization. Drivers live in per-company schemas, so the driver match
+    scans every registered schema (the bounded cross-schema exception for this
+    company-less read); bot_authorizations is public and scanned once on the
+    request session.
+
+    # ponytail: O(schemas x drivers) phone scan - fleets are small and schemas
+    # few; a normalized phone index per schema is the ceiling if a deployment
+    # ever grows large.
     """
     from datetime import datetime, timezone
+    from shepherd_config import get_config
 
     target = _normalize_phone(phone)
-    for d in session.execute(select(Driver).where(Driver.status == "active")).scalars():
-        if _normalize_phone(d.phone_number) == target:
-            return ("driver", d.driver_id, None, d.company_id)
+    shared = get_config().database.shared_schema
+    # session.bind is the connection; .engine gives the engine so we can open
+    # schema-translated connections without going through the DI graph.
+    engine = session.bind.engine
+    for schema in _registered_schemas(session):
+        with engine.connect() as conn:
+            tconn = conn.execution_options(
+                schema_translate_map={"tenant": schema, None: shared}
+            )
+            with Session(bind=tconn) as s:
+                for d in s.execute(
+                    select(Driver).where(Driver.status == "active")
+                ).scalars():
+                    if _normalize_phone(d.phone_number) == target:
+                        return ("driver", d.driver_id, None, d.company_id)
     now = datetime.now(timezone.utc)
     for a in session.execute(
         select(BotAuthorization).where(
