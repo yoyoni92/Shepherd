@@ -55,3 +55,26 @@ jobs:
         env:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: echo "list=$(jq -cn --argjson c "$CHANGES" '$c - ["webui"]')" >> "$GITHUB_OUTPUT"
+
+  python:
+    needs: detect
+    # Empty array => no Python packages changed; skip rather than start an empty matrix.
+    if: needs.detect.outputs.packages != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.detect.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pipx install poetry
+      # `make lint` runs `uvx ruff check .`; uvx ships with uv, which is not preinstalled.
+      - run: pipx install uv
+      - run: make install SVC=${{ matrix.package }}
+      - run: make lint
+      # make lint, typecheck, and test all pass for every package.
+      - run: make typecheck SVC=${{ matrix.package }}
+      - run: make test SVC=${{ matrix.package }}
