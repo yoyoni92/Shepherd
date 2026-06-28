@@ -10,9 +10,12 @@ Four coupled deliverables, built as one plan:
 1. **Central config file** - a single structured `config.toml` (the source of truth for
    the DB connection string and per-company schema mapping), loaded by a shared
    `shepherd_config` package; secrets stay in the environment via `${VAR}` interpolation.
-2. **True schema-per-tenant** - each company's tenant data lives in its own Postgres schema,
-   routed via SQLAlchemy `schema_translate_map`. The existing `company_id` columns and
-   row-level scoping are **kept as a safety net** (belt + suspenders).
+2. **Schema-per-tenant with a many-to-one company -> schema map** - tenant data lives in a
+   Postgres schema chosen by looking up the caller's company, routed via SQLAlchemy
+   `schema_translate_map`. The mapping is **many-to-one**: several companies (e.g. subcompanies
+   of one large company) can resolve to the **same** schema. The existing `company_id` columns
+   and row-level scoping are **kept and load-bearing** - the schema picks the physical location,
+   and `WHERE company_id` separates tenants that share a schema.
 3. **Deploy folder** - a `deploy/` directory that runs the stack from **pre-built images
    pulled from Docker Hub**, with no `git clone` and no source on the destination host.
 4. **CI pipeline** - a path-filtered per-package GitHub Actions matrix that lints, typechecks,
@@ -33,6 +36,20 @@ The application **never computes a schema name from a hardcoded format**. There 
 
 This keeps the app decoupled from any naming scheme and lets the config file fully control
 the company -> schema mapping.
+
+### Corollary: the map is many-to-one
+
+The fleet-api determines "where to read/write the data" by **looking up the schema for the
+caller's company**. Because the lookup is data, several companies can point at the same schema:
+a large company can run two subcompanies inside one shared schema. Consequences:
+
+- `company_id` row scoping is **mandatory for correctness**, not optional. Two subcompanies in a
+  shared schema are kept apart solely by `WHERE company_id` / `assert_company`; sharing a schema
+  is **physical colocation only**, never shared visibility - each subcompany sees only its own rows.
+- Provisioning must not assume one-new-schema-per-company. The target schema may already exist
+  (shared with a sibling); create it only if absent, then point the company at it.
+- No formal parent/subcompany entity is added (flat model). "Subcompany" is just a company whose
+  schema happens to match another's; there is no `parent_company_id`.
 
 ## Current state (what we build on)
 
@@ -77,17 +94,24 @@ shared_schema = "public"          # where control-plane tables live
 fleet_api_url = "${FLEET_API_URL}"
 
 # Seeded companies: explicit schema name (data, not derived).
+# The map is many-to-one: two companies may share a schema (subcompanies).
 [[company]]
 slug = "default"
 schema = "co_default"
 [[company]]
 slug = "internal"                 # playground / sandbox
 schema = "co_internal"
+[[company]]
+slug = "bigcorp-a"
+schema = "co_bigcorp"             # subcompany A and B share one schema
+[[company]]
+slug = "bigcorp-b"
+schema = "co_bigcorp"
 ```
 
-- `[[company]]` entries seed `company_settings.schema_name`. Runtime-created companies get a
-  default schema name generated **once** at provisioning time and then persisted; the app reads
-  the persisted value thereafter.
+- `[[company]]` entries seed `company_settings.schema_name`. The same `schema` value may appear on
+  multiple entries (shared schema). Runtime-created companies get a default schema name generated
+  **once** at provisioning time and then persisted; the app reads the persisted value thereafter.
 - Typed model (sketch): `Config(database: DatabaseConfig, services: ServicesConfig,
   companies: list[CompanyConfig])`, each `CompanyConfig(slug: str, schema: str)`.
 
@@ -126,8 +150,9 @@ attendance_records, channel_identity, bot_authorization, bot_user.
 - Implemented as a FastAPI dependency wrapping the existing `Db` session dependency, sequenced
   after `Caller`. Use `SET LOCAL`-style per-transaction scoping so a pooled connection never
   leaks one tenant's mapping into another request.
-- Row-level scoping (`WHERE company_id`, `assert_company`) is **unchanged** and continues to run
-  - the schema routing is an additional layer, so the existing repo/auth logic keeps working.
+- Row-level scoping (`WHERE company_id`, `assert_company`) is **unchanged** and continues to run.
+  It is now load-bearing rather than redundant: when several companies share a schema, it is the
+  only thing separating them, so it must always apply (no shared-visibility shortcut).
 
 ### Superadmin (`caller.company_id is None`)
 
@@ -140,10 +165,12 @@ attendance_records, channel_identity, bot_authorization, bot_user.
 
 ### Provisioning
 
-- `provision_company(company_id)` (in `db/` or fleet-api repo layer): resolve/assign the
-  company's `schema_name`, `CREATE SCHEMA IF NOT EXISTS`, then `create_all` the tenant tables
-  into it via the translate map.
-- Called on company creation (fleet-api) and during seed for `[[company]]` entries.
+- `provision_company(company_id)` (in `db/` or fleet-api repo layer): resolve the company's
+  `schema_name` (which may be a schema **already shared** with a sibling company),
+  `CREATE SCHEMA IF NOT EXISTS`, then `create_all` the tenant tables into it via the translate
+  map (idempotent - no-op when the shared schema's tables already exist).
+- Called on company creation (fleet-api) and during seed for `[[company]]` entries. Two companies
+  pointing at the same schema provision it once; the second simply attaches to the existing schema.
 
 ### pg_cron
 
@@ -190,7 +217,10 @@ deploy/
 
 - Extend `services/fleet-api/tests/test_tenancy.py`: assert **physical** schema isolation
   (writes land in the company's schema; a query under company A's map cannot see company B's
-  rows) on top of the existing 404 row checks.
+  rows in a different schema) on top of the existing 404 row checks.
+- New **shared-schema** case: two companies mapped to the same schema still isolate by
+  `company_id` - subcompany A cannot read subcompany B's rows even though they share a schema,
+  and provisioning the second company does not duplicate the schema's tables.
 - New tests: `shepherd_config` loader (TOML parse + `${VAR}` interpolation + missing-var error),
   `provision_company` (schema created, tenant tables present), and the routing dependency
   (correct map applied per caller, no leak across requests).
@@ -217,3 +247,5 @@ reference tenancy or config.
 
 - None blocking. Schema naming convention resolved: human-readable `co_<slug>` by convention,
   but stored as data and never derived in code (see Core principle).
+- Company -> schema is many-to-one; subcompanies sharing a schema stay isolated by `company_id`;
+  no formal parent entity (flat model). See "Corollary: the map is many-to-one".
