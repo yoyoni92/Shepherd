@@ -427,10 +427,11 @@ def _seed_channel_identities(conn):
 def _seed_company_settings(conn):
     # The Default Company starts with attendance OFF (empty feature_flags) and Drive
     # unconfigured (null folder + credentials). System admin configures these per company.
+    # schema_name sentinel: plan-02 provisioning overwrites this with the real schema name.
     conn.execute(
         text("""
             INSERT INTO company_settings (company_id, schema_name, feature_flags)
-            VALUES (:id, 'public', '{}'::jsonb)
+            VALUES (:id, '__pending__', '{}'::jsonb)
             ON CONFLICT (company_id) DO NOTHING
         """),
         {"id": DEFAULT_COMPANY_ID},
@@ -508,10 +509,11 @@ def _seed_playground(conn):
         {"id": PLAYGROUND_COMPANY_ID},
     )
     # Attendance ON so the sandbox surfaces every flow; Drive left empty.
+    # schema_name sentinel: plan-02 provisioning overwrites this with the real schema name.
     conn.execute(
         text("""
             INSERT INTO company_settings (company_id, schema_name, feature_flags)
-            VALUES (:id, 'public', '{"attendance": true}'::jsonb)
+            VALUES (:id, '__pending__', '{"attendance": true}'::jsonb)
             ON CONFLICT (company_id) DO NOTHING
         """),
         {"id": PLAYGROUND_COMPANY_ID},
