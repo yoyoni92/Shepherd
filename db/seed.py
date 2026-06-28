@@ -75,8 +75,8 @@ MODELS = ["Corolla", "Transit", "Tucson", "Sportage", "Caddy"]
 
 # Named default system admins (no company; recognised by the bot via normalized phone).
 SYSTEM_ADMINS = [
-    {"name": "Yehonatan Dahan", "email": "yehonatan.dahan@fleetops.io", "phone": "0503363355"},
-    {"name": "Yosef Gabay", "email": "yosef.gabay@fleetops.io", "phone": "0528588058"},
+    {"name": "Yehonatan Dahan", "email": "yehonatan.dahan@shepherd.ai", "phone": "0503363355"},
+    {"name": "Yosef Gabay", "email": "yosef.gabay@shepherd.ai", "phone": "0528588058"},
 ]
 
 
