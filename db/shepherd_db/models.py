@@ -325,7 +325,7 @@ class Driver(TenantMixin, Base):
         server_default="active",
     )
 
-    __table_args__ = (UniqueConstraint("company_id", "phone_number"),)
+    __table_args__ = (UniqueConstraint("company_id", "phone_number"), {"schema": "tenant"})
 
 
 class Customer(TenantMixin, Base):
@@ -344,6 +344,8 @@ class Customer(TenantMixin, Base):
         nullable=False,
         server_default="active",
     )
+
+    __table_args__ = {"schema": "tenant"}
 
 
 class MaintenanceType(TenantMixin, Base):
@@ -375,6 +377,7 @@ class MaintenanceType(TenantMixin, Base):
             "interval_km IS NOT NULL OR interval_months IS NOT NULL",
             name="maintenance_types_interval_present",
         ),
+        {"schema": "tenant"},
     )
 
 
@@ -425,7 +428,7 @@ class Vehicle(TenantMixin, Base):
     customer = relationship("Customer", foreign_keys=[customer_id])
     maintenance_type = relationship("MaintenanceType", foreign_keys=[maintenance_type_id])
 
-    __table_args__ = (UniqueConstraint("company_id", "licensing_plate"),)
+    __table_args__ = (UniqueConstraint("company_id", "licensing_plate"), {"schema": "tenant"})
 
 
 class Accident(TenantMixin, Base):
@@ -457,6 +460,8 @@ class Accident(TenantMixin, Base):
     driver = relationship("Driver", foreign_keys=[driver_id])
     attachments = relationship("AccidentAttachment", back_populates="accident")
 
+    __table_args__ = {"schema": "tenant"}
+
 
 class AccidentAttachment(TenantMixin, Base):
     __tablename__ = "accident_attachments"
@@ -480,6 +485,8 @@ class AccidentAttachment(TenantMixin, Base):
     )
 
     accident = relationship("Accident", foreign_keys=[accident_id], back_populates="attachments")
+
+    __table_args__ = {"schema": "tenant"}
 
 
 class KmUpdate(TenantMixin, Base):
@@ -510,6 +517,8 @@ class KmUpdate(TenantMixin, Base):
 
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
     driver = relationship("Driver", foreign_keys=[driver_id])
+
+    __table_args__ = {"schema": "tenant"}
 
 
 class VehicleCare(TenantMixin, Base):
@@ -546,6 +555,8 @@ class VehicleCare(TenantMixin, Base):
 
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
     driver = relationship("Driver", foreign_keys=[driver_id])
+
+    __table_args__ = {"schema": "tenant"}
 
 
 class Report(TenantMixin, Base):
@@ -588,6 +599,8 @@ class Report(TenantMixin, Base):
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
     driver = relationship("Driver", foreign_keys=[driver_id])
 
+    __table_args__ = {"schema": "tenant"}
+
 
 class Event(TenantMixin, Base):
     __tablename__ = "events"
@@ -621,6 +634,8 @@ class Event(TenantMixin, Base):
     )
 
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
+
+    __table_args__ = {"schema": "tenant"}
 
 
 class SystemConfig(Base):
@@ -661,11 +676,7 @@ class KpiDaily(Base):
     avg_km_per_driver_7d = mapped_column(Numeric, nullable=True)
     avg_days_between_maintenance = mapped_column(Numeric, nullable=True)
     docs_expiring_count = mapped_column(Integer, nullable=True)
-    top_customer_id = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("customers.customer_id"),
-        nullable=True,
-    )
+    top_customer_id = mapped_column(UUID(as_uuid=True), nullable=True)
     top_customer_km = mapped_column(Integer, nullable=True)
     top_customer_vehicle_count = mapped_column(Integer, nullable=True)
     computed_ts = mapped_column(
@@ -701,7 +712,7 @@ class AttendanceRecord(TenantMixin, Base):
         server_default="present",
     )
 
-    __table_args__ = (UniqueConstraint("driver_id", "work_date"),)
+    __table_args__ = (UniqueConstraint("driver_id", "work_date"), {"schema": "tenant"})
 
 
 class ChannelIdentity(TenantMixin, Base):
@@ -745,11 +756,7 @@ class BotAuthorization(Base):
     )
     phone_number = mapped_column(Text, nullable=False)
     role = mapped_column(user_role_type, nullable=False, server_default="driver")
-    driver_id = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
-        nullable=True,
-    )
+    driver_id = mapped_column(UUID(as_uuid=True), nullable=True)
     # Derived from the inviting caller's company (Feature 3).
     company_id = mapped_column(
         UUID(as_uuid=True),
@@ -763,7 +770,14 @@ class BotAuthorization(Base):
         server_default=text("now()"),
     )
 
-    driver = relationship("Driver", foreign_keys=[driver_id])
+    # ponytail: cross-schema (public->tenant) FK is impossible; viewonly relationship
+    # resolves under whatever schema the session is bound to.
+    driver = relationship(
+        "Driver",
+        primaryjoin="foreign(BotAuthorization.driver_id) == Driver.driver_id",
+        viewonly=True,
+        uselist=False,
+    )
 
 
 class BotUser(Base):
@@ -777,11 +791,7 @@ class BotUser(Base):
     telegram_chat_id = mapped_column(BigInteger, nullable=False, unique=True)
     role = mapped_column(user_role_type, nullable=False, server_default="driver")
     phone_number = mapped_column(Text, nullable=True)
-    driver_id = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
-        nullable=True,
-    )
+    driver_id = mapped_column(UUID(as_uuid=True), nullable=True)
     # Derived from the matched driver / authorization at enrollment (Feature 3).
     company_id = mapped_column(
         UUID(as_uuid=True),
@@ -795,7 +805,14 @@ class BotUser(Base):
         server_default=text("now()"),
     )
 
-    driver = relationship("Driver", foreign_keys=[driver_id])
+    # ponytail: cross-schema (public->tenant) FK is impossible; viewonly relationship
+    # resolves under whatever schema the session is bound to.
+    driver = relationship(
+        "Driver",
+        primaryjoin="foreign(BotUser.driver_id) == Driver.driver_id",
+        viewonly=True,
+        uselist=False,
+    )
 
 
 class AppUser(Base):

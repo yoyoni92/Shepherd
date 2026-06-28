@@ -97,7 +97,7 @@ The ORM `Driver` relationships on `BotUser` / `BotAuthorization` become `viewonl
 
 Steps:
 
-- [ ] 1. Write the failing test `db/tests/test_schema_tokens.py`:
+- [x] 1. Write the failing test `db/tests/test_schema_tokens.py`:
 
 ```python
 """The tenant domain tables carry the symbolic 'tenant' schema token; control-plane
@@ -141,12 +141,12 @@ def test_no_public_to_tenant_foreign_keys():
         assert not _table(tname).c[col].foreign_keys, f"{tname}.{col} still has a FK"
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd db && poetry run pytest tests/test_schema_tokens.py -q`
   Expected: `AssertionError: drivers` (the tenant tables have `schema is None`) /
   `... still has a FK`.
 
-- [ ] 3. Minimal impl in `db/shepherd_db/models.py`.
+- [x] 3. Minimal impl in `db/shepherd_db/models.py`.
 
   Update `TenantMixin` docstring note (optional) and add the `"tenant"` token to each of the 11
   tenant tables' `__table_args__`. For the four tables that already have a tuple, append the dict:
@@ -225,10 +225,10 @@ class AttendanceRecord(TenantMixin, Base):
     )
 ```
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd db && poetry run pytest tests/test_schema_tokens.py -q`
 
-- [ ] 5. Commit:
+- [x] 5. Commit:
 
 ```
 git add db/shepherd_db/models.py db/tests/test_schema_tokens.py
