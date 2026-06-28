@@ -37,3 +37,19 @@ def test_interpolates_env_var(tmp_path, monkeypatch):
     cfg = get_config()
     assert cfg.database.url == "postgresql+psycopg://x:y@db:5432/s"
     assert cfg.services.fleet_api_url == "http://fleet-api:8000"
+
+
+def test_missing_var_raises_naming_var(tmp_path, monkeypatch):
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        '[database]\n'
+        'url = "${DATABASE_URL}"\n'
+        '\n'
+        '[services]\n'
+        'fleet_api_url = "http://fleet-api:8000"\n'
+    )
+    monkeypatch.setenv("SHEPHERD_CONFIG", str(cfg_file))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    get_config.cache_clear()
+    with pytest.raises(RuntimeError, match="DATABASE_URL"):
+        get_config()

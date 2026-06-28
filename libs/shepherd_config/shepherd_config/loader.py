@@ -29,7 +29,16 @@ _VAR = re.compile(r"\$\{([^}]+)\}")
 
 def _interpolate(value: str) -> str:
     # ponytail: a tiny regex over string leaves, not a templating engine.
-    return _VAR.sub(lambda m: os.environ[m.group(1)], value)
+    def repl(m: "re.Match[str]") -> str:
+        name = m.group(1)
+        try:
+            return os.environ[name]
+        except KeyError:
+            raise RuntimeError(
+                f"config references unset environment variable: {name}"
+            ) from None
+
+    return _VAR.sub(repl, value)
 
 
 def _walk(node):
