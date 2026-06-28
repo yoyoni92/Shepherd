@@ -1,16 +1,7 @@
 """The tenant domain tables carry the symbolic 'tenant' schema token; control-plane
 and identity tables stay in public (schema None); no public->tenant FK survives."""
-import pytest
-
 from shepherd_db.models import Base
 
-
-# Shadow the conftest ensure_schema fixture so this file stays metadata-only.
-# The conftest version calls create_all which requires a live tenant schema
-# (a later task provisions it); these tests only inspect Base.metadata.
-@pytest.fixture(scope="session", autouse=True)
-def ensure_schema():  # noqa: F811
-    pass
 
 TENANT = {
     "drivers", "customers", "maintenance_types", "vehicles", "accidents",

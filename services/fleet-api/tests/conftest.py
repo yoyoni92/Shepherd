@@ -1,4 +1,7 @@
+import atexit
 import os
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -14,35 +17,68 @@ TEST_TOKEN = "test-internal-token"
 # Fixed Default Company id - seed.py uses the same value so tests + seed are deterministic.
 DEFAULT_COMPANY_ID = "00000000-0000-0000-0000-0000000000c0"
 
+# --- Schema-per-tenant test bootstrap ---
+# build() provisions tenant tables per schema from config.  We map the sole
+# test company to schema "public" so all 11 tenant tables land in public and
+# the existing flat-schema tests continue to work unchanged.
+_TEST_CONFIG = """\
+[database]
+url = "postgresql+psycopg://test:test@localhost:5432/test"
+shared_schema = "public"
+[services]
+fleet_api_url = "http://fleet-api:8000"
+[[company]]
+slug = "default"
+schema = "public"
+"""
+_fd, _CONF_PATH = tempfile.mkstemp(suffix=".toml", prefix="shepherd_test_")
+with os.fdopen(_fd, "w") as _fh:
+    _fh.write(_TEST_CONFIG)
+atexit.register(lambda: os.path.exists(_CONF_PATH) and os.unlink(_CONF_PATH))
+os.environ["SHEPHERD_CONFIG"] = _CONF_PATH
+
+import shepherd_config as _sc  # noqa: E402
+_sc.get_config.cache_clear()
+
+_DB_DIR = Path(__file__).parents[3] / "db"
+sys.path.insert(0, str(_DB_DIR))
+from provisioning import provision_company  # noqa: E402
+# --- end bootstrap ---
+
 
 @pytest.fixture(scope="session")
 def pg_engine():
     with PostgresContainer("postgres:16", driver="psycopg") as pg:
         url = pg.get_connection_url()
-        engine = create_engine(url)
+        _base = create_engine(url)
+        # Translate the symbolic "tenant" schema to "public" so ORM queries
+        # (which emit FROM tenant.<table>) resolve against the tenant tables
+        # provisioned into public by build() in apply_schema.
+        engine = _base.execution_options(schema_translate_map={"tenant": "public"})
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         yield engine
-        engine.dispose()
+        _base.dispose()
 
 
 @pytest.fixture(scope="session", autouse=True)
 def apply_schema(pg_engine):
     # Schema is built from the models (migrations were removed); bootstrap.sql's
     # pg_cron scheduling is guarded, so it's a no-op on this plain test container.
-    import sys
-
-    db_dir = Path(__file__).parents[3] / "db"
-    sys.path.insert(0, str(db_dir))
     from create_schema import build
 
     build(pg_engine)
-    # Insert the Default Company first (idempotent) so tenant FKs resolve and
+    # Insert the Default Company and its schema_name so tenant FKs resolve and
     # refresh_kpi_daily (now per-company) produces at least one snapshot row.
     with pg_engine.begin() as conn:
         conn.exec_driver_sql(
             "INSERT INTO companies (company_id, name) VALUES (%(id)s, 'Default Company') "
             "ON CONFLICT (company_id) DO NOTHING",
+            {"id": DEFAULT_COMPANY_ID},
+        )
+        conn.exec_driver_sql(
+            "INSERT INTO company_settings (company_id, schema_name) "
+            "VALUES (%(id)s, 'public') ON CONFLICT (company_id) DO NOTHING",
             {"id": DEFAULT_COMPANY_ID},
         )
     # The KPI endpoint reads the latest snapshot without seeding one; backfill a row
@@ -130,3 +166,18 @@ def company_admin_headers(company_id: str) -> dict:
             role=Role.company_admin, company_id=company_id
         ).model_dump_json(),
     }
+
+
+def make_company_in_schema(engine, name: str, schema: str) -> str:
+    """Provision <schema>, insert a company linked to it, return the company id."""
+    from sqlalchemy.orm import Session
+    from shepherd_db.models import Company, CompanySettings
+
+    provision_company(engine, schema)
+    with Session(engine) as s:
+        c = Company(name=name)
+        s.add(c)
+        s.flush()
+        s.add(CompanySettings(company_id=c.company_id, schema_name=schema))
+        s.commit()
+        return str(c.company_id)

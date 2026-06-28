@@ -1,4 +1,6 @@
+import atexit
 import os
+import tempfile
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -7,6 +9,30 @@ from testcontainers.postgres import PostgresContainer
 # Disable Ryuk cleanup container - not needed for local test runs and
 # avoids pulling the ryuk image on first run.
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
+
+# --- Schema-per-tenant test bootstrap ---
+# build() provisions tenant tables into the schemas listed in config.  We map
+# the sole test company to schema "public" so all 11 tenant tables land in
+# public and the existing flat-schema tests continue to work unchanged.
+_TEST_CONFIG = """\
+[database]
+url = "postgresql+psycopg://test:test@localhost:5432/test"
+shared_schema = "public"
+[services]
+fleet_api_url = "http://fleet-api:8000"
+[[company]]
+slug = "default"
+schema = "public"
+"""
+_fd, _CONF_PATH = tempfile.mkstemp(suffix=".toml", prefix="shepherd_test_")
+with os.fdopen(_fd, "w") as _fh:
+    _fh.write(_TEST_CONFIG)
+atexit.register(lambda: os.path.exists(_CONF_PATH) and os.unlink(_CONF_PATH))
+os.environ["SHEPHERD_CONFIG"] = _CONF_PATH
+
+import shepherd_config as _sc  # noqa: E402
+_sc.get_config.cache_clear()
+# --- end bootstrap ---
 
 
 @pytest.fixture(scope="session")

@@ -14,14 +14,6 @@ from shepherd_db.models import Base  # noqa: E402
 TENANT_NAMES = {t.name for t in TENANT_TABLES}
 
 
-# Shadow the conftest ensure_schema fixture so this module manages its own DB.
-# The conftest version calls create_all on the full metadata, which fails until
-# later tasks fix intra-tenant FK references for the schema-per-tenant setup.
-@pytest.fixture(scope="session", autouse=True)
-def ensure_schema():  # noqa: F811
-    pass
-
-
 @pytest.fixture(scope="module")
 def engine():
     with PostgresContainer("postgres:16", driver="psycopg") as pg:

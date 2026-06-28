@@ -1278,7 +1278,7 @@ sweeps the public users/bot_authorizations tables."
 
 Steps:
 
-- [ ] 1. Write a failing guard test inline in conftest by asserting the helper exists - add
+- [x] 1. Write a failing guard test inline in conftest by asserting the helper exists - add
   `services/fleet-api/tests/test_conftest_helper.py`:
 
 ```python
@@ -1304,11 +1304,11 @@ def test_make_company_in_schema_provisions_and_links(pg_engine):
     assert got == schema
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd services/fleet-api && poetry run pytest tests/test_conftest_helper.py -q`
   Expected: `ImportError: cannot import name 'make_company_in_schema'`.
 
-- [ ] 3. Minimal impl in `services/fleet-api/tests/conftest.py`. Add the db dir to `sys.path` at
+- [x] 3. Minimal impl in `services/fleet-api/tests/conftest.py`. Add the db dir to `sys.path` at
   import time and add the helper. Near the top (after existing imports) add:
 
 ```python
@@ -1362,17 +1362,17 @@ def make_company_in_schema(engine, name: str, schema: str) -> str:
   a minimal test `config.toml` via an autouse env fixture, or rely on plan 01's default. Confirm
   `build(pg_engine)` succeeds before the rest of the suite runs.
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd services/fleet-api && poetry run pytest tests/test_conftest_helper.py -q`
 
-- [ ] 5. Run the FULL fleet-api suite to confirm nothing regressed end-to-end:
+- [x] 5. Run the FULL fleet-api suite to confirm nothing regressed end-to-end:
   `cd services/fleet-api && poetry run pytest -q`
 
 - [ ] 6. Optionally refactor `test_schema_routing.py`, `test_enroll_cross_schema.py`,
   `test_tenancy.py` to use `make_company_in_schema` instead of their local copies (pure cleanup;
   keep if it reduces duplication, skip if it risks churn).
 
-- [ ] 7. Commit:
+- [x] 7. Commit:
 
 ```
 git add services/fleet-api/tests/conftest.py services/fleet-api/tests/test_conftest_helper.py
