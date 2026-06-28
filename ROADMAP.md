@@ -17,38 +17,25 @@ Google-Drive-files RAG is planned to replace the chat/RAG stack.
 - `services/webui` - Next.js 15 admin console (dashboard, entity CRUD, Config, Bot Management, health)
 - `services/telegram-bot` - phone-enrolled Hebrew Telegram bot (aiogram 3, long-polling), driver + admin flows
 
+### Phase 4 - Delivery
+- `.github/workflows/ci.yml` - full lifecycle CI pipeline: path-filtered per-package quality gates
+  (lint/typecheck/test reusing the Makefile, one leg per changed package), lint and mypy enforced
+  repo-wide across all 5 packages, and a build/push matrix publishing
+  `<org>/shepherd-<svc>:<sha>` + `:latest` to Docker Hub on merge to main. Required GitHub
+  config: secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`, var `DOCKERHUB_ORG`.
+- `deploy/` - production operator runbook: pull-only `docker-compose.prod.yml` (pre-built Docker
+  Hub images, no git clone), `deploy.sh` idempotent deploy script, `config.example.toml` and
+  `.env.example` templates.
+- `libs/shepherd_config` - central `config.toml` (path via `SHEPHERD_CONFIG`) holds the DB
+  connection string and company-to-schema map; loaded with `${VAR}` env interpolation. Fleet-api
+  and telegram-bot source all connection config from it.
+- Schema-per-tenant: domain tables live in per-company Postgres schemas, routed via
+  `schema_translate_map`; `company_id` row scoping is still enforced and is load-bearing when
+  companies share a schema.
+
 ---
 
 ## Up Next
-
-### CI/CD - Full Lifecycle Pipeline
-
-**What**: Replace the stub `.github/workflows/ci.yml` (today it only runs `libs/` tests) with a
-complete GitHub Actions pipeline that covers every package: **lint (ruff) -> typecheck (mypy) ->
-test (pytest) -> build Docker image -> push to Docker Hub**.
-
-**Why**: All services plus `libs/` share one Poetry/ruff/mypy/pytest toolchain, yet CI only
-exercises `libs/`. The `Makefile` already exposes `lint`, `typecheck`, and `test` targets, so CI
-should run them uniformly to catch regressions before merge and publish images automatically.
-
-**Scope**:
-
-| Layer | What |
-|-------|------|
-| Matrix | One job per package (`libs/` + each `services/*`), path-filtered so only changed packages run |
-| Quality gates | Reuse Makefile targets: `make lint`, `make typecheck`, `make test` per package |
-| Build + push | On merge to `main`, build each service's `Dockerfile` and push to the Docker Hub global registry, tagged `org/shepherd-<service>:<git-sha>` and `:latest` |
-| Secrets | `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` as repo secrets |
-
-**Approach**:
-1. Path-filtered matrix discovers changed packages.
-2. Each matrix leg runs `make lint typecheck test` against its package.
-3. A build-and-push stage gated on `main` uses `docker/build-push-action` to publish images.
-
-**Outcome**: every push is lint-, type-, and test-checked; every merge to `main` publishes fresh
-service images to the Docker Hub global registry.
-
----
 
 ### MkDocs - Unified Monorepo Documentation Site
 

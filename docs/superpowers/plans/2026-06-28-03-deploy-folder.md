@@ -39,7 +39,7 @@
 
 Steps:
 
-- [ ] 1. Create `deploy/.env.example` with the exact contents below. Every value an operator must supply lives here once; `config.toml` and the compose interpolation both read from it.
+- [x] 1. Create `deploy/.env.example` with the exact contents below. Every value an operator must supply lives here once; `config.toml` and the compose interpolation both read from it.
 
 ```bash
 # deploy/.env.example
@@ -91,7 +91,7 @@ GDRIVE_FOLDER_ID=
 FLEET_API_URL=http://fleet-api:8000
 ```
 
-- [ ] 2. Create `deploy/.gitignore` with the exact contents below.
+- [x] 2. Create `deploy/.gitignore` with the exact contents below.
 
 ```gitignore
 # deploy/.gitignore
@@ -101,7 +101,7 @@ config.toml
 secrets/
 ```
 
-- [ ] 3. VERIFICATION — confirm both files exist and the template parses as a valid env file (no shell-special breakage):
+- [x] 3. VERIFICATION — confirm both files exist and the template parses as a valid env file (no shell-special breakage):
 
 ```bash
 test -f deploy/.env.example && test -f deploy/.gitignore && \
@@ -114,7 +114,7 @@ Expected output (exactly):
 REGISTRY=docker.io/yourorg TAG=latest
 ```
 
-- [ ] 4. COMMIT.
+- [x] 4. COMMIT.
 
 ```bash
 git add deploy/.env.example deploy/.gitignore
@@ -140,7 +140,7 @@ Matches the `shepherd_config` schema from plan 01. Non-secret structure only; se
 
 Steps:
 
-- [ ] 1. Create `deploy/config.example.toml` with the exact contents below.
+- [x] 1. Create `deploy/config.example.toml` with the exact contents below.
 
 ```toml
 # deploy/config.example.toml
@@ -177,7 +177,7 @@ schema = "co_default"
 # schema = "co_bigcorp"
 ```
 
-- [ ] 2. VERIFICATION — confirm the template is valid TOML (`${VAR}` placeholders are ordinary strings to a TOML parser):
+- [x] 2. VERIFICATION — confirm the template is valid TOML (`${VAR}` placeholders are ordinary strings to a TOML parser):
 
 ```bash
 python3 -c "import tomllib; d=tomllib.load(open('deploy/config.example.toml','rb')); print(d['database']['shared_schema'], d['company'][0]['slug'])"
@@ -189,7 +189,7 @@ Expected output (exactly):
 public default
 ```
 
-- [ ] 3. COMMIT.
+- [x] 3. COMMIT.
 
 ```bash
 git add deploy/config.example.toml
@@ -216,7 +216,7 @@ A faithful copy of `docker-compose.yml`: same services, ports, volumes, healthch
 
 Steps:
 
-- [ ] 1. Create `deploy/docker-compose.prod.yml` with the exact contents below.
+- [x] 1. Create `deploy/docker-compose.prod.yml` with the exact contents below.
 
 ```yaml
 # deploy/docker-compose.prod.yml
@@ -325,7 +325,7 @@ volumes:
   pgdata:
 ```
 
-- [ ] 2. Bake `roles.sql` into the postgres image so the prod host needs no source mount. Edit `db/postgres.Dockerfile`, appending a `COPY` after the `RUN` block (build context for this image is `./db`, so `roles.sql` is at the context root):
+- [x] 2. Bake `roles.sql` into the postgres image so the prod host needs no source mount. Edit `db/postgres.Dockerfile`, appending a `COPY` after the `RUN` block (build context for this image is `./db`, so `roles.sql` is at the context root):
 
 ```dockerfile
 # Bake role/grant bootstrap into initdb so no host mount is needed in prod
@@ -342,7 +342,7 @@ test -f db/roles.sql && grep -q "COPY roles.sql /docker-entrypoint-initdb.d/" db
 
 Expected output: `OK`
 
-- [ ] 3. VERIFICATION — render and validate the compose file with full var interpolation. `config` requires `.env` and `config.toml` to exist, so create them from the templates first (they are gitignored, so they will not be committed):
+- [x] 3. VERIFICATION — render and validate the compose file with full var interpolation. `config` requires `.env` and `config.toml` to exist, so create them from the templates first (they are gitignored, so they will not be committed):
 
 ```bash
 cp deploy/.env.example deploy/.env
@@ -362,13 +362,13 @@ Expected output (exactly, order may vary by service):
 
 A clean `config` exit code (`echo $?` -> `0`) confirms the YAML parses and every `${VAR}` resolved. If `config` warns about an unset variable, that variable is missing from `.env.example` — fix it there.
 
-- [ ] 4. CLEANUP the local secret copies so they are never staged:
+- [x] 4. CLEANUP the local secret copies so they are never staged:
 
 ```bash
 rm -f deploy/.env deploy/config.toml
 ```
 
-- [ ] 5. COMMIT.
+- [x] 5. COMMIT.
 
 ```bash
 git add deploy/docker-compose.prod.yml db/postgres.Dockerfile
@@ -399,7 +399,7 @@ A short bash script: validate inputs, `docker compose pull`, `up -d`, wait for P
 
 Steps:
 
-- [ ] 1. Create `deploy/deploy.sh` with the exact contents below.
+- [x] 1. Create `deploy/deploy.sh` with the exact contents below.
 
 ```bash
 #!/usr/bin/env bash
@@ -434,13 +434,13 @@ echo ">> Stack status:"
 echo ">> Done. db-init ran schema + seed (idempotent); app services are gated on it."
 ```
 
-- [ ] 2. Make it executable:
+- [x] 2. Make it executable:
 
 ```bash
 chmod +x deploy/deploy.sh
 ```
 
-- [ ] 3. VERIFICATION (a) — bash syntax check (no run, no Docker needed):
+- [x] 3. VERIFICATION (a) — bash syntax check (no run, no Docker needed):
 
 ```bash
 bash -n deploy/deploy.sh && echo "syntax OK"
@@ -452,7 +452,7 @@ Expected output (exactly):
 syntax OK
 ```
 
-- [ ] 4. VERIFICATION (b) — confirm the guard rails fire when inputs are missing (run from a temp dir so no real `.env` is present):
+- [x] 4. VERIFICATION (b) — confirm the guard rails fire when inputs are missing (run from a temp dir so no real `.env` is present):
 
 ```bash
 ( cd "$(mktemp -d)" && cp "$OLDPWD/deploy/deploy.sh" . && ./deploy.sh; echo "exit=$?" )
@@ -465,7 +465,7 @@ ERROR: .env not found. Run: cp .env.example .env  then fill it.
 exit=1
 ```
 
-- [ ] 5. VERIFICATION (c) — DOCUMENTED MANUAL SMOKE (requires plan 04 images to exist on Docker Hub; do NOT run in CI). On a host with Docker and a filled `deploy/.env` + `deploy/config.toml`:
+- [x] 5. VERIFICATION (c) — DOCUMENTED MANUAL SMOKE (requires plan 04 images to exist on Docker Hub; do NOT run in CI). On a host with Docker and a filled `deploy/.env` + `deploy/config.toml`:
 
 ```bash
 cd deploy && ./deploy.sh
@@ -475,7 +475,7 @@ curl -fsS http://localhost:8000/health
 
 Expected: `deploy.sh` ends with `>> postgres healthy.` and a `docker compose ps` table where `db-init` shows `Exited (0)` and `fleet-api`/`webui` show `healthy`; the `curl` prints fleet-api's health JSON (HTTP 200). Re-running `./deploy.sh` produces the same end state (idempotent).
 
-- [ ] 6. COMMIT.
+- [x] 6. COMMIT.
 
 ```bash
 git add deploy/deploy.sh
@@ -503,7 +503,7 @@ Exact, copy-pasteable steps for an operator on a fresh host. Documents that imag
 
 Steps:
 
-- [ ] 1. Create `deploy/README.md` with the exact contents below.
+- [x] 1. Create `deploy/README.md` with the exact contents below.
 
 ```markdown
 # Shepherd - Deploy Folder
@@ -621,7 +621,7 @@ docker compose -f docker-compose.prod.yml --env-file .env down
   reverse proxy / firewall in front of `3000` (and `8000` if exposed) in prod.
 ```
 
-- [ ] 2. VERIFICATION — confirm the README exists and references the four deliverables it documents:
+- [x] 2. VERIFICATION — confirm the README exists and references the four deliverables it documents:
 
 ```bash
 test -f deploy/README.md && \
@@ -634,7 +634,7 @@ Expected output (a count of 4 or greater):
 <a number >= 4>
 ```
 
-- [ ] 3. COMMIT.
+- [x] 3. COMMIT.
 
 ```bash
 git add deploy/README.md

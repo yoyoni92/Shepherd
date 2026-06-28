@@ -174,7 +174,7 @@ SHEPHERD_CONFIG (default config.toml) into typed Pydantic models."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Append to `libs/shepherd_config/tests/test_loader.py`:
+- [x] **Step 1 - Write the failing test.** Append to `libs/shepherd_config/tests/test_loader.py`:
 ```python
 def test_interpolates_env_var(tmp_path, monkeypatch):
     cfg_file = tmp_path / "config.toml"
@@ -194,10 +194,10 @@ def test_interpolates_env_var(tmp_path, monkeypatch):
     assert cfg.services.fleet_api_url == "http://fleet-api:8000"
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_interpolates_env_var -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_interpolates_env_var -q`
   Expected: a Pydantic `ValidationError` is NOT raised, but `cfg.database.url == "${DATABASE_URL}"` so the assertion fails: `assert '${DATABASE_URL}' == 'postgresql+psycopg://x:y@db:5432/s'`.
 
-- [ ] **Step 3 - Minimal implementation.** Edit `libs/shepherd_config/shepherd_config/loader.py`. Add `import re` to the imports and the helpers below, and change `get_config` to walk the parsed data first.
+- [x] **Step 3 - Minimal implementation.** Edit `libs/shepherd_config/shepherd_config/loader.py`. Add `import re` to the imports and the helpers below, and change `get_config` to walk the parsed data first.
 
   Add after the imports:
 ```python
@@ -228,9 +228,9 @@ def get_config() -> Config:
     return Config.model_validate(_walk(raw))
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py -q` -> 2 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py -q` -> 2 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add libs/shepherd_config/shepherd_config/loader.py libs/shepherd_config/tests/test_loader.py
 git commit -m "interpolate \${VAR} env refs in shepherd_config loader
@@ -253,7 +253,7 @@ environment and never in the committed config template."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Append to `libs/shepherd_config/tests/test_loader.py`:
+- [x] **Step 1 - Write the failing test.** Append to `libs/shepherd_config/tests/test_loader.py`:
 ```python
 def test_missing_var_raises_naming_var(tmp_path, monkeypatch):
     cfg_file = tmp_path / "config.toml"
@@ -271,10 +271,10 @@ def test_missing_var_raises_naming_var(tmp_path, monkeypatch):
         get_config()
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_missing_var_raises_naming_var -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_missing_var_raises_naming_var -q`
   Expected: `Failed: DID NOT RAISE <class 'RuntimeError'>` wrapping a `KeyError: 'DATABASE_URL'` (current code raises `KeyError`, not `RuntimeError`).
 
-- [ ] **Step 3 - Minimal implementation.** Edit `libs/shepherd_config/shepherd_config/loader.py`, replacing `_interpolate`:
+- [x] **Step 3 - Minimal implementation.** Edit `libs/shepherd_config/shepherd_config/loader.py`, replacing `_interpolate`:
 ```python
 def _interpolate(value: str) -> str:
     # ponytail: a tiny regex over string leaves, not a templating engine.
@@ -290,9 +290,9 @@ def _interpolate(value: str) -> str:
     return _VAR.sub(repl, value)
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py -q` -> 3 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py -q` -> 3 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add libs/shepherd_config/shepherd_config/loader.py libs/shepherd_config/tests/test_loader.py
 git commit -m "raise on unset \${VAR} in shepherd_config loader
@@ -317,7 +317,7 @@ instead of surfacing a bare KeyError."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Append to `libs/shepherd_config/tests/test_loader.py`:
+- [x] **Step 1 - Write the failing test.** Append to `libs/shepherd_config/tests/test_loader.py`:
 ```python
 def test_parses_companies_with_schema_alias(tmp_path, monkeypatch):
     cfg_file = tmp_path / "config.toml"
@@ -344,10 +344,10 @@ def test_parses_companies_with_schema_alias(tmp_path, monkeypatch):
     assert cfg.companies[1].schema_name == "co_bigcorp"
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_parses_companies_with_schema_alias -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_parses_companies_with_schema_alias -q`
   Expected: `AttributeError: 'Config' object has no attribute 'companies'` (the field does not exist yet).
 
-- [ ] **Step 3 - Minimal implementation.** Edit `libs/shepherd_config/shepherd_config/loader.py`. Change the pydantic import and add the model + field:
+- [x] **Step 3 - Minimal implementation.** Edit `libs/shepherd_config/shepherd_config/loader.py`. Change the pydantic import and add the model + field:
 ```python
 from pydantic import BaseModel, ConfigDict, Field
 ```
@@ -388,9 +388,9 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py -q` -> 4 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py -q` -> 4 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add libs/shepherd_config/shepherd_config/loader.py libs/shepherd_config/shepherd_config/__init__.py libs/shepherd_config/tests/test_loader.py
 git commit -m "parse companies list in shepherd_config config
@@ -416,7 +416,7 @@ many-to-one company to schema map."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Create `libs/shepherd_config/tests/test_example_config.py`:
+- [x] **Step 1 - Write the failing test.** Create `libs/shepherd_config/tests/test_example_config.py`:
 ```python
 from pathlib import Path
 
@@ -438,10 +438,10 @@ def test_example_config_loads(monkeypatch):
     assert {c.slug for c in cfg.companies} == {"default", "internal"}
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_example_config.py -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry run pytest tests/test_example_config.py -q`
   Expected: `FileNotFoundError: [Errno 2] No such file or directory: '.../config.example.toml'` (the file does not exist yet).
 
-- [ ] **Step 3 - Minimal implementation.** Create `config.example.toml` at the repo root:
+- [x] **Step 3 - Minimal implementation.** Create `config.example.toml` at the repo root:
 ```toml
 # Shepherd central config (committed template).
 # Copy to config.toml (gitignored) and resolve secrets via the environment.
@@ -478,9 +478,9 @@ config.toml
 SHEPHERD_CONFIG=config.toml
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_example_config.py -q` -> 1 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_example_config.py -q` -> 1 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add config.example.toml .gitignore .env.example libs/shepherd_config/tests/test_example_config.py
 git commit -m "add config.example.toml and SHEPHERD_CONFIG env
@@ -577,7 +577,7 @@ directly, so the DB connection has a single source of truth."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Create `services/telegram-bot/tests/test_config_source.py`:
+- [x] **Step 1 - Write the failing test.** Create `services/telegram-bot/tests/test_config_source.py`:
 ```python
 import importlib
 
@@ -602,10 +602,10 @@ def test_config_sources_db_and_fleet_url(tmp_path, monkeypatch):
     assert config.settings.fleet_api_url == "http://fleet-api:9999"
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd services/telegram-bot && poetry run pytest tests/test_config_source.py -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd services/telegram-bot && poetry run pytest tests/test_config_source.py -q`
   Expected: `ModuleNotFoundError: No module named 'shepherd_config'` (the path dep is not installed yet).
 
-- [ ] **Step 3 - Minimal implementation.** Add the path dep to `services/telegram-bot/pyproject.toml` under `[tool.poetry.dependencies]`, after the `pydantic-settings` line:
+- [x] **Step 3 - Minimal implementation.** Add the path dep to `services/telegram-bot/pyproject.toml` under `[tool.poetry.dependencies]`, after the `pydantic-settings` line:
 ```toml
 shepherd-config = { path = "../../libs/shepherd_config", develop = true }
 ```
@@ -628,9 +628,9 @@ if _cfg is not None:
     settings.fleet_api_url = _cfg.services.fleet_api_url
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd services/telegram-bot && poetry run pytest tests/test_config_source.py -q` -> 1 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd services/telegram-bot && poetry run pytest tests/test_config_source.py -q` -> 1 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add services/telegram-bot/pyproject.toml services/telegram-bot/poetry.lock services/telegram-bot/app/config.py services/telegram-bot/tests/test_config_source.py
 git commit -m "source telegram-bot db and fleet url from config
@@ -654,7 +654,7 @@ keeping bot-only env (token, model keys) and env defaults intact."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Create `db/tests/test_company_settings_schema.py`:
+- [x] **Step 1 - Write the failing test.** Create `db/tests/test_company_settings_schema.py`:
 ```python
 from shepherd_db.models import CompanySettings
 
@@ -664,17 +664,17 @@ def test_company_settings_has_schema_name_column():
     assert col.nullable is False
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd db && poetry run pytest tests/test_company_settings_schema.py -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd db && poetry run pytest tests/test_company_settings_schema.py -q`
   Expected: `KeyError: 'schema_name'` (the column does not exist yet).
 
-- [ ] **Step 3 - Minimal implementation.** Edit `db/shepherd_db/models.py` in `class CompanySettings`, adding the column after `gdrive_credentials_json`:
+- [x] **Step 3 - Minimal implementation.** Edit `db/shepherd_db/models.py` in `class CompanySettings`, adding the column after `gdrive_credentials_json`:
 ```python
     schema_name = mapped_column(Text, nullable=False)  # opaque per-tenant schema; seeded by the schema-per-tenant plan
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd db && poetry run pytest tests/test_company_settings_schema.py -q` -> 1 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd db && poetry run pytest tests/test_company_settings_schema.py -q` -> 1 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add db/shepherd_db/models.py db/tests/test_company_settings_schema.py
 git commit -m "add schema_name column to company_settings

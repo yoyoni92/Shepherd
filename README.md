@@ -13,7 +13,26 @@ db/               Postgres schema (models = source of truth) + bootstrap.sql + s
 services/         fleet-api, telegram-bot, webui
 tests/e2e/        cross-system integration tests (telegram-bot vs live stack)
 plans/            design & implementation plans
+deploy/           production runbook: pull-only compose, deploy.sh, config/env templates
+config.example.toml  central config template (DB URL + company-to-schema map)
 ```
+
+## Configuration
+
+The DB connection string and the company-to-schema map live in `config.toml` (gitignored).
+Copy `config.example.toml`, fill in secrets, and point the services at it:
+
+```
+SHEPHERD_CONFIG=/path/to/config.toml
+```
+
+The `shepherd_config` package (`libs/shepherd_config`) loads this file at startup with
+`${VAR}` env interpolation. Secret values stay in the environment; the TOML file is safe
+to commit without credentials.
+
+Tenant isolation uses schema-per-tenant: each company's domain tables live in its own
+Postgres schema, routed via `schema_translate_map`. `company_id` row scoping is also
+enforced and is load-bearing when companies share a schema.
 
 ## Dev setup
 
@@ -21,6 +40,16 @@ plans/            design & implementation plans
 - Per package: `poetry env use python3.12 && poetry install && poetry run pytest`.
 - Cross-system integration tests: `make up` then `make e2e` (drives the telegram-bot
   against the live Fleet API + Postgres; see [`tests/e2e/`](tests/e2e/README.md)).
+- Production deploy: see [`deploy/README.md`](deploy/README.md) - pulls pre-built Docker
+  Hub images; no git clone needed on the server.
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`): path-filtered per-package quality gates
+(lint/typecheck/test via the Makefile, one leg per changed package) on every push and
+pull request; build and push all 5 service images to Docker Hub on merge to `main`.
+Required GitHub config: secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`, var
+`DOCKERHUB_ORG`.
 
 ## Status
 

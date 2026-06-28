@@ -634,7 +634,7 @@ search_path, so tenant rows land in the right schema."
 
 Steps:
 
-- [ ] 1. Write the failing test `services/fleet-api/tests/test_schema_routing.py`:
+- [x] 1. Write the failing test `services/fleet-api/tests/test_schema_routing.py`:
 
 ```python
 """A row written under company A's schema is physically absent from company B's
@@ -689,11 +689,11 @@ def test_physical_isolation_across_distinct_schemas(client, pg_engine):
     assert plate not in [v["licensing_plate"] for v in client.get("/vehicles", headers=company_headers(b)).json()]
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd services/fleet-api && poetry run pytest tests/test_schema_routing.py -q`
   Expected: `assert in_a == 1` fails (today the row lands in public, not `co_phys_a`).
 
-- [ ] 3. Minimal impl `services/fleet-api/app/deps.py`. Replace the engine/session block:
+- [x] 3. Minimal impl `services/fleet-api/app/deps.py`. Replace the engine/session block:
 
 ```python
 """FastAPI dependencies: schema-scoped DB session, internal token guard, caller context."""
@@ -794,14 +794,14 @@ Caller = Annotated[CallerContext, Depends(get_caller)]
   Note: `get_caller` (the strict variant used by routers that declare `caller: Caller`) is
   unchanged, so existing behaviour for those routers is preserved. Only the session binding moved.
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd services/fleet-api && poetry run pytest tests/test_schema_routing.py -q`
 
-- [ ] 5. Run the full fleet-api suite to confirm no regression (existing companies have no
+- [x] 5. Run the full fleet-api suite to confirm no regression (existing companies have no
   `schema_name`, so they resolve to the shared schema = public and behave exactly as before):
   `cd services/fleet-api && poetry run pytest -q`
 
-- [ ] 6. Commit:
+- [x] 6. Commit:
 
 ```
 git add services/fleet-api/app/deps.py services/fleet-api/tests/test_schema_routing.py
@@ -829,7 +829,7 @@ a per-statement option so it cannot leak across pooled requests."
 
 Steps:
 
-- [ ] 1. Write the failing test `services/fleet-api/tests/test_enroll_cross_schema.py`:
+- [x] 1. Write the failing test `services/fleet-api/tests/test_enroll_cross_schema.py`:
 
 ```python
 """bot-enroll runs company-less but must find a driver that lives in a dedicated
@@ -877,12 +877,12 @@ def test_enroll_finds_driver_in_dedicated_schema(raw_client, pg_engine):
     assert r.json()["role"] == "driver"
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd services/fleet-api && poetry run pytest tests/test_enroll_cross_schema.py -q`
   Expected: `assert r.status_code == 200` fails with 404 (the company-less session binds public, so
   the driver in `co_enroll` is never scanned).
 
-- [ ] 3. Minimal impl in `services/fleet-api/app/repo.py`. Add a schema-iteration helper and route
+- [x] 3. Minimal impl in `services/fleet-api/app/repo.py`. Add a schema-iteration helper and route
   the driver scan through it. Above `find_enrollment_by_phone`, add:
 
 ```python
@@ -943,14 +943,14 @@ def find_enrollment_by_phone(session: Session, phone: str):
   `# ponytail:` O(schemas x drivers) phone scan - fleets are small and schemas few; a normalized
   phone index per schema is the ceiling if a deployment ever grows large.
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd services/fleet-api && poetry run pytest tests/test_enroll_cross_schema.py -q`
 
-- [ ] 5. Run the full fleet-api suite (the default-schema enrollment path still works because
+- [x] 5. Run the full fleet-api suite (the default-schema enrollment path still works because
   public is always in `_registered_schemas`):
   `cd services/fleet-api && poetry run pytest -q`
 
-- [ ] 6. Commit:
+- [x] 6. Commit:
 
 ```
 git add services/fleet-api/app/repo.py services/fleet-api/tests/test_enroll_cross_schema.py
@@ -975,7 +975,7 @@ bot_authorizations scan stays a single public read on the request session."
 
 Steps:
 
-- [ ] 1. Append the failing tests to `services/fleet-api/tests/test_tenancy.py`. Add at the top
+- [x] 1. Append the failing tests to `services/fleet-api/tests/test_tenancy.py`. Add at the top
   (after the existing imports):
 
 ```python
@@ -1051,24 +1051,24 @@ def test_provisioning_shared_schema_is_idempotent(pg_engine):
     assert {t.name for t in TENANT_TABLES} <= set(after)
 ```
 
-- [ ] 2. Run, expect FAIL (before this task's helper/imports exist the new tests cannot resolve
+- [x] 2. Run, expect FAIL (before this task's helper/imports exist the new tests cannot resolve
   `provision_company` / `CompanySettings.schema_name`):
   `cd services/fleet-api && poetry run pytest tests/test_tenancy.py -k "shared or idempotent" -q`
   Expected first failure surfaces while the imports/helpers are absent (ImportError) or, once
   added, the shared-schema assertions confirm behaviour. If the assertions fail it means routing or
   row-scoping regressed.
 
-- [ ] 3. Minimal impl: there is no production code change in this task - the shared-schema
+- [x] 3. Minimal impl: there is no production code change in this task - the shared-schema
   behaviour is delivered by Tasks 1-4. This task only adds the tests above. If
   `test_shared_schema_subcompanies_isolate_by_company_id` fails on the `count(*) == 2`
   colocation assertion, confirm both companies' `company_settings.schema_name` equals
   `co_shared_pair` and that `_resolve_schema` is reading it; if it fails on the per-caller plate
   assertions, the row-level `WHERE company_id` scoping regressed (it must not have).
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd services/fleet-api && poetry run pytest tests/test_tenancy.py -q`
 
-- [ ] 5. Commit:
+- [x] 5. Commit:
 
 ```
 git add services/fleet-api/tests/test_tenancy.py
@@ -1094,7 +1094,7 @@ company_id row scoping is load-bearing once a schema is shared."
 
 Steps:
 
-- [ ] 1. Write the failing test `services/fleet-api/tests/test_kpi_per_schema.py`:
+- [x] 1. Write the failing test `services/fleet-api/tests/test_kpi_per_schema.py`:
 
 ```python
 """refresh_kpi_daily reads tenant tables from each company's schema and writes a public
@@ -1134,12 +1134,12 @@ def test_kpi_counts_a_company_in_a_dedicated_schema(pg_engine):
     assert row is not None  # the dedicated-schema company produced a snapshot row
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd services/fleet-api && poetry run pytest tests/test_kpi_per_schema.py -q`
   Expected: `assert row is not None` fails - the current `refresh_kpi_daily` reads `vehicles` /
   `drivers` only from public, so `co_kpi`'s company gets no row (or errors on missing public rows).
 
-- [ ] 3. Minimal impl: replace the `refresh_kpi_daily()` function body in `db/bootstrap.sql` with a
+- [x] 3. Minimal impl: replace the `refresh_kpi_daily()` function body in `db/bootstrap.sql` with a
   per-company loop that runs the existing per-company computation against each company's schema via
   dynamic SQL. Keep `cleanup_expired_bot_access()` and the `DO $do$` pg_cron block unchanged.
 
@@ -1245,14 +1245,14 @@ $fn$ LANGUAGE plpgsql;
   `%L` literalises the company id and window). Schemas shared by sibling companies are visited once
   per company and kept apart by `WHERE company_id`, so the snapshot stays per-company-correct.
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd services/fleet-api && poetry run pytest tests/test_kpi_per_schema.py -q`
 
-- [ ] 5. Run the existing KPI test + conftest backfill to confirm the default (public-schema)
+- [x] 5. Run the existing KPI test + conftest backfill to confirm the default (public-schema)
   company still produces a snapshot:
   `cd services/fleet-api && poetry run pytest tests/ -k "kpi" -q`
 
-- [ ] 6. Commit:
+- [x] 6. Commit:
 
 ```
 git add db/bootstrap.sql services/fleet-api/tests/test_kpi_per_schema.py
@@ -1368,7 +1368,7 @@ def make_company_in_schema(engine, name: str, schema: str) -> str:
 - [x] 5. Run the FULL fleet-api suite to confirm nothing regressed end-to-end:
   `cd services/fleet-api && poetry run pytest -q`
 
-- [ ] 6. Optionally refactor `test_schema_routing.py`, `test_enroll_cross_schema.py`,
+- [x] 6. Optionally refactor `test_schema_routing.py`, `test_enroll_cross_schema.py`,
   `test_tenancy.py` to use `make_company_in_schema` instead of their local copies (pure cleanup;
   keep if it reduces duplication, skip if it risks churn).
 
