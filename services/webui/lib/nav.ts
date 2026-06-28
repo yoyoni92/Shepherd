@@ -41,7 +41,7 @@ export const NAV: NavItem[] = [
   { href: '/bot', label: 'ניהול בוט', Icon: Bot },
   { href: '/companies', label: 'חברות', Icon: Landmark, allowedRoles: ['admin'] },
   { href: '/access', label: 'משתמשי גישה', Icon: KeyRound, allowedRoles: ['admin'] },
-  { href: '/config', label: 'הגדרות', Icon: Settings, allowedRoles: ['admin'] },
+  { href: '/config', label: 'הגדרות', Icon: Settings },
   { href: '/health', label: 'מצב מערכת', Icon: Activity, statusDot: true, allowedRoles: ['admin'] },
 ]
 

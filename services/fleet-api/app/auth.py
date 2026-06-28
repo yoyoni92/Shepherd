@@ -34,9 +34,9 @@ class Action(str, Enum):
 # {action: {role: ownership_required}}
 # None = forbidden; False = allowed regardless of ownership; True = only if is_owner
 # company_admin mirrors admin for operational actions (F1's repo scoping enforces
-# per-company isolation), incl. bot management scoped to its own company
-# (MANAGE_BOT_USERS, MANAGE_BOT_INVITES - repo filters + assert_company isolate),
-# but is denied system-wide management: MANAGE_APP_USERS, MANAGE_COMPANIES, EDIT_CONFIG.
+# per-company isolation), incl. bot management and config editing scoped to its own
+# company (the config router writes to caller.company_id), but is denied system-wide
+# management: MANAGE_APP_USERS, MANAGE_COMPANIES.
 _MATRIX: dict[Action, dict[Role, bool | None]] = {
     Action.READ_VEHICLES:    {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},
     Action.MANAGE_VEHICLES:  {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
@@ -52,7 +52,7 @@ _MATRIX: dict[Action, dict[Role, bool | None]] = {
     Action.READ_EVENTS:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
     Action.WRITE_EVENTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
     Action.READ_CONFIG:      {Role.admin: False, Role.driver: False,  Role.customer: False, Role.company_admin: False},
-    Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: None},
+    Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
     Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
     Action.MANAGE_ATTENDANCE: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
     Action.MANAGE_MAINTENANCE_TYPES: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},

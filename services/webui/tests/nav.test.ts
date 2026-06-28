@@ -54,9 +54,11 @@ describe('filterNav while acting-as (Feature 8)', () => {
   // (not the operator's session flags). The Sidebar passes role='company_admin'.
   it('hides the system-only tabs when acting-as', () => {
     const hrefs = filterNav(NAV, 'company_admin', { attendance: true }).map((i) => i.href)
-    for (const sys of ['/companies', '/access', '/config', '/health']) {
+    for (const sys of ['/companies', '/access', '/health']) {
       expect(hrefs).not.toContain(sys)
     }
+    // Config is company-scoped: a company admin manages their own company's settings.
+    expect(hrefs).toContain('/config')
   })
 
   it('shows attendance when the act-as company has the flag on', () => {
