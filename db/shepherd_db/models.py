@@ -293,6 +293,7 @@ class CompanySettings(Base):
     )
     gdrive_folder_id = mapped_column(Text, nullable=True)
     gdrive_credentials_json = mapped_column(Text, nullable=True)  # SECRET - never returned
+    schema_name = mapped_column(Text, nullable=False)  # opaque per-tenant schema; seeded by the schema-per-tenant plan
     feature_flags = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
     created_at = mapped_column(
         DateTime(timezone=True),

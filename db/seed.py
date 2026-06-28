@@ -429,8 +429,8 @@ def _seed_company_settings(conn):
     # unconfigured (null folder + credentials). System admin configures these per company.
     conn.execute(
         text("""
-            INSERT INTO company_settings (company_id, feature_flags)
-            VALUES (:id, '{}'::jsonb)
+            INSERT INTO company_settings (company_id, schema_name, feature_flags)
+            VALUES (:id, 'public', '{}'::jsonb)
             ON CONFLICT (company_id) DO NOTHING
         """),
         {"id": DEFAULT_COMPANY_ID},
@@ -510,8 +510,8 @@ def _seed_playground(conn):
     # Attendance ON so the sandbox surfaces every flow; Drive left empty.
     conn.execute(
         text("""
-            INSERT INTO company_settings (company_id, feature_flags)
-            VALUES (:id, '{"attendance": true}'::jsonb)
+            INSERT INTO company_settings (company_id, schema_name, feature_flags)
+            VALUES (:id, 'public', '{"attendance": true}'::jsonb)
             ON CONFLICT (company_id) DO NOTHING
         """),
         {"id": PLAYGROUND_COMPANY_ID},
