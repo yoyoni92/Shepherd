@@ -98,3 +98,39 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+
+  build-push:
+    needs: [detect, python, webui]
+    # Publish only on push to main. !cancelled() && !failure() lets this run when a quality
+    # leg was skipped (unchanged package) while still blocking on an actual gate failure.
+    if: >-
+      !cancelled() && !failure()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Contexts/Dockerfiles match docker-compose.yml. These images are exactly what
+        # deploy/docker-compose.prod.yml (plan 03) pulls as ${REGISTRY}/shepherd-<svc>:${TAG}.
+        include:
+          - { svc: postgres, context: ./db, dockerfile: db/postgres.Dockerfile }
+          - { svc: db-init, context: ./db, dockerfile: db/Dockerfile }
+          - { svc: fleet-api, context: ., dockerfile: services/fleet-api/Dockerfile }
+          - { svc: telegram-bot, context: ., dockerfile: services/telegram-bot/Dockerfile }
+          - { svc: webui, context: ./services/webui, dockerfile: services/webui/Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:${{ github.sha }}
+            ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:latest
