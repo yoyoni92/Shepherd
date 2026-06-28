@@ -1,7 +1,7 @@
 """F7 - company-scoped attendance window settings (managed by the company admin)."""
+from shepherd_db.models import Company
 from sqlalchemy.orm import Session
 
-from shepherd_db.models import Company
 from tests.conftest import company_admin_headers, superadmin_headers
 
 

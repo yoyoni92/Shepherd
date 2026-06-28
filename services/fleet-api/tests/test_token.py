@@ -1,8 +1,9 @@
 """T10 - Internal-token guard: missing/wrong token -> 401; client-asserted role ignored.
 /health is public (load-balancer probe). All other endpoints require X-Internal-Token.
 """
-from tests.conftest import TEST_TOKEN
 from shepherd_contracts.auth import CallerContext, Role
+
+from tests.conftest import TEST_TOKEN
 
 
 def test_missing_token_rejected(raw_client):

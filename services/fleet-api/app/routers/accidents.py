@@ -7,10 +7,10 @@ from app import repo
 from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
 from app.schemas import (
-    AccidentCreate,
-    AccidentRead,
-    AccidentListItem,
     AccidentAttachmentOut,
+    AccidentCreate,
+    AccidentListItem,
+    AccidentRead,
 )
 
 router = APIRouter(prefix="/accidents", tags=["accidents"])

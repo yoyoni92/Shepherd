@@ -7,12 +7,10 @@ in config is provisioned with the tenant tables. bootstrap.sql holds the non-mod
 import os
 
 import shepherd_config as _sc
+from provisioning import TENANT_TABLES, provision_company
+from shepherd_db.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-
-from shepherd_db.models import Base
-
-from provisioning import TENANT_TABLES, provision_company
 
 _BOOTSTRAP = os.path.join(os.path.dirname(__file__), "bootstrap.sql")
 _TENANT = {t.name for t in TENANT_TABLES}

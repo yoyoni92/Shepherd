@@ -1,7 +1,7 @@
 """T4 - Vehicles CRUD with ownership enforcement (T3 integration)."""
 import uuid
 
-from tests.conftest import admin_headers, driver_headers, customer_headers
+from tests.conftest import admin_headers, customer_headers, driver_headers
 
 
 def _plate(suffix: str) -> str:
@@ -116,7 +116,11 @@ def test_list_vehicles_driver_sees_own_only(client):
     driver_id = _make_driver(client)
     p_own = _plate(uuid.uuid4().hex[:6])
     p_other = _plate(uuid.uuid4().hex[:6])
-    client.post("/vehicles", json={"licensing_plate": p_own, "driver_id": driver_id}, headers=admin_headers())
+    client.post(
+        "/vehicles",
+        json={"licensing_plate": p_own, "driver_id": driver_id},
+        headers=admin_headers(),
+    )
     client.post("/vehicles", json={"licensing_plate": p_other}, headers=admin_headers())
     r = client.get("/vehicles", headers=driver_headers(driver_id))
     assert r.status_code == 200

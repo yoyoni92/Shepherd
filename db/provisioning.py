@@ -4,9 +4,8 @@ The schema name is data (read from config / company_settings), never derived her
 Provisioning is idempotent: CREATE SCHEMA IF NOT EXISTS + create_all(checkfirst) of just
 the tenant tables under a schema_translate_map. A second company that shares a schema_name
 re-attaches to the existing schema (no-op)."""
-from sqlalchemy.engine import Connection, Engine
-
 from shepherd_db.models import Base
+from sqlalchemy.engine import Connection, Engine
 
 # The fleet-api domain tables that live in a per-company (symbolic "tenant") schema.
 _TENANT_NAMES = {

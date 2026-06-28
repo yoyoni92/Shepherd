@@ -1,6 +1,6 @@
 """T6 - Accidents + attachments + accident_logged event."""
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from tests.conftest import admin_headers, customer_headers, driver_headers
 
@@ -8,7 +8,10 @@ from tests.conftest import admin_headers, customer_headers, driver_headers
 def _make_driver(client) -> str:
     r = client.post(
         "/drivers",
-        json={"full_name": "Accident Driver", "phone_number": f"+1{uuid.uuid4().int % 10**10:010d}"},
+        json={
+            "full_name": "Accident Driver",
+            "phone_number": f"+1{uuid.uuid4().int % 10**10:010d}",
+        },
         headers=admin_headers(),
     )
     return r.json()["driver_id"]
@@ -30,7 +33,7 @@ def test_log_accident_admin(client):
         "/accidents",
         json={
             "vehicle_id": vehicle_id,
-            "datetime": datetime.now(tz=timezone.utc).isoformat(),
+            "datetime": datetime.now(tz=UTC).isoformat(),
             "location": "Tel Aviv",
         },
         headers=admin_headers(),
@@ -45,7 +48,7 @@ def test_log_accident_with_attachments(client):
         "/accidents",
         json={
             "vehicle_id": vehicle_id,
-            "datetime": datetime.now(tz=timezone.utc).isoformat(),
+            "datetime": datetime.now(tz=UTC).isoformat(),
             "attachments": [
                 {"category": "photo_our_vehicle", "file_url": "s3://bucket/photo.jpg"},
                 {"category": "another_driver_insurance", "file_url": "s3://bucket/ins.pdf"},
@@ -61,7 +64,7 @@ def test_log_accident_driver_own(client):
     vehicle_id = _make_vehicle(client, driver_id=driver_id)
     r = client.post(
         "/accidents",
-        json={"vehicle_id": vehicle_id, "datetime": datetime.now(tz=timezone.utc).isoformat()},
+        json={"vehicle_id": vehicle_id, "datetime": datetime.now(tz=UTC).isoformat()},
         headers=driver_headers(driver_id),
     )
     assert r.status_code == 201
@@ -72,7 +75,7 @@ def test_log_accident_driver_not_own(client):
     vehicle_id = _make_vehicle(client)
     r = client.post(
         "/accidents",
-        json={"vehicle_id": vehicle_id, "datetime": datetime.now(tz=timezone.utc).isoformat()},
+        json={"vehicle_id": vehicle_id, "datetime": datetime.now(tz=UTC).isoformat()},
         headers=driver_headers(other_driver_id),
     )
     assert r.status_code == 403
@@ -82,7 +85,7 @@ def test_log_accident_customer_forbidden(client):
     vehicle_id = _make_vehicle(client)
     r = client.post(
         "/accidents",
-        json={"vehicle_id": vehicle_id, "datetime": datetime.now(tz=timezone.utc).isoformat()},
+        json={"vehicle_id": vehicle_id, "datetime": datetime.now(tz=UTC).isoformat()},
         headers=customer_headers(str(uuid.uuid4())),
     )
     assert r.status_code == 403
@@ -100,7 +103,7 @@ def test_list_accidents_includes_attachments(client):
         "/accidents",
         json={
             "vehicle_id": vehicle_id,
-            "datetime": datetime.now(tz=timezone.utc).isoformat(),
+            "datetime": datetime.now(tz=UTC).isoformat(),
             "location": "Haifa-list-test",
             "attachments": [
                 {"category": "photo_our_vehicle", "file_url": "s3://bucket/photo.jpg"}
@@ -127,7 +130,7 @@ def test_list_accidents_admin_sets_driver_id(client):
         json={
             "vehicle_id": vehicle_id,
             "driver_id": driver_id,
-            "datetime": datetime.now(tz=timezone.utc).isoformat(),
+            "datetime": datetime.now(tz=UTC).isoformat(),
         },
         headers=admin_headers(),
     )

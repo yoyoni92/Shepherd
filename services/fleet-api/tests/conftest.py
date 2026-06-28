@@ -6,10 +6,9 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from shepherd_contracts.auth import CallerContext, Role
 from sqlalchemy import create_engine, text
 from testcontainers.postgres import PostgresContainer
-
-from shepherd_contracts.auth import CallerContext, Role
 
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 os.environ.setdefault("AUTH_JWT_SECRET", "test-jwt-secret")
@@ -38,11 +37,13 @@ atexit.register(lambda: os.path.exists(_CONF_PATH) and os.unlink(_CONF_PATH))
 os.environ["SHEPHERD_CONFIG"] = _CONF_PATH
 
 import shepherd_config as _sc  # noqa: E402
+
 _sc.get_config.cache_clear()
 
 _DB_DIR = Path(__file__).parents[3] / "db"
 sys.path.insert(0, str(_DB_DIR))
 from provisioning import provision_company  # noqa: E402
+
 # --- end bootstrap ---
 
 
@@ -96,8 +97,8 @@ def apply_schema(pg_engine):
 @pytest.fixture
 def client(pg_engine):
     """Authenticated test client - DB injected, internal token check skipped."""
-    from app.main import app
     from app.deps import get_engine, verify_internal_token
+    from app.main import app
 
     os.environ["INTERNAL_SERVICE_TOKEN"] = TEST_TOKEN
     app.dependency_overrides[get_engine] = lambda: pg_engine
@@ -110,8 +111,8 @@ def client(pg_engine):
 @pytest.fixture
 def raw_client(pg_engine):
     """Test client with real token enforcement - used for T10."""
-    from app.main import app
     from app.deps import get_engine
+    from app.main import app
 
     os.environ["INTERNAL_SERVICE_TOKEN"] = TEST_TOKEN
     app.dependency_overrides[get_engine] = lambda: pg_engine
@@ -176,8 +177,8 @@ def company_admin_headers(company_id: str) -> dict:
 
 def make_company_in_schema(engine, name: str, schema: str) -> str:
     """Provision <schema>, insert a company linked to it, return the company id."""
-    from sqlalchemy.orm import Session
     from shepherd_db.models import Company, CompanySettings
+    from sqlalchemy.orm import Session
 
     provision_company(engine, schema)
     with Session(engine) as s:

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -43,7 +43,7 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
     # A temporary role that has lapsed, or a driver who's been deactivated, loses
     # access immediately (defence-in-depth ahead of the pg_cron sweep).
-    if user.expires_at is not None and user.expires_at < datetime.now(timezone.utc):
+    if user.expires_at is not None and user.expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
     if user.driver is not None and user.driver.status.value != "active":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
@@ -107,7 +107,9 @@ def _authz_read(a) -> BotAuthorizationRead:
     status_code=status.HTTP_201_CREATED,
     summary="Authorize a phone for bot access (admin only)",
 )
-def create_authorization(body: BotAuthorizationCreate, session: Db, caller: Caller) -> BotAuthorizationRead:
+def create_authorization(
+    body: BotAuthorizationCreate, session: Db, caller: Caller
+) -> BotAuthorizationRead:
     assert_permitted(caller.role, Action.MANAGE_BOT_INVITES)
     if body.role not in ("admin", "driver"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
@@ -177,7 +179,9 @@ def list_users(session: Db, caller: Caller, role: str | None = None) -> list[Bot
     response_model=BotUserRead,
     summary="Update a bot user's role (admin only)",
 )
-def update_user_role(user_id: UUID, body: UserRolePatch, session: Db, caller: Caller) -> BotUserRead:
+def update_user_role(
+    user_id: UUID, body: UserRolePatch, session: Db, caller: Caller
+) -> BotUserRead:
     assert_permitted(caller.role, Action.MANAGE_BOT_USERS)
     existing = repo.get_bot_user(session, user_id)
     if existing is None:

@@ -1,7 +1,6 @@
-import sys
 import os
+import sys
 
-import pytest
 from sqlalchemy import text
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

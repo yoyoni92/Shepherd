@@ -4,7 +4,6 @@ from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-
 from shepherd_db.models import VehicleTypeEnum
 
 

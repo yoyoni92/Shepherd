@@ -1,5 +1,4 @@
 import pytest
-
 from shepherd_config import get_config
 
 

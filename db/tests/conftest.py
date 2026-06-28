@@ -31,6 +31,7 @@ atexit.register(lambda: os.path.exists(_CONF_PATH) and os.unlink(_CONF_PATH))
 os.environ["SHEPHERD_CONFIG"] = _CONF_PATH
 
 import shepherd_config as _sc  # noqa: E402
+
 _sc.get_config.cache_clear()
 # --- end bootstrap ---
 

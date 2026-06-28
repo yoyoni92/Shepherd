@@ -37,7 +37,7 @@ _VAR = re.compile(r"\$\{([^}]+)\}")
 
 def _interpolate(value: str) -> str:
     # ponytail: a tiny regex over string leaves, not a templating engine.
-    def repl(m: "re.Match[str]") -> str:
+    def repl(m: re.Match[str]) -> str:
         name = m.group(1)
         try:
             return os.environ[name]

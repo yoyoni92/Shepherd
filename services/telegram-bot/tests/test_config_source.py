@@ -1,6 +1,5 @@
-from shepherd_config import get_config
-
 from app.config import Settings, _apply_shared_config
+from shepherd_config import get_config
 
 
 def test_config_sources_db_and_fleet_url(tmp_path, monkeypatch):

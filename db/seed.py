@@ -2,17 +2,14 @@
 """Synthetic fleet seed - deterministic, idempotent, run via: python seed.py"""
 import json
 import os
-import sys
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
-from sqlalchemy import create_engine, text
-
+from provisioning import provision_company
 from shepherd_config import get_config
 from shepherd_db.logic import next_maintenance
 from shepherd_db.security import hash_password
-
-from provisioning import provision_company
+from sqlalchemy import create_engine, text
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -117,7 +114,8 @@ def _seed_drivers(conn):
     for i in range(1, 26):
         conn.execute(
             text("""
-                INSERT INTO drivers (driver_id, company_id, full_name, phone_number, license_number, status)
+                INSERT INTO drivers
+                    (driver_id, company_id, full_name, phone_number, license_number, status)
                 VALUES (:id, :company_id, :name, :phone, :lic, 'active')
                 ON CONFLICT (driver_id) DO NOTHING
             """),
@@ -135,7 +133,8 @@ def _seed_customers(conn):
     for i in range(1, 26):
         conn.execute(
             text("""
-                INSERT INTO customers (customer_id, company_id, full_name, phone_number, email, status)
+                INSERT INTO customers
+                    (customer_id, company_id, full_name, phone_number, email, status)
                 VALUES (:id, :company_id, :name, :phone, :email, 'active')
                 ON CONFLICT (customer_id) DO NOTHING
             """),
@@ -153,7 +152,8 @@ def _seed_maintenance_types(conn):
     for idx, mt in enumerate(MAINTENANCE_TYPES):
         conn.execute(
             text("""
-                INSERT INTO maintenance_types (id, company_id, name, description, interval_km, steps)
+                INSERT INTO maintenance_types
+                    (id, company_id, name, description, interval_km, steps)
                 VALUES (:id, :company_id, :name, :desc, :interval, :steps)
                 ON CONFLICT (id) DO NOTHING
             """),
@@ -200,7 +200,7 @@ def _seed_vehicles(conn):
                 "company_id": DEFAULT_COMPANY_ID,
                 "plate": f"TLV-{i:04d}",
                 "nick": f"Fleet-{i}",
-                "ins_ts": datetime(2024, 1, i % 28 + 1, tzinfo=timezone.utc),
+                "ins_ts": datetime(2024, 1, i % 28 + 1, tzinfo=UTC),
                 "insurance_valid_to": date(2026, (i % 12) + 1, 15),
                 "license_valid_to": date(2026, (i % 12) + 1, 28),
                 "vendor": VENDORS[i % len(VENDORS)],
@@ -238,7 +238,7 @@ def _seed_accidents(conn):
                 "company_id": DEFAULT_COMPANY_ID,
                 "vehicle_id": stable_uuid("vehicle", i),
                 "driver_id": stable_uuid("driver", i),
-                "dt": datetime(2025, (i % 12) + 1, i % 28 + 1, tzinfo=timezone.utc),
+                "dt": datetime(2025, (i % 12) + 1, i % 28 + 1, tzinfo=UTC),
                 "location": f"Street {i}, Tel Aviv",
                 "desc": f"Accident description {i}",
                 "other_plate": f"BER-{i:04d}",
@@ -269,7 +269,7 @@ def _seed_accident_attachments(conn):
                     "accident_id": acc_id,
                     "category": category,
                     "file_url": f"accidents/{acc_id}/attachments/{attach_i}.jpg",
-                    "uploaded_ts": datetime(2025, (acc_i % 12) + 1, acc_i % 28 + 1, tzinfo=timezone.utc),
+                    "uploaded_ts": datetime(2025, (acc_i % 12) + 1, acc_i % 28 + 1, tzinfo=UTC),
                 },
             )
             attach_i += 1
@@ -295,7 +295,7 @@ def _seed_km_updates(conn):
                     "company_id": DEFAULT_COMPANY_ID,
                     "vehicle_id": stable_uuid("vehicle", v_i),
                     "km": km,
-                    "recorded_ts": datetime(2025, (j % 12) + 1, j * 5, tzinfo=timezone.utc),
+                    "recorded_ts": datetime(2025, (j % 12) + 1, j * 5, tzinfo=UTC),
                     "driver_id": stable_uuid("driver", v_i),
                     "source": "telegram" if j % 2 == 0 else "admin_ui",
                 },
@@ -369,7 +369,7 @@ def _seed_reports(conn):
                 "ticket_type": TICKET_TYPES[i % 2],
                 "desc": f"Violation {i}",
                 "amount": 250 + i * 50,
-                "issued_ts": datetime(2025, (i % 12) + 1, i % 28 + 1, tzinfo=timezone.utc),
+                "issued_ts": datetime(2025, (i % 12) + 1, i % 28 + 1, tzinfo=UTC),
                 "due_date": date(2025, (i % 12) + 1, 28),
                 "location": f"Location {i}",
                 "authority": "Police" if i % 2 == 0 else "Municipality",
@@ -609,7 +609,8 @@ def seed(engine):
         # ---- public rows (no schema routing) ----
         _seed_companies(conn)
         _seed_company_settings(conn, cfg)
-        _seed_playground(conn, cfg)            # company + settings rows (public) + playground tenant rows
+        # company + settings rows (public) + playground tenant rows
+        _seed_playground(conn, cfg)
         _seed_system_config(conn)              # system_config is public
         _seed_channel_identities(conn)         # channel_identities is public
         _seed_app_users(conn)                  # app_users is public

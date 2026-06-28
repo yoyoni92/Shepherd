@@ -2,7 +2,6 @@
 and identity tables stay in public (schema None); no public->tenant FK survives."""
 from shepherd_db.models import Base
 
-
 TENANT = {
     "drivers", "customers", "maintenance_types", "vehicles", "accidents",
     "accident_attachments", "km_updates", "vehicle_care", "reports", "events",

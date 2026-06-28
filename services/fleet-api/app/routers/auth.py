@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from shepherd_db.security import verify_password
@@ -36,7 +36,7 @@ def login(body: LoginRequest, session: Db) -> LoginResponse:
         )
 
     role = user.role.value if hasattr(user.role, "value") else user.role
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims = {
         "sub": str(user.id),
         "role": role,

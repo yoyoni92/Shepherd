@@ -1,13 +1,13 @@
 """A row written under company A's schema is physically absent from company B's
 different schema; the scoped Db binds the right schema per caller."""
-from pathlib import Path
 import sys
 import uuid
+from pathlib import Path
 
+from shepherd_db.models import Company, CompanySettings
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from shepherd_db.models import Company, CompanySettings
 from tests.conftest import company_headers
 
 sys.path.insert(0, str(Path(__file__).parents[3] / "db"))
@@ -47,4 +47,5 @@ def test_physical_isolation_across_distinct_schemas(client, pg_engine):
     assert in_b == 0
 
     # B's caller (bound to co_phys_b) cannot see it either.
-    assert plate not in [v["licensing_plate"] for v in client.get("/vehicles", headers=company_headers(b)).json()]
+    b_vehicles = client.get("/vehicles", headers=company_headers(b)).json()
+    assert plate not in [v["licensing_plate"] for v in b_vehicles]

@@ -1,12 +1,12 @@
 """bot-enroll runs company-less but must find a driver that lives in a dedicated
 (non-public) schema, by scanning every registered schema."""
-from pathlib import Path
 import sys
 import uuid
-
-from sqlalchemy.orm import Session
+from pathlib import Path
 
 from shepherd_db.models import Company, CompanySettings, Driver
+from sqlalchemy.orm import Session
+
 from tests.conftest import TEST_TOKEN
 
 sys.path.insert(0, str(Path(__file__).parents[3] / "db"))

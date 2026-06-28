@@ -3,15 +3,14 @@
 These are the security contract: a missed company filter is a cross-tenant data leak.
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from provisioning import TENANT_TABLES, provision_company  # noqa: E402 (path set by conftest)
+from shepherd_db.models import Accident, Company, Event, KmUpdate, Vehicle
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from shepherd_db.models import Accident, Company, Event, KmUpdate, Vehicle
 from tests.conftest import company_headers, make_company_in_schema, superadmin_headers
-
-from provisioning import TENANT_TABLES, provision_company  # noqa: E402 (path set by conftest)
 
 
 def _new_company(engine, name: str) -> str:
@@ -118,7 +117,7 @@ def test_derived_write_inherits_company(client, pg_engine):
 
     acc = client.post(
         "/accidents",
-        json={"vehicle_id": vid, "datetime": datetime.now(tz=timezone.utc).isoformat()},
+        json={"vehicle_id": vid, "datetime": datetime.now(tz=UTC).isoformat()},
         headers=company_headers(a),
     )
     assert acc.status_code == 201

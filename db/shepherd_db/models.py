@@ -19,7 +19,6 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship
 from sqlalchemy.sql import text
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -293,7 +292,8 @@ class CompanySettings(Base):
     )
     gdrive_folder_id = mapped_column(Text, nullable=True)
     gdrive_credentials_json = mapped_column(Text, nullable=True)  # SECRET - never returned
-    schema_name = mapped_column(Text, nullable=False, server_default=text("'__pending__'"))  # opaque per-tenant schema; seeded by the schema-per-tenant plan
+    # opaque per-tenant schema; seeded by the schema-per-tenant plan
+    schema_name = mapped_column(Text, nullable=False, server_default=text("'__pending__'"))
     feature_flags = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
     created_at = mapped_column(
         DateTime(timezone=True),

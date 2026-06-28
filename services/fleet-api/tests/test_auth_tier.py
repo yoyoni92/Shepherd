@@ -3,9 +3,9 @@ import base64
 import json
 import uuid
 
+from shepherd_db.models import Company, Vehicle
 from sqlalchemy.orm import Session
 
-from shepherd_db.models import Company, Vehicle
 from tests.conftest import (
     DEFAULT_COMPANY_ID,
     company_admin_headers,

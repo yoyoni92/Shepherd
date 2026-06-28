@@ -2,7 +2,6 @@
 T3 - Ownership scoping via matrix.
 """
 import pytest
-
 from app.auth import Action, can
 from shepherd_contracts.auth import Role
 

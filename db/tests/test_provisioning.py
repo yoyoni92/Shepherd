@@ -1,10 +1,10 @@
 """provision_company creates the schema + the 11 tenant tables, idempotently, and a
 second company sharing the same schema_name is a no-op (no error, no duplicate types)."""
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect
 from testcontainers.postgres import PostgresContainer
 
 sys.path.insert(0, str(Path(__file__).parents[1]))  # db/
