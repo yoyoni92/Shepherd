@@ -78,3 +78,23 @@ jobs:
       # make lint, typecheck, and test all pass for every package.
       - run: make typecheck SVC=${{ matrix.package }}
       - run: make test SVC=${{ matrix.package }}
+
+  webui:
+    needs: detect
+    if: needs.detect.outputs.webui == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/webui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/webui/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
