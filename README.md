@@ -8,7 +8,7 @@ Design & build plans: [`../plans/`](../plans/README.md) (design) and
 ## Layout
 
 ```
-libs/             shared contracts (pydantic models + provider interfaces)
+libs/             shared packages: shepherd-contracts (pydantic models + provider interfaces), shepherd-config (typed config loader)
 db/               Postgres schema (models = source of truth) + bootstrap.sql + seed
 services/         fleet-api, telegram-bot, webui
 tests/e2e/        cross-system integration tests (telegram-bot vs live stack)

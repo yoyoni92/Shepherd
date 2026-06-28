@@ -45,7 +45,7 @@ DB url / fleet-api url from it. webui stays on env vars (no renderer is built).
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Create `libs/shepherd_config/tests/test_loader.py`:
+- [x] **Step 1 - Write the failing test.** Create `libs/shepherd_config/tests/test_loader.py`:
 ```python
 import pytest
 
@@ -70,10 +70,10 @@ def test_loads_minimal_config(tmp_path, monkeypatch):
     assert cfg.services.fleet_api_url == "http://fleet-api:8000"
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry install && poetry run pytest tests/test_loader.py::test_loads_minimal_config -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd libs/shepherd_config && poetry install && poetry run pytest tests/test_loader.py::test_loads_minimal_config -q`
   Expected: `ModuleNotFoundError: No module named 'shepherd_config'` (the package does not exist yet).
 
-- [ ] **Step 3 - Minimal implementation.** Create the package.
+- [x] **Step 3 - Minimal implementation.** Create the package.
 
   `libs/shepherd_config/pyproject.toml`:
 ```toml
@@ -147,9 +147,9 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_loads_minimal_config -q` -> 1 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd libs/shepherd_config && poetry run pytest tests/test_loader.py::test_loads_minimal_config -q` -> 1 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add libs/shepherd_config/pyproject.toml libs/shepherd_config/shepherd_config/__init__.py libs/shepherd_config/shepherd_config/loader.py libs/shepherd_config/tests/test_loader.py
 git commit -m "add shepherd_config package with config.toml loader
