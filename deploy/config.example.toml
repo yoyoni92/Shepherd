@@ -1,0 +1,32 @@
+# deploy/config.example.toml
+# Central config template. Copy to config.toml and edit the [[company]] map.
+#   cp config.example.toml config.toml
+# Secret values stay as ${VAR} and are read from deploy/.env at load time.
+# Mounted into the Python services at /etc/shepherd/config.toml (SHEPHERD_CONFIG).
+
+[database]
+url = "${DATABASE_URL}"        # postgresql+psycopg://... (from .env)
+shared_schema = "public"       # control-plane tables live here
+
+[services]
+fleet_api_url = "${FLEET_API_URL}"
+
+# Seeded companies. The schema name is DATA, never derived from the slug in code.
+# The map is many-to-one: two companies may point at the SAME schema (subcompanies),
+# in which case company_id row scoping is the only thing separating them.
+[[company]]
+slug = "default"
+schema = "co_default"
+
+# Example of a second tenant (uncomment and edit to add one):
+# [[company]]
+# slug = "acme"
+# schema = "co_acme"
+
+# Example of a shared schema (subcompanies a + b colocated in one schema):
+# [[company]]
+# slug = "bigcorp-a"
+# schema = "co_bigcorp"
+# [[company]]
+# slug = "bigcorp-b"
+# schema = "co_bigcorp"
