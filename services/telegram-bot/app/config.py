@@ -25,10 +25,15 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-try:
-    _cfg = get_config()
-except FileNotFoundError:
-    _cfg = None  # ponytail: no config.toml in some envs (unit tests) -> keep env defaults
-if _cfg is not None:
-    settings.database_url = _cfg.database.url
-    settings.fleet_api_url = _cfg.services.fleet_api_url
+
+def _apply_shared_config(s: Settings) -> None:
+    """Overlay shared config values onto *s*; no-op when config.toml is absent."""
+    try:
+        cfg = get_config()
+    except FileNotFoundError:
+        return
+    s.database_url = cfg.database.url
+    s.fleet_api_url = cfg.services.fleet_api_url
+
+
+_apply_shared_config(settings)
