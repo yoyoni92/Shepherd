@@ -17,5 +17,41 @@ permissions:
 jobs:
   detect:
     runs-on: ubuntu-latest
+    outputs:
+      # JSON array of changed Python packages as Makefile SVC paths (webui excluded).
+      packages: ${{ steps.pkgs.outputs.list }}
+      webui: ${{ steps.filter.outputs.webui }}
     steps:
       - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          # Filter keys ARE the Makefile SVC paths, so each leg runs `make ... SVC=<key>`
+          # with no mapping. fleet-api's libs/** covers both contracts and shepherd_config;
+          # the libs key negates shepherd_config so a config-only change does not run the
+          # contracts leg; telegram-bot now depends on shepherd_config so it expands on
+          # libs/shepherd_config/**.
+          filters: |
+            libs:
+              - 'libs/**'
+              - '!libs/shepherd_config/**'
+            'libs/shepherd_config':
+              - 'libs/shepherd_config/**'
+            db:
+              - 'db/**'
+            'services/fleet-api':
+              - 'services/fleet-api/**'
+              - 'libs/**'
+              - 'db/**'
+            'services/telegram-bot':
+              - 'services/telegram-bot/**'
+              - 'libs/shepherd_config/**'
+            webui:
+              - 'services/webui/**'
+      - id: pkgs
+        # Drop webui from the changed set (it runs in its own npm job). jq array-difference
+        # is the smallest available glue; no action does set subtraction. CHANGES is passed
+        # via env (not inlined into the script) to avoid expression-injection warnings.
+        env:
+          CHANGES: ${{ steps.filter.outputs.changes }}
+        run: echo "list=$(jq -cn --argjson c "$CHANGES" '$c - ["webui"]')" >> "$GITHUB_OUTPUT"
