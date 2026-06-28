@@ -10,4 +10,4 @@ RUN apt-get update \
 # Bake role/grant bootstrap into initdb so no host mount is needed in prod
 # (dev compose used a ./db/roles.sql volume; baking is a no-op on an existing
 # data volume since initdb scripts run only on first cluster init).
-COPY roles.sql /docker-entrypoint-initdb.d/roles.sql
+COPY roles.sql /docker-entrypoint-initdb.d/01-roles.sql
