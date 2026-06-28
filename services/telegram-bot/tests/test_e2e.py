@@ -96,6 +96,17 @@ async def test_unknown_shares_contact_enrolls_as_admin(sim, rec, mock_api):
     assert texts.WELCOME_ADMIN in rec.sent_texts()
 
 
+async def test_unknown_shares_contact_enrolls_as_system_admin(sim, rec, mock_api):
+    as_unknown(mock_api)
+    mock_api.post(f"{FLEET}/bot-enroll").mock(
+        return_value=httpx.Response(200, json={"role": "admin", "is_system_admin": True})
+    )
+    await sim.share_contact(UNKNOWN_CHAT, "0503363355")
+    # A system admin lands on their own console, not the per-company admin menu.
+    assert texts.SYSADMIN_MENU_TITLE in rec.sent_texts()
+    assert texts.WELCOME_ADMIN not in rec.sent_texts()
+
+
 async def test_unknown_shares_contact_not_authorized(sim, rec, mock_api):
     as_unknown(mock_api)
     mock_api.post(f"{FLEET}/bot-enroll").mock(

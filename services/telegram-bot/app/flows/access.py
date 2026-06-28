@@ -47,7 +47,14 @@ async def enroll(ctx: Ctx, route: str | None) -> None:
     if route == "enroll_with_phone":
         resp = await ctx.fleet.enroll(ctx.chat_id, ctx.contact_phone)
         if resp.status_code == 200:
-            role = resp.json().get("role")
+            data = resp.json()
+            role = data.get("role")
+            # A system admin enrolls with role="admin" + is_system_admin flag; land them
+            # on their own console, not the per-company admin menu.
+            if data.get("is_system_admin"):
+                await commands.apply(ctx.bot, ctx.chat_id, "system_admin")
+                await send(ctx, texts.SYSADMIN_MENU_TITLE, reply_markup=keyboards.sysadmin_menu())
+                return
             await commands.apply(ctx.bot, ctx.chat_id, role)
             kb = keyboards.admin_menu() if role == "admin" else keyboards.driver_menu()
             await send(ctx, texts.WELCOME.get(role, texts.WELCOME_DRIVER), reply_markup=kb)
