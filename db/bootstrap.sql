@@ -7,11 +7,11 @@
 -- (company_settings.schema_name); read each company's schema with dynamic SQL and
 -- write the snapshot into public.kpi_daily. company_id row-scoping keeps shared-schema
 -- subcompanies apart.
--- # ponytail: one company at a time with format()/EXECUTE (%%I quotes the schema
--- identifier, %%L literalises the company id and window; file uses %%%% so psycopg
--- passes a literal %% to Postgres). Schemas shared by sibling companies are visited
--- once per company and kept apart by WHERE company_id, so the snapshot stays
--- per-company-correct.
+-- # ponytail: one company at a time with format()/EXECUTE; the file uses %%%%
+-- so psycopg passes a literal %% to Postgres, where PL/pgSQL format() then
+-- interprets %%I (identifier-quote the schema) and %%L (literalise company id /
+-- window). Schemas shared by sibling companies are visited once per company and
+-- kept apart by WHERE company_id, so the snapshot stays per-company-correct.
 CREATE OR REPLACE FUNCTION refresh_kpi_daily() RETURNS void AS $fn$
 DECLARE
   v_window_start timestamptz := (current_date - interval '7 days');
