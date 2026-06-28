@@ -9,7 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from shepherd_db.models import Accident, Company, Event, KmUpdate, Vehicle
-from tests.conftest import company_headers, superadmin_headers
+from tests.conftest import company_headers, make_company_in_schema, superadmin_headers
+
+from provisioning import TENANT_TABLES, provision_company  # noqa: E402 (path set by conftest)
 
 
 def _new_company(engine, name: str) -> str:
@@ -165,3 +167,66 @@ def test_per_company_config_isolation(client, pg_engine):
     # A can.
     got = client.get(f"/config/{key}", headers=company_headers(a))
     assert got.status_code == 200 and got.json()["config_value"] == "A-only"
+
+
+# --- S7: two companies SHARING a schema still isolate by company_id ---
+
+def test_shared_schema_subcompanies_isolate_by_company_id(client, pg_engine):
+    a = make_company_in_schema(pg_engine, "share-A", "co_shared_pair")
+    b = make_company_in_schema(pg_engine, "share-B", "co_shared_pair")  # same schema
+    pa = f"SHA-{uuid.uuid4().hex[:6]}"
+    pb = f"SHB-{uuid.uuid4().hex[:6]}"
+    _make_vehicle(client, a, pa)
+    _make_vehicle(client, b, pb)
+
+    # Physically colocated: both rows live in co_shared_pair.vehicles.
+    from sqlalchemy import text
+    with pg_engine.connect() as conn:
+        total = conn.execute(
+            text(
+                "SELECT count(*) FROM co_shared_pair.vehicles"
+                " WHERE licensing_plate IN (:a, :b)"
+            ),
+            {"a": pa, "b": pb},
+        ).scalar()
+    assert total == 2
+
+    # A's caller sees only A's row (company_id row scoping).
+    plates_a = [
+        v["licensing_plate"]
+        for v in client.get("/vehicles", headers=company_headers(a)).json()
+    ]
+    assert pa in plates_a and pb not in plates_a
+
+    # B's caller sees only B's row.
+    plates_b = [
+        v["licensing_plate"]
+        for v in client.get("/vehicles", headers=company_headers(b)).json()
+    ]
+    assert pb in plates_b and pa not in plates_b
+
+
+# --- S8: by-PK read across shared-schema subcompanies still 404s ---
+
+def test_shared_schema_by_pk_read_leak_returns_404(client, pg_engine):
+    a = make_company_in_schema(pg_engine, "share-A2", "co_shared_pk")
+    b = make_company_in_schema(pg_engine, "share-B2", "co_shared_pk")  # same schema
+    plate_b = f"SPK-{uuid.uuid4().hex[:6]}"
+    _make_vehicle(client, b, plate_b)
+    # GET /vehicles/{plate} finds the row (same schema) then assert_company raises 404
+    # because vehicle.company_id != company_A_id.  This is the isolation 404, not a
+    # validation error - the route takes a plate (str), so no UUID parse step.
+    res = client.get(f"/vehicles/{plate_b}", headers=company_headers(a))
+    assert res.status_code == 404
+
+
+# --- S9: provisioning the second sharer does not duplicate tables ---
+
+def test_provisioning_shared_schema_is_idempotent(pg_engine):
+    from sqlalchemy import inspect
+    provision_company(pg_engine, "co_idem")
+    before = inspect(pg_engine).get_table_names(schema="co_idem")
+    provision_company(pg_engine, "co_idem")  # must not raise / duplicate
+    after = inspect(pg_engine).get_table_names(schema="co_idem")
+    assert sorted(before) == sorted(after)
+    assert {t.name for t in TENANT_TABLES} <= set(after)
