@@ -45,6 +45,9 @@ async def enroll(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "enroll_with_phone":
+        if not ctx.contact_phone:
+            await send(ctx, texts.NOT_AUTHORIZED)
+            return
         resp = await ctx.fleet.enroll(ctx.chat_id, ctx.contact_phone)
         if resp.status_code == 200:
             data = resp.json()

@@ -194,6 +194,7 @@ def route_decision(ctx: Ctx) -> tuple[str, str | None]:
 
     ar = active_route(ctx)
     if ar is not None:
+        assert ctx.flow is not None, "active_route returned non-None but ctx.flow is None"
         return (FLOW_TO_FEATURE[ctx.flow], ar)
 
     if ctx.is_callback and ctx.callback_data in CALLBACK_MAP:

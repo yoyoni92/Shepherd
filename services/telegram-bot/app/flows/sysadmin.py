@@ -121,7 +121,8 @@ async def _overview(ctx: Ctx) -> None:
 
 
 async def _debug_driver(ctx: Ctx) -> None:
-    playground = ctx.whoami.get("playground_company_id")
+    whoami = ctx.whoami or {}
+    playground = whoami.get("playground_company_id")
     if not playground:
         await send(ctx, texts.SA_NO_PLAYGROUND)
         return
@@ -137,7 +138,7 @@ async def _debug_driver(ctx: Ctx) -> None:
         "company_id": str(playground),
         "driver_id": d["driver_id"],
         "driver_name": d["full_name"],
-        "operator_id": ctx.whoami.get("user_id"),
+        "operator_id": whoami.get("user_id"),
         "attendance_enabled": True,
     }
     await sessions.set_state(ctx.chat_id, {"impersonation": imp})
@@ -146,7 +147,8 @@ async def _debug_driver(ctx: Ctx) -> None:
 
 
 async def _debug_admin(ctx: Ctx) -> None:
-    playground = ctx.whoami.get("playground_company_id")
+    whoami = ctx.whoami or {}
+    playground = whoami.get("playground_company_id")
     if not playground:
         await send(ctx, texts.SA_NO_PLAYGROUND)
         return
@@ -154,7 +156,7 @@ async def _debug_admin(ctx: Ctx) -> None:
         "mode": "debug",
         "role": "admin",
         "company_id": str(playground),
-        "operator_id": ctx.whoami.get("user_id"),
+        "operator_id": whoami.get("user_id"),
         "attendance_enabled": True,
     }
     await sessions.set_state(ctx.chat_id, {"impersonation": imp})
@@ -186,6 +188,7 @@ async def _live_start(ctx: Ctx) -> None:
 
 
 async def _live_pick_company(ctx: Ctx) -> None:
+    assert ctx.callback_data is not None
     company_id = ctx.callback_data[len("sa_co_"):]
     name = ctx.state.get("companies", {}).get(company_id, "")
     await sessions.set_state(
@@ -237,7 +240,7 @@ async def _live_pick_role(ctx: Ctx) -> None:
                 "role": "admin",
                 "company_id": company_id,
                 "company_name": name,
-                "operator_id": ctx.whoami.get("user_id"),
+                "operator_id": (ctx.whoami or {}).get("user_id"),
                 "attendance_enabled": True,
             },
             texts.SA_LIVE_ACK.format(persona=texts.SA_PERSONA_ADMIN, company=name),
@@ -261,6 +264,7 @@ async def _live_pick_role(ctx: Ctx) -> None:
 
 
 async def _live_pick_driver(ctx: Ctx) -> None:
+    assert ctx.callback_data is not None
     driver_id = ctx.callback_data[len("sa_drv_"):]
     name = ctx.state.get("company_name", "")
     driver_name = ctx.state.get("drivers", {}).get(driver_id)
@@ -272,7 +276,7 @@ async def _live_pick_driver(ctx: Ctx) -> None:
         "driver_id": driver_id,
         "driver_name": driver_name,
         "effective_id": driver_id,
-        "operator_id": ctx.whoami.get("user_id"),
+        "operator_id": (ctx.whoami or {}).get("user_id"),
         "attendance_enabled": True,
     }
     await _enter(
@@ -281,6 +285,7 @@ async def _live_pick_driver(ctx: Ctx) -> None:
 
 
 async def _live_pick_admin(ctx: Ctx) -> None:
+    assert ctx.callback_data is not None
     admin_id = ctx.callback_data[len("sa_adm_"):]
     name = ctx.state.get("company_name", "")
     imp = {
@@ -289,7 +294,7 @@ async def _live_pick_admin(ctx: Ctx) -> None:
         "company_id": ctx.state["company_id"],
         "company_name": name,
         "effective_id": admin_id,
-        "operator_id": ctx.whoami.get("user_id"),
+        "operator_id": (ctx.whoami or {}).get("user_id"),
         "attendance_enabled": True,
     }
     await _enter(

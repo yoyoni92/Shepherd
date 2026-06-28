@@ -222,6 +222,7 @@ def update_km(
     """
     # Load the vehicle first so the km_update + any derived event inherit its company_id.
     vehicle = session.get(Vehicle, vehicle_id)
+    assert vehicle is not None, f"Vehicle {vehicle_id} not found"
     km_update = KmUpdate(
         vehicle_id=vehicle_id, km=km, driver_id=driver_id, source=source,
         company_id=vehicle.company_id,
@@ -304,6 +305,7 @@ def list_accidents(session: Session, *, company_id: UUID | None = None) -> list[
 def create_care(session: Session, data: dict) -> VehicleCare:
     # Care inherits company_id from its vehicle (set before flush - it's NOT NULL).
     vehicle = session.get(Vehicle, data["vehicle_id"])
+    assert vehicle is not None, f"Vehicle {data['vehicle_id']} not found"
     care = VehicleCare(**data, company_id=vehicle.company_id)
     session.add(care)
     session.flush()
@@ -342,10 +344,11 @@ def create_care(session: Session, data: dict) -> VehicleCare:
 
     session.commit()
     session.refresh(care)
-    # attach computed next values for the response
-    care._next_km = nm["next_km"]
-    care._next_date = nm["next_date"]
-    care._next_type = nm["next_type"]
+    # Attach computed next values for the API response; not persisted to DB.
+    # These are runtime-only instance attrs on the ORM object.
+    care._next_km = nm["next_km"]  # type: ignore[attr-defined]
+    care._next_date = nm["next_date"]  # type: ignore[attr-defined]
+    care._next_type = nm["next_type"]  # type: ignore[attr-defined]
     return care
 
 
@@ -719,6 +722,8 @@ def find_enrollment_by_phone(session: Session, phone: str):
     shared = get_config().database.shared_schema
     # session.bind is the connection; .engine gives the engine so we can open
     # schema-translated connections without going through the DI graph.
+    from sqlalchemy import Connection as SAConnection
+    assert isinstance(session.bind, SAConnection), "session.bind must be a Connection here"
     engine = session.bind.engine
     for schema in _registered_schemas(session):
         with engine.connect() as conn:

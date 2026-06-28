@@ -53,6 +53,7 @@ def normalize_message(m: Message) -> dict:
 
 
 def normalize_callback(c: CallbackQuery) -> dict:
+    assert isinstance(c.message, Message), "CallbackQuery.message must be a Message"
     return {
         "chat_id": c.message.chat.id,
         "sender_id": c.from_user.id if c.from_user else None,

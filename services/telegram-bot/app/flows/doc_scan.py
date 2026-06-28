@@ -74,6 +74,7 @@ async def doc_scan(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "doc_scan_type":
+        assert ctx.callback_data is not None
         doc_type = _TYPE.get(ctx.callback_data)
         if doc_type == "driver_license":
             resp = await ctx.fleet.get("/drivers")
@@ -103,6 +104,7 @@ async def doc_scan(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "doc_scan_pick_driver":
+        assert ctx.callback_data is not None
         ctx.state.update(
             step="awaiting_file", target_driver_id=ctx.callback_data.removeprefix("ds_drv_")
         )
@@ -113,6 +115,7 @@ async def doc_scan(ctx: Ctx, route: str | None) -> None:
     if route == "doc_scan_file":
         await send(ctx, texts.DOC_SCAN_ANALYZING)
         file_id = ctx.photo_id or ctx.document_id
+        assert file_id is not None, "photo_id or document_id must be set for doc_scan_file route"
         data = await download(ctx, file_id)
         is_pdf = bool(ctx.document_name and ctx.document_name.lower().endswith(".pdf"))
         mime = "application/pdf" if is_pdf else "image/jpeg"

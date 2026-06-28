@@ -48,6 +48,7 @@ async def maintenance(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "maint_log_vehicle":
+        assert ctx.callback_data is not None
         vehicle_id = ctx.callback_data.removeprefix("ml_veh_")
         resp = await ctx.fleet.get("/maintenance-types")
         types = resp.json() if resp.status_code == 200 else []
@@ -66,6 +67,7 @@ async def maintenance(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "maint_log_type":
+        assert ctx.callback_data is not None
         ctx.state.update(step="awaiting_km", maint_type=ctx.callback_data.removeprefix("ml_type_"))
         await sessions.set_state(ctx.chat_id, ctx.state)
         await send(ctx, texts.MAINT_KM_PROMPT)

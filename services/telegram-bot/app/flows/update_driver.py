@@ -31,6 +31,7 @@ async def update_driver(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "update_driver_pick":
+        assert ctx.callback_data is not None
         target = ctx.callback_data.removeprefix("ud2_driver_")
         await sessions.set_state(
             ctx.chat_id,
@@ -53,10 +54,10 @@ async def update_driver(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "update_driver_value":
-        field = ctx.state.get("field")
-        ok, column, value = validate.validate(field, ctx.text)
+        field_key: str | None = ctx.state.get("field")
+        ok, column, value = validate.validate(field_key, ctx.text)
         if not ok:
-            await send(ctx, _INVALID.get(field, texts.UPDATE_INVALID_LICENSE))
+            await send(ctx, _INVALID.get(field_key or "", texts.UPDATE_INVALID_LICENSE))
             return
         await ctx.fleet.patch(f"/drivers/{ctx.state['target_driver_id']}", {column: value})
         await sessions.clear_state(ctx.chat_id)
@@ -66,7 +67,9 @@ async def update_driver(ctx: Ctx, route: str | None) -> None:
 
     if route == "update_driver_license_file":
         await send(ctx, texts.DOC_SCAN_ANALYZING)
-        data = await download(ctx, ctx.photo_id or ctx.document_id)
+        file_id = ctx.photo_id or ctx.document_id
+        assert file_id is not None, "photo_id or document_id must be set for license file upload"
+        data = await download(ctx, file_id)
         is_pdf = bool(ctx.document_name and ctx.document_name.lower().endswith(".pdf"))
         mime = "application/pdf" if is_pdf else "image/jpeg"
         fields = await vision.extract("driver_license", data, mime)

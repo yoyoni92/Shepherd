@@ -33,7 +33,7 @@ schema = "public"
 _fd, _CONF_PATH = tempfile.mkstemp(suffix=".toml", prefix="shepherd_test_")
 with os.fdopen(_fd, "w") as _fh:
     _fh.write(_TEST_CONFIG)
-atexit.register(lambda: os.path.exists(_CONF_PATH) and os.unlink(_CONF_PATH))
+atexit.register(lambda: os.unlink(_CONF_PATH) if os.path.exists(_CONF_PATH) else None)
 os.environ["SHEPHERD_CONFIG"] = _CONF_PATH
 
 import shepherd_config as _sc  # noqa: E402

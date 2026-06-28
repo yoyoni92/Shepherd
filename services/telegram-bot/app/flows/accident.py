@@ -20,6 +20,7 @@ _IL = ZoneInfo("Asia/Jerusalem")
 
 
 async def _store_photo(ctx: Ctx, category: str) -> None:
+    assert ctx.photo_id is not None, "photo_id must be set when storing a photo"
     data = await download(ctx, ctx.photo_id)
     key = f"accidents/{ctx.chat_id}/{category}.jpg"
     url = await storage.upload(key, data, "image/jpeg", ctx.company_id)
@@ -27,10 +28,12 @@ async def _store_photo(ctx: Ctx, category: str) -> None:
 
 
 def _fmt_time(iso: str | None) -> str:
-    try:
-        return datetime.fromisoformat(iso).strftime("%d/%m/%Y %H:%M")
-    except (TypeError, ValueError):
-        return datetime.now(_IL).strftime("%d/%m/%Y %H:%M")
+    if iso:
+        try:
+            return datetime.fromisoformat(iso).strftime("%d/%m/%Y %H:%M")
+        except ValueError:
+            pass
+    return datetime.now(_IL).strftime("%d/%m/%Y %H:%M")
 
 
 async def _notify_admins(ctx: Ctx) -> None:
@@ -78,6 +81,7 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "accident_description":
+        description: str | None
         if ctx.voice_id:
             audio = await download(ctx, ctx.voice_id)
             description = await stt.transcribe(audio)
@@ -119,6 +123,7 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "accident_area_video":
+        assert ctx.video_id is not None, "video_id must be set for accident_area_video route"
         idx = ctx.state.get("video_count", 0)
         data = await download(ctx, ctx.video_id)
         key = f"accidents/{ctx.chat_id}/accident_video_{idx}.mp4"

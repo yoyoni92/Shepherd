@@ -120,8 +120,10 @@ class FleetClient:
         )
 
     # --- Convenience ---
-    async def driver_vehicle(self, driver_id: str) -> dict[str, Any] | None:
+    async def driver_vehicle(self, driver_id: str | None) -> dict[str, Any] | None:
         """The driver's assigned vehicle (Fleet API ownership-filters by caller context)."""
+        if driver_id is None:
+            return None
         r = await self.get(
             "/vehicles", caller=driver_ctx(driver_id, self._company_id, self._impersonator)
         )

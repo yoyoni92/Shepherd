@@ -26,16 +26,22 @@ _VALUE_PROMPT = {
 }
 
 
-def field_from_callback(cb: str) -> str | None:
+def field_from_callback(cb: str | None) -> str | None:
+    if cb is None:
+        return None
     return CANONICAL.get(cb)
 
 
-def value_prompt(field: str) -> str:
+def value_prompt(field: str | None) -> str:
+    if field is None:
+        return ""
     return _VALUE_PROMPT.get(field, "")
 
 
-def validate(field: str, value: str) -> tuple[bool, str | None, str | None]:
+def validate(field: str | None, value: str | None) -> tuple[bool, str | None, str | None]:
     """Return (ok, db_column, normalized_value)."""
+    if field is None:
+        return (False, None, None)
     value = (value or "").strip()
     if field == "license_valid":
         try:

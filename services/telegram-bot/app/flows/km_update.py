@@ -48,6 +48,7 @@ async def km_update(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "km_update_vehicle":
+        assert ctx.callback_data is not None
         vehicle_id = ctx.callback_data.removeprefix("km_veh_")
         current_km = (ctx.state.get("kms") or {}).get(vehicle_id)
         await _ask_km(ctx, vehicle_id, current_km)

@@ -28,10 +28,10 @@ async def update_details(ctx: Ctx, route: str | None) -> None:
         return
 
     if route == "update_details_value":
-        field = ctx.state.get("field")
-        ok, column, value = validate.validate(field, ctx.text)
+        field_key: str | None = ctx.state.get("field")
+        ok, column, value = validate.validate(field_key, ctx.text)
         if not ok:
-            await send(ctx, _INVALID.get(field, texts.UPDATE_INVALID_LICENSE))
+            await send(ctx, _INVALID.get(field_key or "", texts.UPDATE_INVALID_LICENSE))
             return
         await ctx.fleet.patch(f"/drivers/{ctx.driver_id}", {column: value})
         await sessions.clear_state(ctx.chat_id)

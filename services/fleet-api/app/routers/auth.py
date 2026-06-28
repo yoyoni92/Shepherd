@@ -47,7 +47,7 @@ def login(body: LoginRequest, session: Db) -> LoginResponse:
 
     # Surface the company's feature flags so the webui can gate nav without a round-trip
     # (empty for a system admin with no company).
-    feature_flags = {}
+    feature_flags: dict[str, object] = {}
     if user.company_id:
         settings = repo.get_company_settings(session, user.company_id)
         feature_flags = settings.feature_flags if settings and settings.feature_flags else {}
