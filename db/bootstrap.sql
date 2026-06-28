@@ -114,22 +114,43 @@ $fn$ LANGUAGE plpgsql;
 -- whose next_maintenance_date has arrived (within the per-company warning buffer,
 -- default 30 days), unless an open maintenance_due event already exists for the
 -- vehicle (one open event per cycle - create_care resolves it on the next service).
+-- Mirrors refresh_kpi_daily: loops per company, resolves each company's tenant
+-- schema from company_settings, and executes dynamic SQL so tenant tables in
+-- non-public schemas are reached correctly.
 CREATE OR REPLACE FUNCTION emit_time_maintenance_due() RETURNS void AS $fn$
+DECLARE
+  c record;
+  v_schema text;
 BEGIN
-  INSERT INTO events (vehicle_id, company_id, event_type, severity, message,
-                      source_type, status, payload_json)
-  SELECT v.vehicle_id, v.company_id, 'maintenance_due', 'warning', 'Maintenance due soon',
-         'scheduler', 'open', '{"trigger": "time"}'::jsonb
-  FROM vehicles v
-  WHERE v.next_maintenance_date IS NOT NULL
-    AND current_date >= v.next_maintenance_date - COALESCE(
-      (SELECT (config_value #>> '{}')::int FROM system_config s
-       WHERE s.company_id = v.company_id AND s.config_key = 'maintenance_time_buffer_days'), 30)
-    AND NOT EXISTS (
-      SELECT 1 FROM events e
-      WHERE e.vehicle_id = v.vehicle_id
-        AND e.event_type = 'maintenance_due'
-        AND e.status = 'open');
+  FOR c IN SELECT company_id FROM companies LOOP
+    SELECT COALESCE(s.schema_name, 'public') INTO v_schema
+      FROM company_settings s WHERE s.company_id = c.company_id;
+    IF v_schema IS NULL THEN
+      v_schema := 'public';
+    END IF;
+    IF v_schema = '__pending__' THEN
+      CONTINUE;
+    END IF;
+
+    EXECUTE format($q$
+      INSERT INTO %%1$I.events (vehicle_id, company_id, event_type, severity, message,
+                                source_type, status, payload_json)
+      SELECT v.vehicle_id, v.company_id, 'maintenance_due', 'warning',
+             'Maintenance due soon', 'scheduler', 'open', '{"trigger": "time"}'::jsonb
+      FROM %%1$I.vehicles v
+      WHERE v.company_id = %%2$L
+        AND v.next_maintenance_date IS NOT NULL
+        AND current_date >= v.next_maintenance_date - COALESCE(
+          (SELECT (config_value #>> '{}')::int FROM system_config s
+           WHERE s.company_id = %%2$L
+             AND s.config_key = 'maintenance_time_buffer_days'), 30)
+        AND NOT EXISTS (
+          SELECT 1 FROM %%1$I.events e
+          WHERE e.vehicle_id = v.vehicle_id
+            AND e.event_type = 'maintenance_due'
+            AND e.status = 'open')
+    $q$, v_schema, c.company_id);
+  END LOOP;
 END;
 $fn$ LANGUAGE plpgsql;
 
