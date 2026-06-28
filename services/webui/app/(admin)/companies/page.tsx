@@ -203,23 +203,36 @@ function CompanySettingsDialog({ company, onClose }: { company: CompanyRead | nu
               <label className="flex items-center gap-2 text-[12px] font-semibold text-faint">
                 <KeyRound size={13} />
                 <span>פרטי חשבון שירות (JSON)</span>
-                {settings?.gdrive_configured && (
+                {settings?.gdrive_configured ? (
                   <span
                     className="text-[11px] font-bold rounded-full px-2 py-0.5"
                     style={{ color: '#86efac', background: 'rgba(134,239,172,.12)' }}
                   >
                     מוגדר ✓
                   </span>
-                )}
+                ) : settings ? (
+                  <span
+                    className="text-[11px] font-bold rounded-full px-2 py-0.5"
+                    style={{ color: '#f87171', background: 'rgba(248,113,113,.14)' }}
+                  >
+                    לא מוגדר
+                  </span>
+                ) : null}
               </label>
               <textarea
                 value={creds}
                 onChange={(e) => setCreds(e.target.value)}
                 rows={4}
-                dir="ltr"
+                // dir=auto: Hebrew placeholder reads RTL; pasted JSON renders LTR.
+                dir="auto"
                 placeholder={settings?.gdrive_configured ? 'הדבק/י JSON חדש כדי להחליף' : 'הדבק/י את ה-JSON'}
                 className="text-[12px] rounded-md px-2 py-2 font-mono"
-                style={{ ...fieldStyle, background: 'var(--bg, #0b1220)' }}
+                style={{
+                  ...fieldStyle,
+                  background: 'var(--bg, #0b1220)',
+                  // Red outline while credentials are missing, to flag Drive is unusable.
+                  borderColor: settings && !settings.gdrive_configured ? '#f87171' : undefined,
+                }}
               />
               <p className="text-[11px] text-faint">נשמר באופן מאובטח ואינו מוצג שוב לאחר השמירה.</p>
             </div>

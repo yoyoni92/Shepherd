@@ -38,7 +38,7 @@ export const NAV: NavItem[] = [
   { href: '/customers', label: 'לקוחות', Icon: Building2, badge: 'customers' },
   { href: '/events', label: 'משימות', Icon: TriangleAlert, badge: 'events' },
   { href: '/attendance', label: 'נוכחות', Icon: CalendarCheck, featureFlag: 'attendance' },
-  { href: '/bot', label: 'ניהול בוט', Icon: Bot },
+  { href: '/bot', label: 'ניהול בוט', Icon: Bot, allowedRoles: ['admin'] },
   { href: '/companies', label: 'חברות', Icon: Landmark, allowedRoles: ['admin'] },
   { href: '/access', label: 'משתמשי גישה', Icon: KeyRound, allowedRoles: ['admin'] },
   { href: '/config', label: 'הגדרות', Icon: Settings, allowedRoles: ['admin'] },

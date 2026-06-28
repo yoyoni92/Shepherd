@@ -33,6 +33,14 @@ export function parseActAs(raw: string | undefined | null): ActAsState | null {
   return null
 }
 
+// Client-only: read the current act-as state from document.cookie. Returns null
+// on the server or when not acting-as.
+export function readActAsClient(): ActAsState | null {
+  if (typeof document === 'undefined') return null
+  const m = document.cookie.match(new RegExp(`(?:^|; )${ACT_AS_STATE_COOKIE}=([^;]*)`))
+  return parseActAs(m ? decodeURIComponent(m[1]) : null)
+}
+
 // Client-only: enter act-as by writing both cookies (24h, lax). The caller then
 // hard-navigates so every server read (middleware, layout, proxy) re-runs fresh.
 export function setActAsCookies(state: ActAsState): void {

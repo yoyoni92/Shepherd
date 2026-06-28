@@ -1,5 +1,8 @@
 'use client'
+import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { readActAsClient } from '@/lib/actAs'
 import { Route, Gauge, CalendarClock, Wrench, FileText, Building2, type LucideIcon } from 'lucide-react'
 import { useKpis } from '@/hooks/useKpis'
 import { useCustomers } from '@/hooks/useCustomers'
@@ -54,6 +57,13 @@ export default function DashboardPage() {
   const alerts = alertsFromEvents(events)
   const recent = sortEvents(events).slice(0, 5)
 
+  // System health is system-level: show it only to a system admin operating as
+  // themselves (hidden for company admins and while acting-as a company).
+  const { data: session } = useSession()
+  const [actingAs, setActingAs] = useState(false)
+  useEffect(() => setActingAs(!!readActAsClient()), [])
+  const showHealth = session?.user?.role === 'admin' && !actingAs
+
   return (
     <div className="animate-fade-up">
       <div className="grid gap-3.5 mb-[22px]" style={{ gridTemplateColumns: 'repeat(6,1fr)' }}>
@@ -92,7 +102,7 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <HealthSummary />
+      {showHealth && <HealthSummary />}
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1.3fr 1fr' }}>
         {/* Alerts */}

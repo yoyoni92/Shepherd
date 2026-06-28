@@ -71,6 +71,7 @@ const CONFIG = [
   { config_key: 'license_expiring_days', config_value: 30, description: 'days ahead to warn on רישוי' },
   { config_key: 'insurance_expiring_days', config_value: 30, description: 'days ahead to warn on insurance' },
   { config_key: 'maintenance_km_buffer', config_value: 1000, description: 'km before next service to alert' },
+  { config_key: 'km_max_increment', config_value: 10000, description: 'max km increase per update' },
   { config_key: 'image_confidence_min', config_value: 0.7, description: 'min classifier confidence' },
 ]
 
