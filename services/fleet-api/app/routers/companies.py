@@ -31,6 +31,7 @@ def _settings_read(company_id: UUID, s) -> CompanySettingsRead:
         gdrive_folder_id=s.gdrive_folder_id if s else None,
         gdrive_configured=bool(s and s.gdrive_credentials_json),
         feature_flags=(s.feature_flags if s and s.feature_flags else {}),
+        schema_name=(s.schema_name if s else None),
     )
 
 

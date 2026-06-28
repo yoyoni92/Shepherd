@@ -464,6 +464,7 @@ class CompanySettingsRead(BaseModel):
     # The raw credentials blob is a secret and is never returned - only whether it's set.
     gdrive_configured: bool
     feature_flags: dict = {}
+    schema_name: str | None = None
 
 
 class CompanySettingsUpdate(BaseModel):

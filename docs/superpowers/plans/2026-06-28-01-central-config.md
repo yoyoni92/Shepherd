@@ -699,7 +699,7 @@ provisioning of the value are owned by the schema-per-tenant plan."
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Create `services/fleet-api/tests/test_settings_read_schema.py`:
+- [x] **Step 1 - Write the failing test.** Create `services/fleet-api/tests/test_settings_read_schema.py`:
 ```python
 from types import SimpleNamespace
 from uuid import uuid4
@@ -718,10 +718,10 @@ def test_settings_read_exposes_schema_name():
     assert out.schema_name == "co_acme"
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd services/fleet-api && poetry run pytest tests/test_settings_read_schema.py -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd services/fleet-api && poetry run pytest tests/test_settings_read_schema.py -q`
   Expected: `AttributeError: 'CompanySettingsRead' object has no attribute 'schema_name'` (the field does not exist yet).
 
-- [ ] **Step 3 - Minimal implementation.** Edit `services/fleet-api/app/schemas.py`, adding the field to `CompanySettingsRead`:
+- [x] **Step 3 - Minimal implementation.** Edit `services/fleet-api/app/schemas.py`, adding the field to `CompanySettingsRead`:
 ```python
 class CompanySettingsRead(BaseModel):
     company_id: UUID
@@ -743,9 +743,9 @@ def _settings_read(company_id: UUID, s) -> CompanySettingsRead:
     )
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd services/fleet-api && poetry run pytest tests/test_settings_read_schema.py -q` -> 1 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd services/fleet-api && poetry run pytest tests/test_settings_read_schema.py -q` -> 1 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add services/fleet-api/app/schemas.py services/fleet-api/app/routers/companies.py services/fleet-api/tests/test_settings_read_schema.py
 git commit -m "expose schema_name in CompanySettingsRead
