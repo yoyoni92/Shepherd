@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from shepherd_config import get_config
 from shepherd_contracts.auth import CallerContext
 
 _engine: Engine | None = None
@@ -16,7 +17,7 @@ _engine: Engine | None = None
 def get_engine() -> Engine:
     global _engine
     if _engine is None:
-        url = os.environ["DATABASE_URL"]
+        url = get_config().database.url
         _engine = create_engine(url)
     return _engine
 

@@ -16,6 +16,7 @@ google-api-python-client = "^2.140"
 google-auth = "^2.34"
 shepherd-contracts = { path = "../../libs", develop = true }
 shepherd-db = { path = "../../db", develop = true }
+shepherd-config = { path = "../../libs/shepherd_config", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

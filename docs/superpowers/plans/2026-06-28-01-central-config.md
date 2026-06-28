@@ -505,7 +505,7 @@ real config.toml, and document the SHEPHERD_CONFIG path variable in
 
 Steps:
 
-- [ ] **Step 1 - Write the failing test.** Create `services/fleet-api/tests/test_config_url.py`:
+- [x] **Step 1 - Write the failing test.** Create `services/fleet-api/tests/test_config_url.py`:
 ```python
 from app import deps
 from shepherd_config import get_config
@@ -527,10 +527,10 @@ def test_get_engine_uses_config_url(tmp_path, monkeypatch):
     assert engine.url.drivername == "sqlite+pysqlite"
 ```
 
-- [ ] **Step 2 - Run it, expect FAIL.** `cd services/fleet-api && poetry run pytest tests/test_config_url.py -q`
+- [x] **Step 2 - Run it, expect FAIL.** `cd services/fleet-api && poetry run pytest tests/test_config_url.py -q`
   Expected: `ModuleNotFoundError: No module named 'shepherd_config'` (the path dep is not installed yet).
 
-- [ ] **Step 3 - Minimal implementation.** Add the path dep to `services/fleet-api/pyproject.toml` under `[tool.poetry.dependencies]`, after the `shepherd-db` line:
+- [x] **Step 3 - Minimal implementation.** Add the path dep to `services/fleet-api/pyproject.toml` under `[tool.poetry.dependencies]`, after the `shepherd-db` line:
 ```toml
 shepherd-config = { path = "../../libs/shepherd_config", develop = true }
 ```
@@ -550,9 +550,9 @@ def get_engine() -> Engine:
     return _engine
 ```
 
-- [ ] **Step 4 - Run it, expect PASS.** `cd services/fleet-api && poetry run pytest tests/test_config_url.py -q` -> 1 passed.
+- [x] **Step 4 - Run it, expect PASS.** `cd services/fleet-api && poetry run pytest tests/test_config_url.py -q` -> 1 passed.
 
-- [ ] **Step 5 - Commit.**
+- [x] **Step 5 - Commit.**
 ```
 git add services/fleet-api/pyproject.toml services/fleet-api/poetry.lock services/fleet-api/app/deps.py services/fleet-api/tests/test_config_url.py
 git commit -m "source fleet-api db url from shepherd_config
