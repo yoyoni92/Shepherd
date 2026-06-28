@@ -25,6 +25,9 @@ test-results/
 !.env.example
 secrets/
 
+# Central config: real file is local-only; the committed template is config.example.toml
+config.toml
+
 # Models / data artifacts
 *.pth
 artifacts/

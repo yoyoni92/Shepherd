@@ -1,0 +1,19 @@
+# Shepherd central config (committed template).
+# Copy to config.toml (gitignored) and resolve secrets via the environment.
+# Secret values use ${VAR} and resolve from the process environment at load time.
+[database]
+url = "${DATABASE_URL}"            # postgresql+psycopg://...
+shared_schema = "public"          # where control-plane tables live
+
+[services]
+fleet_api_url = "${FLEET_API_URL}"
+
+# Seeded companies: the schema name is opaque data, never derived from a format.
+# The map is many-to-one: several companies may share one schema (subcompanies).
+[[company]]
+slug = "default"
+schema = "co_default"
+
+[[company]]
+slug = "internal"                 # playground / sandbox
+schema = "co_internal"
