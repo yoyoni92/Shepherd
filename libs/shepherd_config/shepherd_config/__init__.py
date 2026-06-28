@@ -1,7 +1,14 @@
 """Central config package for Shepherd services."""
-from .loader import Config, DatabaseConfig, ServicesConfig, get_config
+from .loader import (
+    CompanyConfig,
+    Config,
+    DatabaseConfig,
+    ServicesConfig,
+    get_config,
+)
 
 __all__ = [
+    "CompanyConfig",
     "Config",
     "DatabaseConfig",
     "ServicesConfig",

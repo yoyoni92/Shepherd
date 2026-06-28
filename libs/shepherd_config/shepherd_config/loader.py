@@ -7,7 +7,7 @@ import re
 import tomllib
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DatabaseConfig(BaseModel):
@@ -19,9 +19,17 @@ class ServicesConfig(BaseModel):
     fleet_api_url: str
 
 
+class CompanyConfig(BaseModel):
+    slug: str
+    schema_name: str = Field(alias="schema")  # TOML key is "schema"; attr is schema_name
+
+
 class Config(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     database: DatabaseConfig
     services: ServicesConfig
+    companies: list[CompanyConfig] = Field(default=[], alias="company")
 
 
 _VAR = re.compile(r"\$\{([^}]+)\}")

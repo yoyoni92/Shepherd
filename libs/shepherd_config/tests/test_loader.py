@@ -53,3 +53,28 @@ def test_missing_var_raises_naming_var(tmp_path, monkeypatch):
     get_config.cache_clear()
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         get_config()
+
+
+def test_parses_companies_with_schema_alias(tmp_path, monkeypatch):
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        '[database]\n'
+        'url = "postgresql://u:p@db/s"\n'
+        '\n'
+        '[services]\n'
+        'fleet_api_url = "http://fleet-api:8000"\n'
+        '\n'
+        '[[company]]\n'
+        'slug = "default"\n'
+        'schema = "co_default"\n'
+        '\n'
+        '[[company]]\n'
+        'slug = "bigcorp-b"\n'
+        'schema = "co_bigcorp"\n'
+    )
+    monkeypatch.setenv("SHEPHERD_CONFIG", str(cfg_file))
+    get_config.cache_clear()
+    cfg = get_config()
+    assert [c.slug for c in cfg.companies] == ["default", "bigcorp-b"]
+    assert cfg.companies[0].schema_name == "co_default"
+    assert cfg.companies[1].schema_name == "co_bigcorp"
