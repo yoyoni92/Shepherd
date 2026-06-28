@@ -19,3 +19,21 @@ def test_loads_minimal_config(tmp_path, monkeypatch):
     assert cfg.database.url == "postgresql+psycopg://u:p@localhost:5432/db"
     assert cfg.database.shared_schema == "public"
     assert cfg.services.fleet_api_url == "http://fleet-api:8000"
+
+
+def test_interpolates_env_var(tmp_path, monkeypatch):
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        '[database]\n'
+        'url = "${DATABASE_URL}"\n'
+        '\n'
+        '[services]\n'
+        'fleet_api_url = "${FLEET_API_URL}"\n'
+    )
+    monkeypatch.setenv("SHEPHERD_CONFIG", str(cfg_file))
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x:y@db:5432/s")
+    monkeypatch.setenv("FLEET_API_URL", "http://fleet-api:8000")
+    get_config.cache_clear()
+    cfg = get_config()
+    assert cfg.database.url == "postgresql+psycopg://x:y@db:5432/s"
+    assert cfg.services.fleet_api_url == "http://fleet-api:8000"
