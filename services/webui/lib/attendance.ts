@@ -1,8 +1,11 @@
 // Attendance domain types. Employees are drivers (id is the driver UUID); the webui
 // generates the weekday skeleton and overlays records fetched from the Fleet API.
-import type { Holiday } from './holidays'
+import type { Holiday, HolidayKind } from './holidays'
 
 export type AttendanceStatus = 'present' | 'late' | 'leave' | 'absent'
+
+// Why a day is annotated: a holiday kind, or 'rest' for a plain non-working weekday (שבת).
+export type NoteKind = HolidayKind | 'rest'
 
 export interface AttendanceDay {
   day: number
@@ -11,7 +14,9 @@ export interface AttendanceDay {
   in: string
   out: string
   status: AttendanceStatus
-  note?: string // holiday name, when the day falls on a מועד
+  working: boolean // false => rest day (חג / ערב חג / שבת / …); shown but not counted
+  note?: string // holiday name, or the rest-day label (e.g. 'שבת')
+  noteKind?: NoteKind // drives the coloured category pill (חג / ערב חג / צום / מועד / rest)
 }
 
 /** Per-company working-day rules that shape which days the skeleton includes. */
@@ -64,9 +69,10 @@ export function monthOptions(count = 3, today: Date = new Date()): { key: string
 }
 
 /**
- * Working-day skeleton for each employee; days default to empty 'present'.
- * Non-working weekdays are skipped, as are חג/ערב חג days when the company marks them
- * non-working, so holidays never count as 'absent'. Holiday names ride along as `note`.
+ * Full-month skeleton for each employee; days default to empty 'present'.
+ * EVERY day is included so the report shows weekends and holidays too, but rest days
+ * (שבת, and חג/ערב חג when the company marks them non-working) carry `working: false`
+ * and a `note`/`noteKind` so they are labelled and excluded from the work-day counts.
  */
 export function buildMonthSkeleton(
   monthKey: string,
@@ -79,11 +85,23 @@ export function buildMonthSkeleton(
   const skeleton: AttendanceDay[] = []
   for (let d = 1; d <= cap; d++) {
     const dow = new Date(`${monthKey}-${pad(d)}T00:00:00`).getDay()
-    if (!workDays.includes(dow)) continue // weekend / non-working weekday (incl. שבת)
     const hol = holidays?.get(d)
-    if (hol?.kind === 'chag' && !chagWorking) continue
-    if (hol?.kind === 'erev' && !erevChagWorking) continue
-    skeleton.push({ day: d, dateLabel: `${pad(d)}/${pad(m)}`, weekday: WD[dow], in: '', out: '', status: 'present', note: hol?.name })
+    const weekdayWork = workDays.includes(dow)
+    let working = weekdayWork
+    if (hol?.kind === 'chag') working = weekdayWork && chagWorking
+    else if (hol?.kind === 'erev') working = weekdayWork && erevChagWorking
+
+    let note: string | undefined
+    let noteKind: NoteKind | undefined
+    if (hol) {
+      note = hol.name
+      noteKind = hol.kind
+    } else if (!working) {
+      note = dow === 6 ? 'שבת' : WD[dow] // plain weekend / non-working weekday
+      noteKind = 'rest'
+    }
+
+    skeleton.push({ day: d, dateLabel: `${pad(d)}/${pad(m)}`, weekday: WD[dow], in: '', out: '', status: 'present', working, note, noteKind })
   }
   const records: Record<string, AttendanceDay[]> = {}
   for (const e of employees) records[e.id] = skeleton.map((d) => ({ ...d }))
@@ -133,6 +151,7 @@ export function aggregate(records: readonly AttendanceDay[]): DayAggregate {
     outSum = 0,
     n = 0
   for (const r of records) {
+    if (r.working === false) continue // rest day (שבת / חג / …): shown but never counted
     if (isWorked(r.status)) pres++
     if (r.status === 'late') late++
     if (r.status === 'leave') leave++

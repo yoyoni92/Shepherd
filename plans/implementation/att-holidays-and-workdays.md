@@ -18,12 +18,16 @@ overlays Jewish-holiday notes onto the monthly attendance report.
     Saturday checkbox. Default `[0,1,2,3,4]` (Sun-Thu).
   - `chag_working`: are חג days work days? Default `false`.
   - `erev_chag_working`: are ערב חג days work days? Default `true`.
-  - A calendar day is in the skeleton iff `weekday ∈ work_days` AND (chag -> chag_working)
-    AND (erev -> erev_chag_working). Non-working days are skipped, so holidays/weekends are
-    never counted as `absent`. Minor/fast days stay work days and carry only a note.
+  - A day is `working` iff `weekday ∈ work_days` AND (chag -> chag_working) AND
+    (erev -> erev_chag_working). Minor/fast days stay work days.
+  - **Every** day is shown in the report (weekends + holidays included). Rest days carry
+    `working: false` and a `note`/`noteKind` (חג / ערב חג / צום / מועד / שבת), are rendered
+    read-only and dimmed in the edit modal, and are excluded from the work-day counts so
+    they never read as `absent`.
 - **Notes visibility**: WebUI נוכחות grid (a "חגי ומועדי החודש" banner, which also covers
-  PDF since export is `window.print()`), the per-day edit modal (note under each date), and
-  the CSV export (appended "חגים ומועדים" section). Telegram bot is untouched.
+  PDF since export is `window.print()`), the per-day edit modal (each special day shows a
+  coloured category pill + name; rest days are read-only), and the CSV export (appended
+  "חגים ומועדים" section). Telegram bot is untouched.
 
 ## Contract change
 

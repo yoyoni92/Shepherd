@@ -1,6 +1,7 @@
 'use client'
 import { X } from 'lucide-react'
 import { aggregate, hoursFor, type AttendanceDay, type AttendanceMonth, type Employee } from '@/lib/attendance'
+import { HOLIDAY_META } from '@/components/meta'
 import { Avatar } from '@/components/Avatar'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -60,37 +61,56 @@ export function AttendanceEditModal({ month, employee, monthLabel, onPatch, onCl
         <div className="flex-1 overflow-y-auto" style={{ padding: '4px 22px 12px' }}>
           {days.map((d) => {
             const h = hoursFor(d)
+            const rest = !d.working
+            const pill = d.noteKind && d.noteKind !== 'rest' ? HOLIDAY_META[d.noteKind] : null
             return (
               <div
                 key={d.day}
                 className="grid items-center border-b border-divider"
                 style={{ gridTemplateColumns: '3px 1.4fr 1fr 1fr 1.2fr 64px', gap: 10, padding: '7px 0' }}
               >
-                <div style={{ minWidth: 3, width: 3, height: 30, borderRadius: 3, background: STATUS_ACCENT[d.status] }} />
+                <div style={{ minWidth: 3, width: 3, height: 30, borderRadius: 3, background: rest ? '#475569' : STATUS_ACCENT[d.status] }} />
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold ltr">{d.dateLabel}</div>
-                  <div className="text-[10.5px] text-faint truncate">
-                    {d.note ? d.note : `יום ${d.weekday}`}
-                  </div>
+                  {d.note ? (
+                    <div className="flex items-center gap-1.5 mt-[2px] min-w-0">
+                      {pill && (
+                        <span
+                          className="text-[10px] font-bold rounded whitespace-nowrap shrink-0"
+                          style={{ color: pill.color, background: pill.bg, padding: '1px 6px' }}
+                        >
+                          {pill.label}
+                        </span>
+                      )}
+                      <span className="text-[10.5px] truncate" style={{ color: pill ? pill.color : 'var(--muted, #94a3b8)' }}>
+                        {d.note}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-[10.5px] text-faint">יום {d.weekday}</div>
+                  )}
                 </div>
                 <input
                   type="time"
                   value={d.in}
+                  disabled={rest}
                   onChange={(e) => onPatch(employee.id, d.day, { in: e.target.value })}
-                  className="bg-bg border border-control rounded-[7px] text-[12.5px] text-ink outline-none w-full"
+                  className="bg-bg border border-control rounded-[7px] text-[12.5px] text-ink outline-none w-full disabled:opacity-40"
                   style={{ padding: '6px 8px' }}
                 />
                 <input
                   type="time"
                   value={d.out}
+                  disabled={rest}
                   onChange={(e) => onPatch(employee.id, d.day, { out: e.target.value })}
-                  className="bg-bg border border-control rounded-[7px] text-[12.5px] text-ink outline-none w-full"
+                  className="bg-bg border border-control rounded-[7px] text-[12.5px] text-ink outline-none w-full disabled:opacity-40"
                   style={{ padding: '6px 8px' }}
                 />
                 <select
                   value={d.status}
+                  disabled={rest}
                   onChange={(e) => onPatch(employee.id, d.day, { status: e.target.value as AttendanceDay['status'] })}
-                  className="bg-bg border border-control rounded-[7px] text-[12.5px] text-ink outline-none w-full"
+                  className="bg-bg border border-control rounded-[7px] text-[12.5px] text-ink outline-none w-full disabled:opacity-40"
                   style={{ padding: '6px 8px' }}
                 >
                   <option value="present">נוכח</option>
@@ -98,7 +118,7 @@ export function AttendanceEditModal({ month, employee, monthLabel, onPatch, onCl
                   <option value="leave">חופשה</option>
                   <option value="absent">היעדרות</option>
                 </select>
-                <div className="text-left text-[12.5px] font-bold text-success">{h ? `${h} ש׳` : '—'}</div>
+                <div className="text-left text-[12.5px] font-bold text-success">{rest ? '—' : h ? `${h} ש׳` : '—'}</div>
               </div>
             )
           })}

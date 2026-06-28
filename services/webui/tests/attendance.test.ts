@@ -30,6 +30,7 @@ const day = (over: Partial<AttendanceDay>): AttendanceDay => ({
   in: '08:00',
   out: '17:00',
   status: 'present',
+  working: true,
   ...over,
 })
 
@@ -141,13 +142,15 @@ describe('month helpers', () => {
     const opts = monthOptions(3, new Date('2026-06-15T00:00:00'))
     expect(opts.map((o) => o.key)).toEqual(['2026-04', '2026-05', '2026-06'])
   })
-  it('buildMonthSkeleton skips weekends and seeds each employee', () => {
+  it('buildMonthSkeleton includes every day and seeds each employee', () => {
     const month = buildMonthSkeleton('2026-06', [{ id: 'd1', name: 'A', role: 'נהג' }])
     expect(month.label).toBe('יוני 2026')
     const days = month.records['d1']
-    expect(days.length).toBeGreaterThan(0)
-    // no Friday/Saturday in the skeleton
-    expect(days.every((d) => d.weekday !== 'שישי' && d.weekday !== 'שבת')).toBe(true)
+    expect(days).toHaveLength(30) // June has 30 days; weekends are kept, not skipped
+    // Saturdays are shown but marked as non-working rest days, labelled שבת.
+    const sat = days.find((d) => d.weekday === 'שבת')
+    expect(sat?.working).toBe(false)
+    expect(sat).toMatchObject({ note: 'שבת', noteKind: 'rest' })
   })
 })
 
@@ -157,30 +160,39 @@ describe('buildMonthSkeleton working-day rules', () => {
   const dayOf = (month: ReturnType<typeof buildMonthSkeleton>, d: number) =>
     month.records['d1'].find((x) => x.day === d)
 
-  it('custom workDays let Friday/Saturday into the skeleton', () => {
-    const month = buildMonthSkeleton('2026-06', emp, { workDays: all })
-    expect(month.records['d1'].some((d) => d.weekday === 'שבת')).toBe(true)
+  it('marks Saturday non-working by default but working when its weekday is enabled', () => {
+    const off = buildMonthSkeleton('2026-06', emp) // default Sun-Thu
+    expect(dayOf(off, 6)?.working).toBe(false) // 2026-06-06 is a Saturday
+    const on = buildMonthSkeleton('2026-06', emp, { workDays: all })
+    expect(dayOf(on, 6)?.working).toBe(true)
   })
 
-  it('excludes חג days unless chagWorking is on', () => {
+  it('keeps חג days visible but non-working unless chagWorking is on', () => {
     const holidays = new Map([[10, hol(10, 'chag', 'פסח א׳')]])
     const off = buildMonthSkeleton('2026-06', emp, { workDays: all, chagWorking: false, holidays })
-    expect(dayOf(off, 10)).toBeUndefined()
+    expect(dayOf(off, 10)).toMatchObject({ working: false, note: 'פסח א׳', noteKind: 'chag' })
     const on = buildMonthSkeleton('2026-06', emp, { workDays: all, chagWorking: true, holidays })
-    expect(dayOf(on, 10)?.note).toBe('פסח א׳')
+    expect(dayOf(on, 10)).toMatchObject({ working: true, note: 'פסח א׳' })
   })
 
-  it('keeps ערב חג by default but drops it when erevChagWorking is off', () => {
+  it('keeps ערב חג working by default but non-working when erevChagWorking is off', () => {
     const holidays = new Map([[10, hol(10, 'erev', 'ערב פסח')]])
     const on = buildMonthSkeleton('2026-06', emp, { workDays: all, holidays })
-    expect(dayOf(on, 10)?.note).toBe('ערב פסח')
+    expect(dayOf(on, 10)).toMatchObject({ working: true, note: 'ערב פסח', noteKind: 'erev' })
     const off = buildMonthSkeleton('2026-06', emp, { workDays: all, erevChagWorking: false, holidays })
-    expect(dayOf(off, 10)).toBeUndefined()
+    expect(dayOf(off, 10)).toMatchObject({ working: false, note: 'ערב פסח' })
   })
 
-  it('attaches a note to working days that fall on a minor מועד', () => {
+  it('attaches a note to working days that fall on a fast or minor מועד', () => {
     const holidays = new Map([[10, hol(10, 'minor', 'חנוכה')]])
     const month = buildMonthSkeleton('2026-06', emp, { workDays: all, holidays })
-    expect(dayOf(month, 10)?.note).toBe('חנוכה')
+    expect(dayOf(month, 10)).toMatchObject({ working: true, note: 'חנוכה', noteKind: 'minor' })
+  })
+
+  it('does not count rest days in the aggregate', () => {
+    const month = buildMonthSkeleton('2026-06', emp) // Sun-Thu; weekends are rest
+    const a = aggregate(month.records['d1'])
+    const workingDays = month.records['d1'].filter((d) => d.working).length
+    expect(a.pres).toBe(workingDays) // every working day defaults to 'present'
   })
 })
