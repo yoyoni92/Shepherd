@@ -35,7 +35,10 @@ async def km_update(ctx: Ctx, route: str | None) -> None:
             await sessions.set_state(
                 ctx.chat_id, {"flow": "km_update", "step": "awaiting_vehicle", "kms": kms}
             )
-            await send(ctx, texts.KM_PICK_VEHICLE, reply_markup=keyboards.pick_list(items, "km_veh_"))
+            await send(
+                ctx, texts.KM_PICK_VEHICLE,
+                reply_markup=keyboards.pick_list(items, "km_veh_"),
+            )
             return
         vehicle = await ctx.fleet.driver_vehicle(ctx.driver_id)
         if vehicle is None:

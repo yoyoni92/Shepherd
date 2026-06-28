@@ -84,7 +84,10 @@ class FleetClient:
         return r.json() if r.status_code == 200 else None
 
     async def enroll(self, chat_id: int, phone_number: str) -> httpx.Response:
-        """Enroll by phone match (active driver or authorization). 200 -> granted; 404 -> not authorized."""
+        """Enroll by phone match (active driver or authorization).
+
+        200 -> granted; 404 -> not authorized.
+        """
         return await self._request(
             "POST",
             "/bot-enroll",

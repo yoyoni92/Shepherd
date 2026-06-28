@@ -76,7 +76,11 @@ def test_admin_authorization_enrolls_as_admin(client):
 def test_expired_authorization_rejected(client):
     client.post(
         "/bot-authorizations",
-        json={"phone_number": "0505556677", "role": "admin", "expires_at": "2000-01-01T00:00:00+00:00"},
+        json={
+            "phone_number": "0505556677",
+            "role": "admin",
+            "expires_at": "2000-01-01T00:00:00+00:00",
+        },
         headers=admin_headers(),
     )
     e = client.post(

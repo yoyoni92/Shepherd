@@ -1,15 +1,15 @@
 """FastAPI dependencies: schema-scoped DB session, internal token guard, caller context."""
 import json
-from typing import Annotated, Generator
+from collections.abc import Generator
+from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy import create_engine, select
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
-
 from shepherd_config import get_config
 from shepherd_contracts.auth import CallerContext
 from shepherd_db.models import CompanySettings
+from sqlalchemy import create_engine, select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 _engine: Engine | None = None
 # company_id -> schema_name. Schema names are stable data; cache for the process lifetime.
@@ -58,8 +58,10 @@ def get_caller(
 ) -> CallerContext:
     try:
         return CallerContext.model_validate(json.loads(x_caller_context))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid caller context")
+    except Exception as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid caller context"
+        ) from err
 
 
 def get_caller_optional(
@@ -70,8 +72,10 @@ def get_caller_optional(
         return None
     try:
         return CallerContext.model_validate(json.loads(x_caller_context))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid caller context")
+    except Exception as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid caller context"
+        ) from err
 
 
 def get_db(

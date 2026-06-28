@@ -53,7 +53,9 @@ def create_customer(body: CustomerCreate, session: Db, caller: Caller) -> Custom
     summary="Update customer (admin only)",
     description="Partial update — only provided fields are written.",
 )
-def update_customer(customer_id: UUID, body: CustomerUpdate, session: Db, caller: Caller) -> CustomerRead:
+def update_customer(
+    customer_id: UUID, body: CustomerUpdate, session: Db, caller: Caller
+) -> CustomerRead:
     assert_permitted(caller.role, Action.MANAGE_CUSTOMERS)
     existing = repo.get_customer(session, customer_id)
     if existing is None:

@@ -510,7 +510,9 @@ async def test_driver_km_update(sim, rec, mock_api):
         )
     )
     route = mock_api.post(f"{FLEET}/km").mock(
-        return_value=httpx.Response(200, json={"km_update_id": "k1", "maintenance_event_created": False})
+        return_value=httpx.Response(
+            200, json={"km_update_id": "k1", "maintenance_event_created": False}
+        )
     )
     await sim.tap(DRIVER_CHAT, "km_update")
     assert texts.KM_UPDATE_PROMPT.format(current=50000) in rec.sent_texts()
@@ -549,7 +551,9 @@ async def test_admin_km_update_picks_vehicle(sim, rec, mock_api):
         )
     )
     route = mock_api.post(f"{FLEET}/km").mock(
-        return_value=httpx.Response(200, json={"km_update_id": "k1", "maintenance_event_created": False})
+        return_value=httpx.Response(
+            200, json={"km_update_id": "k1", "maintenance_event_created": False}
+        )
     )
     await sim.tap(ADMIN_CHAT, "km_update")
     assert texts.KM_PICK_VEHICLE in rec.sent_texts()

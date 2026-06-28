@@ -82,7 +82,9 @@ def test_attendance_other_month_excludes_record(client):
 
 
 def test_attendance_forbidden_for_driver(client):
-    resp = client.get("/attendance/2026-06", headers=driver_headers("00000000-0000-0000-0000-000000000000"))
+    resp = client.get(
+        "/attendance/2026-06", headers=driver_headers("00000000-0000-0000-0000-000000000000")
+    )
     assert resp.status_code == 403
 
 

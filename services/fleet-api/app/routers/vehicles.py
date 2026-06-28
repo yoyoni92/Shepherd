@@ -46,9 +46,13 @@ def list_vehicles(session: Db, caller: Caller) -> list[VehicleRead]:
     assert_permitted(caller.role, Action.READ_VEHICLES)
     company_id = UUID(caller.company_id) if caller.company_id else None
     if caller.role == Role.driver:
-        vehicles = repo.list_vehicles(session, driver_id=UUID(caller.driver_id), company_id=company_id)
+        vehicles = repo.list_vehicles(
+            session, driver_id=UUID(caller.driver_id), company_id=company_id
+        )
     elif caller.role == Role.customer:
-        vehicles = repo.list_vehicles(session, customer_id=UUID(caller.customer_id), company_id=company_id)
+        vehicles = repo.list_vehicles(
+            session, customer_id=UUID(caller.customer_id), company_id=company_id
+        )
     else:
         vehicles = repo.list_vehicles(session, company_id=company_id)
     return [_to_read(v) for v in vehicles]
@@ -103,7 +107,9 @@ def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleR
     summary="Update vehicle (admin only)",
     description="Partial update — only provided fields are written.",
 )
-def update_vehicle(vehicle_id: UUID, body: VehicleUpdate, session: Db, caller: Caller) -> VehicleRead:
+def update_vehicle(
+    vehicle_id: UUID, body: VehicleUpdate, session: Db, caller: Caller
+) -> VehicleRead:
     assert_permitted(caller.role, Action.MANAGE_VEHICLES)
     existing = repo.get_vehicle_by_id(session, vehicle_id)
     if existing is None:

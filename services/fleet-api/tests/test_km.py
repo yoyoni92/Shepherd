@@ -1,7 +1,7 @@
 """T5 - KM update + maintenance trigger + ownership enforcement."""
 import uuid
 
-from tests.conftest import admin_headers, driver_headers, customer_headers
+from tests.conftest import admin_headers, customer_headers, driver_headers
 
 
 def _make_driver(client) -> str:
@@ -16,7 +16,11 @@ def _make_driver(client) -> str:
 def _make_vehicle(client, driver_id: str | None = None, next_maintenance_km: int | None = None):
     mt = client.post(
         "/maintenance-types",
-        json={"name": f"cycle-{uuid.uuid4().hex[:6]}", "interval_km": 10000, "steps": ["small", "big"]},
+        json={
+            "name": f"cycle-{uuid.uuid4().hex[:6]}",
+            "interval_km": 10000,
+            "steps": ["small", "big"],
+        },
         headers=admin_headers(),
     ).json()
     plate = f"KM-{uuid.uuid4().hex[:6]}"
@@ -110,9 +114,15 @@ def test_km_update_triggers_maintenance_event(client):
 def test_km_update_dedups_open_maintenance_event(client):
     """A second km report past the threshold does not open a second maintenance_due."""
     vehicle_id, _ = _make_vehicle(client, next_maintenance_km=10000)
-    first = client.post("/km", json={"vehicle_id": vehicle_id, "km": 9600, "source": "admin_ui"}, headers=admin_headers())
+    first = client.post(
+        "/km", json={"vehicle_id": vehicle_id, "km": 9600, "source": "admin_ui"},
+        headers=admin_headers(),
+    )
     assert first.json()["maintenance_event_created"] is True
-    second = client.post("/km", json={"vehicle_id": vehicle_id, "km": 9700, "source": "admin_ui"}, headers=admin_headers())
+    second = client.post(
+        "/km", json={"vehicle_id": vehicle_id, "km": 9700, "source": "admin_ui"},
+        headers=admin_headers(),
+    )
     assert second.json()["maintenance_event_created"] is False
 
 

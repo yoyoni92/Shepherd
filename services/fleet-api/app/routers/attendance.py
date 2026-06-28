@@ -115,7 +115,9 @@ def clock_out(body: ClockRequest, session: Db) -> ClockResponse:
     enabled, start, end = _window(session, company_id)
     if enabled and _outside_window(now, start, end):
         return ClockResponse(result="blocked", window_start=start, window_end=end)
-    result, t, hours = repo.attendance_clock_out(session, body.driver_id, now.strftime("%H:%M"), now.date())
+    result, t, hours = repo.attendance_clock_out(
+        session, body.driver_id, now.strftime("%H:%M"), now.date()
+    )
     return ClockResponse(result=result, time=t, hours=hours, window_start=start, window_end=end)
 
 
@@ -130,7 +132,9 @@ def clock_out(body: ClockRequest, session: Db) -> ClockResponse:
 def get_settings(session: Db, caller: Caller) -> AttendanceSettings:
     assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
     if not caller.company_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company context required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="company context required"
+        )
     cid = UUID(caller.company_id)
     enabled, start, end = _window(session, cid)
     work_days, chag, erev = _work_rules(session, cid)
@@ -148,7 +152,9 @@ def get_settings(session: Db, caller: Caller) -> AttendanceSettings:
 def put_settings(body: AttendanceSettings, session: Db, caller: Caller) -> AttendanceSettings:
     assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
     if not caller.company_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company context required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="company context required"
+        )
     cid = UUID(caller.company_id)
     repo.set_config(session, "attendance_window_enabled", body.enabled, cid)
     repo.set_config(session, "attendance_window_start", body.start, cid)
@@ -197,12 +203,16 @@ def list_month(
     _assert_attendance_enabled(session, caller)
     try:
         d = datetime.strptime(month, "%Y-%m")
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="month must be YYYY-MM")
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="month must be YYYY-MM"
+        ) from err
     company_id = UUID(caller.company_id) if caller.company_id else None
     return [
         _to_read(r)
-        for r in repo.list_attendance_month(session, d.year, d.month, driver_id, company_id=company_id)
+        for r in repo.list_attendance_month(
+            session, d.year, d.month, driver_id, company_id=company_id
+        )
     ]
 
 
@@ -212,12 +222,16 @@ def list_month(
     summary="Upsert one attendance day (admin only)",
     description="day is YYYY-MM-DD. Creates or updates the (driver, date) record.",
 )
-def upsert_day(driver_id: UUID, day: str, body: AttendancePatch, session: Db, caller: Caller) -> AttendanceRecordRead:
+def upsert_day(
+    driver_id: UUID, day: str, body: AttendancePatch, session: Db, caller: Caller
+) -> AttendanceRecordRead:
     assert_permitted(caller.role, Action.MANAGE_ATTENDANCE)
     try:
         work_date = date.fromisoformat(day)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="day must be YYYY-MM-DD")
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="day must be YYYY-MM-DD"
+        ) from err
     # The record inherits the driver's company, so the driver must be in the caller's company.
     # Tenant isolation (404) is asserted before the feature gate so cross-tenant probes can't
     # learn another company's attendance state.

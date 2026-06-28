@@ -1,7 +1,7 @@
 """T9 - reports, events, and config endpoints."""
 import uuid
 
-from tests.conftest import admin_headers, driver_headers, customer_headers
+from tests.conftest import admin_headers, customer_headers, driver_headers
 
 
 def _make_vehicle(client) -> str:
@@ -27,7 +27,11 @@ def test_create_report_admin(client):
 
 def test_list_reports_admin(client):
     vehicle_id = _make_vehicle(client)
-    client.post("/reports", json={"vehicle_id": vehicle_id, "ticket_type": "parking"}, headers=admin_headers())
+    client.post(
+        "/reports",
+        json={"vehicle_id": vehicle_id, "ticket_type": "parking"},
+        headers=admin_headers(),
+    )
     r = client.get("/reports", headers=admin_headers())
     assert r.status_code == 200
     assert isinstance(r.json(), list)

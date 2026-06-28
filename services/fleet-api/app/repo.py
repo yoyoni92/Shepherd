@@ -1,9 +1,6 @@
 """Data access layer - SQLAlchemy ORM, all Postgres writes go through here."""
-import json
+from datetime import UTC
 from uuid import UUID
-
-from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session, selectinload
 
 from shepherd_db.logic import next_maintenance
 from shepherd_db.models import (
@@ -15,6 +12,8 @@ from shepherd_db.models import (
     BotUser,
     Company,
     CompanySettings,
+    Customer,
+    Driver,
     Event,
     ImpersonationAudit,
     KmUpdate,
@@ -24,11 +23,10 @@ from shepherd_db.models import (
     SystemConfig,
     Vehicle,
     VehicleCare,
-    Driver,
-    Customer,
 )
 from shepherd_db.security import hash_password
-
+from sqlalchemy import func, select, update
+from sqlalchemy.orm import Session, selectinload
 
 # ---------------------------------------------------------------------------
 # Vehicles
@@ -218,7 +216,10 @@ def update_km(
     driver_id: UUID | None,
     source: str,
 ) -> tuple[UUID, bool]:
-    """Insert km_update row, update vehicle.current_km. Returns (km_update_id, maintenance_triggered)."""
+    """Insert km_update row, update vehicle.current_km.
+
+    Returns (km_update_id, maintenance_triggered).
+    """
     # Load the vehicle first so the km_update + any derived event inherit its company_id.
     vehicle = session.get(Vehicle, vehicle_id)
     km_update = KmUpdate(
@@ -235,7 +236,10 @@ def update_km(
         buffer = get_maintenance_buffer(session, vehicle.company_id)
         # One open maintenance_due per cycle: skip if the cron or a prior km report
         # already opened one (resolved by create_care on the next service).
-        if km >= vehicle.next_maintenance_km - buffer and not _has_open_maintenance_due(session, vehicle_id):
+        if (
+            km >= vehicle.next_maintenance_km - buffer
+            and not _has_open_maintenance_due(session, vehicle_id)
+        ):
             event = Event(
                 vehicle_id=vehicle_id,
                 event_type="maintenance_due",
@@ -560,7 +564,9 @@ def list_attendance_day(
     return [(r, name) for r, name in session.execute(stmt).all()]
 
 
-def attendance_clock_in(session: Session, driver_id: UUID, time_str: str, work_date) -> tuple[str, str | None]:
+def attendance_clock_in(
+    session: Session, driver_id: UUID, time_str: str, work_date
+) -> tuple[str, str | None]:
     rec = session.execute(
         select(AttendanceRecord).where(
             AttendanceRecord.driver_id == driver_id,
@@ -705,7 +711,8 @@ def find_enrollment_by_phone(session: Session, phone: str):
     # few; a normalized phone index per schema is the ceiling if a deployment
     # ever grows large.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from shepherd_config import get_config
 
     target = _normalize_phone(phone)
@@ -724,7 +731,7 @@ def find_enrollment_by_phone(session: Session, phone: str):
                 ).scalars():
                     if _normalize_phone(d.phone_number) == target:
                         return ("driver", d.driver_id, None, d.company_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for a in session.execute(
         select(BotAuthorization).where(
             (BotAuthorization.expires_at.is_(None)) | (BotAuthorization.expires_at > now)
@@ -792,8 +799,8 @@ def create_bot_authorization(
 def list_bot_authorizations(
     session: Session, *, company_id: UUID | None = None
 ) -> list[BotAuthorization]:
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
+    from datetime import datetime
+    now = datetime.now(UTC)
     stmt = select(BotAuthorization).where(
         (BotAuthorization.expires_at.is_(None)) | (BotAuthorization.expires_at > now)
     )
@@ -884,7 +891,7 @@ def upsert_company_settings(
     feature_flags=_UNSET,
 ) -> CompanySettings:
     """Create-or-update the company's settings row, writing only provided fields."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     row = session.get(CompanySettings, company_id)
     if row is None:
@@ -896,7 +903,7 @@ def upsert_company_settings(
         row.gdrive_credentials_json = gdrive_credentials_json
     if feature_flags is not _UNSET:
         row.feature_flags = feature_flags
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     session.commit()
     session.refresh(row)
     return row
@@ -1003,17 +1010,17 @@ def delete_app_user(session: Session, user_id: UUID) -> bool:
 def set_config(
     session: Session, key: str, value: object, company_id: UUID | None = None
 ) -> SystemConfig:
-    from datetime import datetime, timezone
+    from datetime import datetime
     cfg = session.get(SystemConfig, (company_id, key))
     if cfg is None:
         cfg = SystemConfig(
             company_id=company_id, config_key=key, config_value=value,
-            updated_ts=datetime.now(timezone.utc),
+            updated_ts=datetime.now(UTC),
         )
         session.add(cfg)
     else:
         cfg.config_value = value
-        cfg.updated_ts = datetime.now(timezone.utc)
+        cfg.updated_ts = datetime.now(UTC)
     session.commit()
     session.refresh(cfg)
     return cfg

@@ -27,13 +27,18 @@ def _to_read(m) -> MaintenanceTypeRead:
     )
 
 
-@router.get("", response_model=list[MaintenanceTypeRead], summary="List maintenance types (admin only)")
+@router.get(
+    "", response_model=list[MaintenanceTypeRead], summary="List maintenance types (admin only)"
+)
 def list_types(session: Db, caller: Caller) -> list[MaintenanceTypeRead]:
     assert_permitted(caller.role, _ACTION)
     return [_to_read(m) for m in repo.list_maintenance_types(session, company_id=_company(caller))]
 
 
-@router.post("", response_model=MaintenanceTypeRead, status_code=201, summary="Create maintenance type (admin only)")
+@router.post(
+    "", response_model=MaintenanceTypeRead, status_code=201,
+    summary="Create maintenance type (admin only)",
+)
 def create_type(body: MaintenanceTypeCreate, session: Db, caller: Caller) -> MaintenanceTypeRead:
     assert_permitted(caller.role, _ACTION)
     data = body.model_dump()
@@ -41,12 +46,18 @@ def create_type(body: MaintenanceTypeCreate, session: Db, caller: Caller) -> Mai
     return _to_read(repo.create_maintenance_type(session, data))
 
 
-@router.patch("/{type_id}", response_model=MaintenanceTypeRead, summary="Update maintenance type (admin only)")
-def update_type(type_id: UUID, body: MaintenanceTypeUpdate, session: Db, caller: Caller) -> MaintenanceTypeRead:
+@router.patch(
+    "/{type_id}", response_model=MaintenanceTypeRead, summary="Update maintenance type (admin only)"
+)
+def update_type(
+    type_id: UUID, body: MaintenanceTypeUpdate, session: Db, caller: Caller
+) -> MaintenanceTypeRead:
     assert_permitted(caller.role, _ACTION)
     existing = repo.get_maintenance_type(session, type_id)
     if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance type not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance type not found"
+        )
     assert_company(existing, caller)
     mtype = repo.update_maintenance_type(session, type_id, body.model_dump(exclude_unset=True))
     return _to_read(mtype)
@@ -62,7 +73,9 @@ def delete_type(type_id: UUID, session: Db, caller: Caller) -> None:
     assert_permitted(caller.role, _ACTION)
     existing = repo.get_maintenance_type(session, type_id)
     if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance type not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance type not found"
+        )
     assert_company(existing, caller)
     in_use = repo.count_vehicles_for_maintenance_type(session, type_id)
     if in_use > 0:

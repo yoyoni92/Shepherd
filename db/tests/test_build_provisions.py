@@ -1,7 +1,7 @@
 """build() creates only public tables in public, then provisions each config schema
 with the tenant tables; tenant tables are NOT created in public."""
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, inspect
@@ -27,9 +27,12 @@ def engine(monkeypatch_module):
         eng.dispose()
 
 
-def test_build_keeps_tenant_tables_out_of_public_and_provisions_config_schema(engine, monkeypatch_module):
+def test_build_keeps_tenant_tables_out_of_public_and_provisions_config_schema(
+    engine, monkeypatch_module
+):
     # Point config at one dedicated schema for the default company.
     from types import SimpleNamespace
+
     import shepherd_config
 
     cfg = SimpleNamespace(

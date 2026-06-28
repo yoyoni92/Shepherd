@@ -8,7 +8,11 @@ def _make_vehicle(client) -> str:
     # admin-defined cycle: small -> big, 10000 km interval
     mt = client.post(
         "/maintenance-types",
-        json={"name": f"cycle-{uuid.uuid4().hex[:6]}", "interval_km": 10000, "steps": ["small", "big"]},
+        json={
+            "name": f"cycle-{uuid.uuid4().hex[:6]}",
+            "interval_km": 10000,
+            "steps": ["small", "big"],
+        },
         headers=admin_headers(),
     ).json()
     plate = f"CARE-{uuid.uuid4().hex[:6]}"
@@ -44,7 +48,12 @@ def test_log_care_advances_cycle(client):
     # First service: small -> next should be big
     r1 = client.post(
         "/vehicle_care",
-        json={"vehicle_id": vehicle_id, "service_date": "2025-01-01", "maintenance_type": "small", "km_at_service": 5000},
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2025-01-01",
+            "maintenance_type": "small",
+            "km_at_service": 5000,
+        },
         headers=admin_headers(),
     )
     assert r1.json()["next_maintenance_type"] == "big"
@@ -52,7 +61,12 @@ def test_log_care_advances_cycle(client):
     # Second service: big -> next should be small
     r2 = client.post(
         "/vehicle_care",
-        json={"vehicle_id": vehicle_id, "service_date": "2025-06-01", "maintenance_type": "big", "km_at_service": 15000},
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2025-06-01",
+            "maintenance_type": "big",
+            "km_at_service": 15000,
+        },
         headers=admin_headers(),
     )
     assert r2.json()["next_maintenance_type"] == "small"
@@ -61,7 +75,12 @@ def test_log_care_advances_cycle(client):
 def test_log_care_sets_next_date_for_time_interval(client):
     mt = client.post(
         "/maintenance-types",
-        json={"name": f"cycle-{uuid.uuid4().hex[:6]}", "interval_km": 15000, "interval_months": 12, "steps": ["annual"]},
+        json={
+            "name": f"cycle-{uuid.uuid4().hex[:6]}",
+            "interval_km": 15000,
+            "interval_months": 12,
+            "steps": ["annual"],
+        },
         headers=admin_headers(),
     ).json()
     plate = f"CARE-{uuid.uuid4().hex[:6]}"
@@ -73,7 +92,12 @@ def test_log_care_sets_next_date_for_time_interval(client):
 
     r = client.post(
         "/vehicle_care",
-        json={"vehicle_id": vehicle_id, "service_date": "2026-06-01", "maintenance_type": "annual", "km_at_service": 30000},
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2026-06-01",
+            "maintenance_type": "annual",
+            "km_at_service": 30000,
+        },
         headers=admin_headers(),
     )
     assert r.status_code == 201
@@ -85,7 +109,12 @@ def test_log_care_driver_forbidden(client):
     vehicle_id = _make_vehicle(client)
     r = client.post(
         "/vehicle_care",
-        json={"vehicle_id": vehicle_id, "service_date": "2025-06-01", "maintenance_type": "small", "km_at_service": 5000},
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2025-06-01",
+            "maintenance_type": "small",
+            "km_at_service": 5000,
+        },
         headers=driver_headers(str(uuid.uuid4())),
     )
     assert r.status_code == 403

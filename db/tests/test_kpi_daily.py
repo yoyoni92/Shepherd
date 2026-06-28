@@ -4,7 +4,7 @@ Seeds a deterministic fleet, runs the function, and asserts today's kpi_daily ro
 Runs against the real Postgres test container; system_config is empty so the docs
 window falls back to the function's 30-day default.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 
@@ -14,7 +14,7 @@ def _scalar(conn, sql, **params):
 
 
 def test_refresh_kpi_daily_row_math(conn):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Use the DB's current_date (UTC container), not the host's local date - the
     # function keys snapshots on current_date, which can differ from a non-UTC host.
     today = _scalar(conn, "SELECT current_date")
@@ -35,16 +35,20 @@ def test_refresh_kpi_daily_row_math(conn):
     # vehicle1: maintenance due (current >= next), insurance expiring in 5d
     v1 = _scalar(
         conn,
-        """INSERT INTO vehicles (company_id, licensing_plate, customer_id, current_km, next_maintenance_km,
-                                 insurance_valid_to, license_valid_to)
+        """INSERT INTO vehicles
+               (company_id, licensing_plate, customer_id,
+                current_km, next_maintenance_km,
+                insurance_valid_to, license_valid_to)
            VALUES (:co, 'V-1', :c, 10000, 9000, :ins, :lic) RETURNING vehicle_id""",
         co=co, c=customer_id, ins=today + timedelta(days=5), lic=today + timedelta(days=400),
     )
     # vehicle2: not due, docs far out
     v2 = _scalar(
         conn,
-        """INSERT INTO vehicles (company_id, licensing_plate, customer_id, current_km, next_maintenance_km,
-                                 insurance_valid_to, license_valid_to)
+        """INSERT INTO vehicles
+               (company_id, licensing_plate, customer_id,
+                current_km, next_maintenance_km,
+                insurance_valid_to, license_valid_to)
            VALUES (:co, 'V-2', :c, 5000, 20000, :ins, :lic) RETURNING vehicle_id""",
         co=co, c=customer_id, ins=today + timedelta(days=400), lic=today + timedelta(days=400),
     )
@@ -66,7 +70,8 @@ def test_refresh_kpi_daily_row_math(conn):
     # vehicle_care: two services 30 days apart -> avg gap 30
     for sd, km in [(today - timedelta(days=40), 800), (today - timedelta(days=10), 1200)]:
         conn.execute(
-            text("""INSERT INTO vehicle_care (company_id, vehicle_id, service_date, maintenance_type, km_at_service)
+            text("""INSERT INTO vehicle_care
+                    (company_id, vehicle_id, service_date, maintenance_type, km_at_service)
                     VALUES (:co, :v, :sd, 'small', :km)"""),
             {"co": co, "v": v1, "sd": sd, "km": km},
         )

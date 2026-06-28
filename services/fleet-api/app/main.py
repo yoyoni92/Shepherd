@@ -58,6 +58,11 @@ app.include_router(sysadmin.router)
 app.include_router(auth.router)
 
 
-@app.get("/health", tags=["health"], summary="Health check", description="Returns 200 when the service is up.")
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Health check",
+    description="Returns 200 when the service is up.",
+)
 def health() -> dict:
     return {"status": "ok"}

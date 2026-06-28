@@ -2,7 +2,6 @@
 from enum import Enum
 
 from fastapi import HTTPException, status
-
 from shepherd_contracts.auth import CallerContext, Role
 
 
@@ -38,28 +37,28 @@ class Action(str, Enum):
 # company (the config router writes to caller.company_id), but is denied system-wide
 # management: MANAGE_APP_USERS, MANAGE_COMPANIES.
 _MATRIX: dict[Action, dict[Role, bool | None]] = {
-    Action.READ_VEHICLES:    {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},
-    Action.MANAGE_VEHICLES:  {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_DRIVERS:   {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_CUSTOMERS: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.KM_UPDATE:        {Role.admin: False, Role.driver: True,  Role.customer: None, Role.company_admin: False},
-    Action.LOG_ACCIDENT:     {Role.admin: False, Role.driver: True,  Role.customer: None, Role.company_admin: False},
-    Action.READ_ACCIDENTS:   {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.LOG_CARE:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.SUBMIT_DOCUMENT:  {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},
-    Action.WRITE_REPORTS:    {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.READ_REPORTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.READ_EVENTS:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.WRITE_EVENTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.READ_CONFIG:      {Role.admin: False, Role.driver: False,  Role.customer: False, Role.company_admin: False},
-    Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_ATTENDANCE: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_MAINTENANCE_TYPES: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_BOT_USERS:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_BOT_INVITES:       {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},
-    Action.MANAGE_APP_USERS:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: None},
-    Action.MANAGE_COMPANIES:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: None},
+    Action.READ_VEHICLES:    {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_VEHICLES:  {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_DRIVERS:   {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_CUSTOMERS: {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.KM_UPDATE:        {Role.admin: False, Role.driver: True,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.LOG_ACCIDENT:     {Role.admin: False, Role.driver: True,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.READ_ACCIDENTS:   {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.LOG_CARE:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.SUBMIT_DOCUMENT:  {Role.admin: False, Role.driver: True,  Role.customer: True, Role.company_admin: False},  # noqa: E501
+    Action.WRITE_REPORTS:    {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.READ_REPORTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.READ_EVENTS:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.WRITE_EVENTS:     {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.READ_CONFIG:      {Role.admin: False, Role.driver: False, Role.customer: False, Role.company_admin: False},  # noqa: E501
+    Action.EDIT_CONFIG:      {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.READ_KPI:         {Role.admin: False, Role.driver: None,  Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_ATTENDANCE:         {Role.admin: False, Role.driver: None, Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_MAINTENANCE_TYPES:  {Role.admin: False, Role.driver: None, Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_BOT_USERS:          {Role.admin: False, Role.driver: None, Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_BOT_INVITES:        {Role.admin: False, Role.driver: None, Role.customer: None, Role.company_admin: False},  # noqa: E501
+    Action.MANAGE_APP_USERS:          {Role.admin: False, Role.driver: None, Role.customer: None, Role.company_admin: None},  # noqa: E501
+    Action.MANAGE_COMPANIES:          {Role.admin: False, Role.driver: None, Role.customer: None, Role.company_admin: None},  # noqa: E501
 }
 
 

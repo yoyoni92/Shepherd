@@ -46,5 +46,7 @@ def update_km(body: KmUpdateRequest, session: Db, caller: Caller) -> KmUpdateRes
             )
 
     driver_id = UUID(caller.driver_id) if caller.role == Role.driver and caller.driver_id else None
-    km_id, triggered = repo.update_km(session, body.vehicle_id, body.km, driver_id=driver_id, source=body.source)
+    km_id, triggered = repo.update_km(
+        session, body.vehicle_id, body.km, driver_id=driver_id, source=body.source
+    )
     return KmUpdateResponse(km_update_id=km_id, maintenance_event_created=triggered)

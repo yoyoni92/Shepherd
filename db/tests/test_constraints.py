@@ -2,12 +2,15 @@ import uuid
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, DataError
+from sqlalchemy.exc import DataError, IntegrityError
 
 
 def test_vehicle_uuid_pk_default(conn, company_id):
     result = conn.execute(
-        text("INSERT INTO vehicles (company_id, licensing_plate) VALUES (:co, 'TEST-001') RETURNING vehicle_id"),
+        text(
+            "INSERT INTO vehicles (company_id, licensing_plate)"
+            " VALUES (:co, 'TEST-001') RETURNING vehicle_id"
+        ),
         {"co": company_id},
     )
     vid = result.scalar()
@@ -53,12 +56,18 @@ def test_enum_column_rejects_invalid_value(conn, company_id):
 
 def test_driver_phone_unique(conn, company_id):
     conn.execute(
-        text("INSERT INTO drivers (company_id, full_name, phone_number) VALUES (:co, :name, :phone)"),
+        text(
+            "INSERT INTO drivers (company_id, full_name, phone_number)"
+            " VALUES (:co, :name, :phone)"
+        ),
         {"co": company_id, "name": "Driver One", "phone": "+972501234567"},
     )
     with pytest.raises(IntegrityError):
         conn.execute(
-            text("INSERT INTO drivers (company_id, full_name, phone_number) VALUES (:co, :name, :phone)"),
+            text(
+                "INSERT INTO drivers (company_id, full_name, phone_number)"
+                " VALUES (:co, :name, :phone)"
+            ),
             {"co": company_id, "name": "Driver Two", "phone": "+972501234567"},
         )
 
@@ -84,7 +93,8 @@ def test_channel_identities_composite_unique(conn, company_id):
 def test_vehicle_care_driver_id_nullable(conn, company_id):
     result = conn.execute(
         text(
-            "INSERT INTO vehicles (company_id, licensing_plate) VALUES (:co, :plate) RETURNING vehicle_id"
+            "INSERT INTO vehicles (company_id, licensing_plate)"
+            " VALUES (:co, :plate) RETURNING vehicle_id"
         ),
         {"co": company_id, "plate": "CARE-TEST-001"},
     )
@@ -106,7 +116,8 @@ def test_vehicle_care_driver_id_nullable(conn, company_id):
         conn.execute(
             text(
                 "INSERT INTO vehicle_care"
-                " (company_id, vehicle_id, service_date, maintenance_type, km_at_service, driver_id)"
+                " (company_id, vehicle_id, service_date,"
+                "  maintenance_type, km_at_service, driver_id)"
                 " VALUES (:co, :vid, '2024-01-01', 'small', 10000, :did)"
             ),
             {"co": company_id, "vid": vehicle_id, "did": fake_driver},

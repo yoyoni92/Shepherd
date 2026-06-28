@@ -20,7 +20,9 @@ router = APIRouter(prefix="/documents", tags=["documents"])
         "If the plate is not found, emits a review event instead of a silent failure."
     ),
 )
-def extracted_document(body: DocumentExtractedRequest, session: Db, caller: Caller) -> DocumentExtractedResponse:
+def extracted_document(
+    body: DocumentExtractedRequest, session: Db, caller: Caller
+) -> DocumentExtractedResponse:
     assert_permitted(caller.role, Action.WRITE_REPORTS)
     company_id = UUID(caller.company_id) if caller.company_id else None
     status_str, event_id, report_id = repo.process_extracted_doc(

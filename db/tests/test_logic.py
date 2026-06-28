@@ -49,7 +49,8 @@ def test_months_interval_drives_next_date():
 
 def test_month_add_clamps_to_month_end():
     # 31 Jan + 1 month -> 28 Feb (no 31 Feb)
-    assert next_maintenance(None, TWO, last_date=date(2026, 1, 31), interval_months=1)["next_date"] == date(2026, 2, 28)
+    nm = next_maintenance(None, TWO, last_date=date(2026, 1, 31), interval_months=1)
+    assert nm["next_date"] == date(2026, 2, 28)
 
 
 def test_no_anchor_date_means_no_due_date():
@@ -57,7 +58,10 @@ def test_no_anchor_date_means_no_due_date():
 
 
 def test_whichever_first_sets_both_thresholds():
-    nm = next_maintenance("קטן", TWO, last_km=10000, interval_km=15000, last_date=date(2026, 6, 1), interval_months=12)
+    nm = next_maintenance(
+        "קטן", TWO, last_km=10000, interval_km=15000,
+        last_date=date(2026, 6, 1), interval_months=12,
+    )
     assert nm["next_km"] == 25000
     assert nm["next_date"] == date(2027, 6, 1)
 
