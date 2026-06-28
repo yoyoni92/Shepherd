@@ -258,7 +258,7 @@ driver relationships become viewonly so they resolve under the bound schema."
 
 Steps:
 
-- [ ] 1. Write the failing test `db/tests/test_provisioning.py`:
+- [x] 1. Write the failing test `db/tests/test_provisioning.py`:
 
 ```python
 """provision_company creates the schema + the 11 tenant tables, idempotently, and a
@@ -313,11 +313,11 @@ def test_second_company_sharing_a_schema_is_a_noop(engine):
     assert {t.name for t in TENANT_TABLES} <= set(insp.get_table_names(schema="co_shared"))
 ```
 
-- [ ] 2. Run, expect FAIL:
+- [x] 2. Run, expect FAIL:
   `cd db && poetry run pytest tests/test_provisioning.py -q`
   Expected: `ModuleNotFoundError: No module named 'provisioning'`.
 
-- [ ] 3. Minimal impl `db/provisioning.py`:
+- [x] 3. Minimal impl `db/provisioning.py`:
 
 ```python
 """Provision a Postgres schema with the tenant (domain) tables.
@@ -362,10 +362,10 @@ def provision_company(
         _provision(conn_or_engine, schema_name, shared_schema)
 ```
 
-- [ ] 4. Run, expect PASS:
+- [x] 4. Run, expect PASS:
   `cd db && poetry run pytest tests/test_provisioning.py -q`
 
-- [ ] 5. Commit:
+- [x] 5. Commit:
 
 ```
 git add db/provisioning.py db/tests/test_provisioning.py

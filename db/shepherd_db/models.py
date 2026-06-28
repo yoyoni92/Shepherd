@@ -410,17 +410,17 @@ class Vehicle(TenantMixin, Base):
     current_km = mapped_column(Integer, nullable=True)
     driver_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
+        ForeignKey("tenant.drivers.driver_id"),
         nullable=True,
     )
     maintenance_type_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("maintenance_types.id"),
+        ForeignKey("tenant.maintenance_types.id"),
         nullable=True,
     )
     customer_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("customers.customer_id"),
+        ForeignKey("tenant.customers.customer_id"),
         nullable=True,
     )
 
@@ -441,12 +441,12 @@ class Accident(TenantMixin, Base):
     )
     vehicle_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("vehicles.vehicle_id"),
+        ForeignKey("tenant.vehicles.vehicle_id"),
         nullable=False,
     )
     driver_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
+        ForeignKey("tenant.drivers.driver_id"),
         nullable=True,
     )
     datetime = mapped_column(DateTime(timezone=True), nullable=False)
@@ -473,7 +473,7 @@ class AccidentAttachment(TenantMixin, Base):
     )
     accident_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("accidents.accident_id"),
+        ForeignKey("tenant.accidents.accident_id"),
         nullable=False,
     )
     category = mapped_column(accident_attachment_category_type, nullable=False)
@@ -499,7 +499,7 @@ class KmUpdate(TenantMixin, Base):
     )
     vehicle_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("vehicles.vehicle_id"),
+        ForeignKey("tenant.vehicles.vehicle_id"),
         nullable=False,
     )
     km = mapped_column(Integer, nullable=False)
@@ -510,7 +510,7 @@ class KmUpdate(TenantMixin, Base):
     )
     driver_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
+        ForeignKey("tenant.drivers.driver_id"),
         nullable=True,
     )
     source = mapped_column(km_update_source_type, nullable=False)
@@ -531,7 +531,7 @@ class VehicleCare(TenantMixin, Base):
     )
     vehicle_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("vehicles.vehicle_id"),
+        ForeignKey("tenant.vehicles.vehicle_id"),
         nullable=False,
     )
     service_date = mapped_column(Date, nullable=False)
@@ -544,7 +544,7 @@ class VehicleCare(TenantMixin, Base):
     next_maintenance_km = mapped_column(Integer, nullable=True)
     driver_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
+        ForeignKey("tenant.drivers.driver_id"),
         nullable=True,
     )
     created_ts = mapped_column(
@@ -569,12 +569,12 @@ class Report(TenantMixin, Base):
     )
     vehicle_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("vehicles.vehicle_id"),
+        ForeignKey("tenant.vehicles.vehicle_id"),
         nullable=False,
     )
     driver_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
+        ForeignKey("tenant.drivers.driver_id"),
         nullable=True,
     )
     ticket_type = mapped_column(ticket_type_type, nullable=False)
@@ -612,7 +612,7 @@ class Event(TenantMixin, Base):
     )
     vehicle_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("vehicles.vehicle_id"),
+        ForeignKey("tenant.vehicles.vehicle_id"),
         nullable=True,
     )
     event_type = mapped_column(event_type_type, nullable=False)
@@ -699,7 +699,7 @@ class AttendanceRecord(TenantMixin, Base):
     )
     driver_id = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("drivers.driver_id"),
+        ForeignKey("tenant.drivers.driver_id"),
         nullable=False,
     )
     work_date = mapped_column(Date, nullable=False)
