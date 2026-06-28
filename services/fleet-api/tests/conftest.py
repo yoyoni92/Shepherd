@@ -51,10 +51,16 @@ def pg_engine():
     with PostgresContainer("postgres:16", driver="psycopg") as pg:
         url = pg.get_connection_url()
         _base = create_engine(url)
-        # Translate the symbolic "tenant" schema to "public" so ORM queries
-        # (which emit FROM tenant.<table>) resolve against the tenant tables
-        # provisioned into public by build() in apply_schema.
-        engine = _base.execution_options(schema_translate_map={"tenant": "public"})
+        # Translate "tenant" -> "public" so ORM queries resolve against the
+        # tenant tables provisioned into public by build() in apply_schema.
+        # Include None: "public" so the key set is consistent with the
+        # per-request schema_translate_map set by get_db; SA caches compiled
+        # SQL by bool(schema_translate_map) not by the key set, so all users
+        # of this engine must carry the same keys to avoid __[SCHEMA__none]
+        # token mismatches when statements are served from cache.
+        engine = _base.execution_options(
+            schema_translate_map={"tenant": "public", None: "public"}
+        )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         yield engine
