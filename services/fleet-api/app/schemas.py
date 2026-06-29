@@ -403,6 +403,8 @@ class BotEnrollResponse(BaseModel):
     user_id: UUID
     expires_at: datetime | None = None
     is_system_admin: bool = False
+    # Lets the bot render the post-enroll menu honoring the company's attendance flag.
+    attendance_enabled: bool = False
 
 
 class BotAuthorizationCreate(BaseModel):
@@ -554,6 +556,16 @@ class SystemOverviewItem(BaseModel):
     open_event_count: int
     attendance_enabled: bool
     gdrive_configured: bool
+    # New per-schema-correct fields
+    customer_count: int = 0
+    accident_count: int = 0
+    maintenance_due_count: int = 0
+    docs_expiring_count: int = 0
+    unpaid_report_count: int = 0
+    total_km_7d: int = 0
+    is_active: bool = True
+    schema_name: str = ""
+    bot_user_count: int = 0
 
 
 class SystemOverview(BaseModel):

@@ -1,5 +1,5 @@
 """Data access layer - SQLAlchemy ORM, all Postgres writes go through here."""
-from datetime import UTC
+from datetime import UTC, date
 from uuid import UUID
 
 from shepherd_db.logic import next_maintenance
@@ -1036,36 +1036,134 @@ def set_config(
 # ---------------------------------------------------------------------------
 
 def system_overview(session: Session) -> list[dict]:
-    """Per-company counts + health flags for the system overview, EXCLUDING internal
-    (Playground) companies."""
+    """Per-company counts + health flags for the system overview.
+
+    All tenant-table counts (vehicles, drivers, events, customers, accidents,
+    reports) are run against each company's own Postgres schema using a
+    schema_translate_map translated connection - the same pattern used by
+    find_enrollment_by_phone and refresh_kpi_daily. Companies whose
+    schema_name is '__pending__' (schema not yet provisioned) get 0 for all
+    tenant counts. Public-table reads (kpi_daily, BotUser, company_settings)
+    stay on the main session.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import Connection as SAConnection
+    from sqlalchemy import or_
+
+    from shepherd_config import get_config
+
+    shared = get_config().database.shared_schema
+    assert isinstance(session.bind, SAConnection), "session.bind must be a Connection"
+    engine = session.bind.engine
+
+    today = date.today()
+    docs_cutoff = today + timedelta(days=30)
+
     overview: list[dict] = []
     for c in session.execute(
         select(Company).where(Company.is_internal.is_(False)).order_by(Company.name)
     ).scalars():
-        vehicle_count = session.scalar(
-            select(func.count()).select_from(Vehicle).where(Vehicle.company_id == c.company_id)
-        ) or 0
-        driver_count = session.scalar(
-            select(func.count()).select_from(Driver).where(Driver.company_id == c.company_id)
-        ) or 0
-        open_event_count = session.scalar(
-            select(func.count()).select_from(Event).where(
-                Event.company_id == c.company_id, Event.status == "open"
-            )
-        ) or 0
         settings = session.get(CompanySettings, c.company_id)
+        schema_name = settings.schema_name if settings else shared
         attendance_enabled = bool(
             settings and settings.feature_flags and settings.feature_flags.get("attendance")
         )
         gdrive_configured = bool(settings and settings.gdrive_credentials_json)
+
+        # Public-table reads: BotUser count and latest kpi_daily snapshot.
+        bot_user_count = session.scalar(
+            select(func.count()).select_from(BotUser).where(
+                BotUser.company_id == c.company_id
+            )
+        ) or 0
+
+        kpi_row = session.execute(
+            select(KpiDaily)
+            .where(KpiDaily.company_id == c.company_id)
+            .order_by(KpiDaily.snapshot_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        total_km_7d = int(kpi_row.total_km_7d) if (kpi_row and kpi_row.total_km_7d) else 0
+
+        # Tenant-table reads: open a schema-translated connection per company.
+        if schema_name == "__pending__":
+            vehicle_count = driver_count = open_event_count = 0
+            customer_count = accident_count = maintenance_due_count = 0
+            docs_expiring_count = unpaid_report_count = 0
+        else:
+            with engine.connect() as conn:
+                tconn = conn.execution_options(
+                    schema_translate_map={"tenant": schema_name, None: shared}
+                )
+                with Session(bind=tconn) as s:
+                    vehicle_count = s.scalar(
+                        select(func.count()).select_from(Vehicle).where(
+                            Vehicle.company_id == c.company_id
+                        )
+                    ) or 0
+                    driver_count = s.scalar(
+                        select(func.count()).select_from(Driver).where(
+                            Driver.company_id == c.company_id
+                        )
+                    ) or 0
+                    open_event_count = s.scalar(
+                        select(func.count()).select_from(Event).where(
+                            Event.company_id == c.company_id,
+                            Event.status == "open",
+                        )
+                    ) or 0
+                    customer_count = s.scalar(
+                        select(func.count()).select_from(Customer).where(
+                            Customer.company_id == c.company_id
+                        )
+                    ) or 0
+                    accident_count = s.scalar(
+                        select(func.count()).select_from(Accident).where(
+                            Accident.company_id == c.company_id
+                        )
+                    ) or 0
+                    maintenance_due_count = s.scalar(
+                        select(func.count()).select_from(Vehicle).where(
+                            Vehicle.company_id == c.company_id,
+                            Vehicle.current_km.is_not(None),
+                            Vehicle.next_maintenance_km.is_not(None),
+                            Vehicle.current_km >= Vehicle.next_maintenance_km,
+                        )
+                    ) or 0
+                    docs_expiring_count = s.scalar(
+                        select(func.count()).select_from(Vehicle).where(
+                            Vehicle.company_id == c.company_id,
+                            or_(
+                                Vehicle.insurance_valid_to <= docs_cutoff,
+                                Vehicle.license_valid_to <= docs_cutoff,
+                            ),
+                        )
+                    ) or 0
+                    unpaid_report_count = s.scalar(
+                        select(func.count()).select_from(Report).where(
+                            Report.company_id == c.company_id,
+                            Report.status == "unpaid",
+                        )
+                    ) or 0
+
         overview.append({
             "company_id": c.company_id,
             "name": c.name,
+            "is_active": c.is_active,
+            "schema_name": schema_name,
             "vehicle_count": vehicle_count,
             "driver_count": driver_count,
             "open_event_count": open_event_count,
             "attendance_enabled": attendance_enabled,
             "gdrive_configured": gdrive_configured,
+            "customer_count": customer_count,
+            "accident_count": accident_count,
+            "maintenance_due_count": maintenance_due_count,
+            "docs_expiring_count": docs_expiring_count,
+            "unpaid_report_count": unpaid_report_count,
+            "total_km_7d": total_km_7d,
+            "bot_user_count": bot_user_count,
         })
     return overview
 
