@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app import texts
+from app import fmt, texts
 from app.context import Ctx
 from app.tg import send
 
@@ -15,15 +15,15 @@ async def fleet_summary(ctx: Ctx, route: str | None) -> None:
         return
     k = rows[0]
 
-    def val(key: str) -> object:
+    def _v(key: str) -> object:
         v = k.get(key)
         return "-" if v is None else v
 
     lines = [
         texts.FLEET_SUMMARY_TITLE,
         "",
-        f'ק"מ ב-7 ימים: {val("total_km_7d")}',
-        f'ממוצע ק"מ לנהג: {val("avg_km_per_driver_7d")}',
-        f"מסמכים שעומדים לפוג: {val('docs_expiring_count')}",
+        fmt.kv('ק"מ ב-7 ימים', _v("total_km_7d")),
+        fmt.kv('ממוצע ק"מ לנהג', _v("avg_km_per_driver_7d")),
+        fmt.kv("מסמכים שעומדים לפוג", _v("docs_expiring_count")),
     ]
     await send(ctx, "\n".join(lines))

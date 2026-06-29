@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app import texts
+from app import fmt, texts
 from app.context import Ctx
 from app.tg import send
 
@@ -21,5 +21,7 @@ async def attendance_admin(ctx: Ctx, route: str | None) -> None:
         clock_in = r.get("clock_in") or "-"
         clock_out = r.get("clock_out") or "-"
         status = _STATUS_HE.get(r.get("status"), r.get("status") or "")
-        lines.append(f"• {name}: {clock_in} - {clock_out} ({status})")
+        lines.append(
+            f"• {name}: {fmt.val(clock_in)} - {fmt.val(clock_out)} ({status})"
+        )
     await send(ctx, "\n".join(lines))

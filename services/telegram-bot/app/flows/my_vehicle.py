@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app import texts
+from app import fmt, texts
 from app.context import Ctx
 from app.tg import send
 
@@ -16,10 +16,10 @@ async def my_vehicle(ctx: Ctx, route: str | None) -> None:
     km = "-" if km is None else km
     lines = [
         texts.MY_VEHICLE_TITLE,
-        f"יצרן: {vehicle.get('vendor') or '-'}",
-        f"דגם: {vehicle.get('model') or '-'}",
-        f"לוחית: {vehicle.get('licensing_plate') or '-'}",
-        f"סוג: {vehicle.get('vehicle_type') or '-'}",
-        f'ק"מ נוכחי: {km}',
+        fmt.kv("יצרן", vehicle.get("vendor") or "-"),
+        fmt.kv("דגם", vehicle.get("model") or "-"),
+        fmt.kv("לוחית", vehicle.get("licensing_plate") or "-"),
+        fmt.kv("סוג", vehicle.get("vehicle_type") or "-"),
+        fmt.kv('ק"מ נוכחי', km),
     ]
     await send(ctx, "\n".join(lines))
