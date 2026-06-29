@@ -104,12 +104,22 @@ async def _overview(ctx: Ctx) -> None:
         return
     lines = [texts.SA_OVERVIEW_TITLE, ""]
     for c in companies:
+        active_flag = texts.SA_ON if c.get("is_active", True) else texts.SA_OFF
         lines.append(
             texts.SA_OVERVIEW_LINE.format(
                 name=c["name"],
+                schema=c.get("schema_name", ""),
+                active=active_flag,
                 vehicles=c["vehicle_count"],
                 drivers=c["driver_count"],
                 events=c["open_event_count"],
+                customers=c.get("customer_count", 0),
+                accidents=c.get("accident_count", 0),
+                unpaid=c.get("unpaid_report_count", 0),
+                maint_due=c.get("maintenance_due_count", 0),
+                docs_exp=c.get("docs_expiring_count", 0),
+                km_7d=c.get("total_km_7d", 0),
+                bot_users=c.get("bot_user_count", 0),
                 attendance=texts.SA_ON if c["attendance_enabled"] else texts.SA_OFF,
                 drive=texts.SA_ON if c["gdrive_configured"] else texts.SA_OFF,
             )
