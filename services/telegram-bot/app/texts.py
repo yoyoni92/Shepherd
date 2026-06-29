@@ -53,17 +53,11 @@ SA_OVERVIEW_BTN = "📊 סקירת מערכת"
 SA_DEBUG_BTN = "🛠 מצב דיבאג"
 SA_LIVE_BTN = "🎭 לקוח חי"
 # Overview
-SA_OVERVIEW_TITLE = "📊 סקירת מערכת"
+SA_OVERVIEW_TITLE = "📊 <b>סקירת מערכת</b>"
 SA_OVERVIEW_EMPTY = "אין חברות להצגה."
-SA_OVERVIEW_LINE = (
-    "🏢 {name} [{schema}] {active}\n"
-    "   🚗 {vehicles} רכבים · 👷 {drivers} נהגים · ⚠️ {events} אירועים\n"
-    "   👥 {customers} לקוחות · 💥 {accidents} תאונות · 🎫 {unpaid} דוחות\n"
-    "   🔧 {maint_due} תחזוקה · 📄 {docs_exp} מסמכים · 📈 {km_7d} ק\"מ (7י)\n"
-    "   🤖 {bot_users} בוט · נוכחות: {attendance} · Drive: {drive}"
-)
-SA_ON = "פעיל"
-SA_OFF = "כבוי"
+# Drill-down detail view
+SA_OVERVIEW_NOT_FOUND = "❌ החברה לא נמצאה."
+SA_BACK_BTN = "⬅️ חזרה"
 # Debug
 SA_DEBUG_PICK = "🛠 מצב דיבאג (Playground) - כפרסונה של מי לפעול?"
 SA_DEBUG_DRIVER_BTN = "🚗 נהג (Playground)"

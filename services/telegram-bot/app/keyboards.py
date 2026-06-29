@@ -22,8 +22,9 @@ def _inline(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
     )
 
 
-def driver_menu(attendance_enabled: bool = True) -> InlineKeyboardMarkup:
+def driver_menu(attendance_enabled: bool = False) -> InlineKeyboardMarkup:
     # The clock-in/out row is shown only when the company's attendance flag is on.
+    # Default off: an opt-in feature should stay hidden unless a caller explicitly enables it.
     rows: list[list[tuple[str, str]]] = []
     if attendance_enabled:
         rows.append([("⏱ כניסה לעבודה", "clock_in"), ("🚪 יציאה מעבודה", "clock_out")])
@@ -81,6 +82,18 @@ def sa_live_role_pick() -> InlineKeyboardMarkup:
 
 def sa_exit() -> InlineKeyboardMarkup:
     return _inline([[(texts.SA_EXIT_BTN, "sa_exit")]])
+
+
+def sa_back() -> InlineKeyboardMarkup:
+    """Single '⬅️ חזרה' button returning to the overview list."""
+    return _inline([[(texts.SA_BACK_BTN, "sa_overview")]])
+
+
+def sa_overview_list(companies: list[dict]) -> InlineKeyboardMarkup:
+    """One '🏢 Name' button per company for the overview drill-down."""
+    return _inline([
+        [(f"🏢 {c['name']}", f"sa_ov_{c['company_id']}")] for c in companies
+    ])
 
 
 def with_exit(kb: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
