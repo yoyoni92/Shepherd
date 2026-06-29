@@ -39,6 +39,39 @@ def test_active_driver_auto_enrolls_as_driver(client):
     assert w.status_code == 200 and w.json()["role"] == "driver"
 
 
+def _set_attendance(client, enabled: bool) -> None:
+    r = client.patch(
+        f"/companies/{DEFAULT_COMPANY_ID}/settings",
+        headers=superadmin_headers(),
+        json={"feature_flags": {"attendance": enabled}},
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_enroll_response_carries_attendance_flag(client):
+    # The bot renders its post-enroll menu from this flag, so it must reflect the
+    # company's attendance setting (regression: it was absent and the bot defaulted on).
+    _set_attendance(client, False)
+    did = _driver(client, "0501114455", name="Att Off")
+    r = client.post(
+        "/bot-enroll",
+        json={"telegram_chat_id": 2020, "phone_number": "0501114455"},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 200 and r.json()["driver_id"] == did
+    assert r.json()["attendance_enabled"] is False
+
+    _set_attendance(client, True)
+    _driver(client, "0501114466", name="Att On")
+    r2 = client.post(
+        "/bot-enroll",
+        json={"telegram_chat_id": 2021, "phone_number": "0501114466"},
+        headers=admin_headers(),
+    )
+    assert r2.status_code == 200
+    assert r2.json()["attendance_enabled"] is True
+
+
 def test_unknown_phone_not_authorized(client):
     r = client.post(
         "/bot-enroll",

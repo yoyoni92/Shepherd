@@ -80,12 +80,18 @@ def enroll(body: BotEnrollRequest, session: Db) -> BotEnrollResponse:
     user = repo.enroll_bot_user(session, body.telegram_chat_id, body.phone_number)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_authorized")
+    attendance_enabled = (
+        repo.company_feature_enabled(session, user.company_id, "attendance")
+        if user.company_id
+        else False
+    )
     return BotEnrollResponse(
         role=user.role.value,
         driver_id=user.driver_id,
         driver_name=user.driver.full_name if user.driver else None,
         user_id=user.id,
         expires_at=user.expires_at,
+        attendance_enabled=attendance_enabled,
     )
 
 

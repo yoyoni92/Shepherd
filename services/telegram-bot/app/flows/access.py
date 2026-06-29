@@ -58,8 +58,15 @@ async def enroll(ctx: Ctx, route: str | None) -> None:
                 await commands.apply(ctx.bot, ctx.chat_id, "system_admin")
                 await send(ctx, texts.SYSADMIN_MENU_TITLE, reply_markup=keyboards.sysadmin_menu())
                 return
-            await commands.apply(ctx.bot, ctx.chat_id, role)
-            kb = keyboards.admin_menu() if role == "admin" else keyboards.driver_menu()
+            # Honor the company's attendance flag on the welcome menu too (the enroll
+            # response carries it); otherwise clock-in shows even when attendance is off.
+            attendance_enabled = bool(data.get("attendance_enabled"))
+            await commands.apply(ctx.bot, ctx.chat_id, role, attendance_enabled)
+            kb = (
+                keyboards.admin_menu()
+                if role == "admin"
+                else keyboards.driver_menu(attendance_enabled)
+            )
             await send(ctx, texts.WELCOME.get(role, texts.WELCOME_DRIVER), reply_markup=kb)
         else:
             await send(ctx, texts.NOT_AUTHORIZED)

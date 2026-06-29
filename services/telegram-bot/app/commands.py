@@ -41,7 +41,7 @@ SYSADMIN_COMMANDS = [
 
 
 async def apply(
-    bot, chat_id: int, role: str | None, attendance_enabled: bool = True
+    bot, chat_id: int, role: str | None, attendance_enabled: bool = False
 ) -> None:
     """Set the chat's command menu to the role-appropriate list (idempotent).
 
