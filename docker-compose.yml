@@ -27,10 +27,17 @@ services:
       retries: 10
 
   db-init:
-    build: ./db
+    # Repo-root context so the image can include libs/shepherd_config (a path dep of db/).
+    build:
+      context: .
+      dockerfile: db/Dockerfile
     command: sh entrypoint.sh
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
+      # Central config (DB url + per-company schema map). build()/seed read it via get_config().
+      SHEPHERD_CONFIG: /etc/shepherd/config.toml
+    volumes:
+      - ./config.toml:/etc/shepherd/config.toml:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,8 +57,11 @@ services:
       # Google Drive storage (Fleet API owns uploads).
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gdrive-sa.json
       GDRIVE_FOLDER_ID: ${GDRIVE_FOLDER_ID:-}
+      # Central config (DB url + per-company schema map). deps.get_engine reads it via get_config().
+      SHEPHERD_CONFIG: /etc/shepherd/config.toml
     volumes:
       - ${GDRIVE_SA_KEY_PATH:-./secrets/gdrive-sa.json}:/run/secrets/gdrive-sa.json:ro
+      - ./config.toml:/etc/shepherd/config.toml:ro
     ports:
       - "8000:8000"
     depends_on:
@@ -109,10 +119,14 @@ services:
       FLEET_API_URL: http://fleet-api:8000
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
+      # Central config (DB url + fleet api url). config.py overlays these via get_config().
+      SHEPHERD_CONFIG: /etc/shepherd/config.toml
       # Media uploads go through Fleet API (POST /files -> Google Drive); no object-store creds here.
       # LLM touches: Whisper (accident voice -> description), Gemini (admin doc scan).
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - ./config.toml:/etc/shepherd/config.toml:ro
     depends_on:
       fleet-api:
         condition: service_healthy

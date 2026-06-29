@@ -115,7 +115,7 @@ jobs:
         # deploy/docker-compose.prod.yml (plan 03) pulls as ${REGISTRY}/shepherd-<svc>:${TAG}.
         include:
           - { svc: postgres, context: ./db, dockerfile: db/postgres.Dockerfile }
-          - { svc: db-init, context: ./db, dockerfile: db/Dockerfile }
+          - { svc: db-init, context: ., dockerfile: db/Dockerfile }
           - { svc: fleet-api, context: ., dockerfile: services/fleet-api/Dockerfile }
           - { svc: telegram-bot, context: ., dockerfile: services/telegram-bot/Dockerfile }
           - { svc: webui, context: ./services/webui, dockerfile: services/webui/Dockerfile }
