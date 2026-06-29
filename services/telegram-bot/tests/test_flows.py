@@ -81,6 +81,44 @@ async def test_enroll_success_driver(store, bot, fleet, mock_api):
     bot.set_my_commands.assert_awaited()
 
 
+async def test_enroll_driver_hides_clock_when_attendance_disabled(store, bot, fleet, mock_api):
+    # Right after enrollment the menu must honor the company's attendance flag, not
+    # default to showing clock-in (regression: the enroll path ignored the flag).
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
+    mock_api.post(f"{FLEET}/bot-enroll").mock(
+        return_value=httpx.Response(
+            200,
+            json={"role": "driver", "driver_id": "d1", "user_id": "u1",
+                  "attendance_enabled": False},
+        )
+    )
+    await dispatch(
+        {"chat_id": 7, "sender_id": 7, "contact_phone": "0501234567", "contact_user_id": 7},
+        bot, fleet,
+    )
+    assert texts.WELCOME_DRIVER in sent_texts(bot)
+    cbs = menu_callbacks(bot)
+    assert "clock_in" not in cbs and "clock_out" not in cbs
+    assert "clock_in" not in command_words(bot) and "clock_out" not in command_words(bot)
+
+
+async def test_enroll_driver_shows_clock_when_attendance_enabled(store, bot, fleet, mock_api):
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
+    mock_api.post(f"{FLEET}/bot-enroll").mock(
+        return_value=httpx.Response(
+            200,
+            json={"role": "driver", "driver_id": "d1", "user_id": "u1",
+                  "attendance_enabled": True},
+        )
+    )
+    await dispatch(
+        {"chat_id": 8, "sender_id": 8, "contact_phone": "0501234567", "contact_user_id": 8},
+        bot, fleet,
+    )
+    cbs = menu_callbacks(bot)
+    assert "clock_in" in cbs and "clock_out" in cbs
+
+
 async def test_enroll_not_authorized(store, bot, fleet, mock_api):
     mock_api.get(f"{FLEET}/whoami").mock(return_value=httpx.Response(404, json={}))
     mock_api.post(f"{FLEET}/bot-enroll").mock(
@@ -500,6 +538,15 @@ async def test_overview_uses_system_admin_context(store, bot, fleet, mock_api):
                         "open_event_count": 1,
                         "attendance_enabled": True,
                         "gdrive_configured": False,
+                        "customer_count": 7,
+                        "accident_count": 2,
+                        "maintenance_due_count": 1,
+                        "docs_expiring_count": 3,
+                        "unpaid_report_count": 4,
+                        "total_km_7d": 1500,
+                        "is_active": True,
+                        "schema_name": "co_acme",
+                        "bot_user_count": 6,
                     }
                 ]
             },
@@ -512,7 +559,14 @@ async def test_overview_uses_system_admin_context(store, bot, fleet, mock_api):
     )
     # The overview reads as the company-less system admin (no company_id, no impersonator).
     assert caller_ctx(route) == {"role": "admin"}
-    assert any("Acme" in t for t in sent_texts(bot))
+    texts_sent = sent_texts(bot)
+    assert any("Acme" in t for t in texts_sent)
+    # New fields must appear in the rendered output.
+    combined = "\n".join(texts_sent)
+    assert "co_acme" in combined, "schema_name 'co_acme' must appear in overview"
+    assert "7" in combined, "customer_count=7 must appear"
+    assert "1500" in combined, "total_km_7d=1500 must appear"
+    assert "4" in combined, "unpaid_report_count=4 must appear"
 
 
 async def test_enter_debug_binds_playground_persona(store, bot, fleet, mock_api):
