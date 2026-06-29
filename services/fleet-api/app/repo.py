@@ -1048,10 +1048,9 @@ def system_overview(session: Session) -> list[dict]:
     """
     from datetime import timedelta
 
+    from shepherd_config import get_config
     from sqlalchemy import Connection as SAConnection
     from sqlalchemy import or_
-
-    from shepherd_config import get_config
 
     shared = get_config().database.shared_schema
     assert isinstance(session.bind, SAConnection), "session.bind must be a Connection"

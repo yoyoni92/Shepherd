@@ -285,7 +285,7 @@ def test_overview_per_schema_dedicated_company(client, pg_engine):
             s.add(Accident(
                 company_id=uuid.UUID(cid),
                 vehicle_id=veh_id,
-                datetime=datetime.datetime.now(datetime.timezone.utc),
+                datetime=datetime.datetime.now(datetime.UTC),
             ))
 
             s.add(Report(
