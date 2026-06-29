@@ -3,10 +3,13 @@
 System-admin identity at whoami/enroll (precedence over tenant matches) + the
 company-less-admin-gated /sysadmin/* endpoints and the impersonation audit trail.
 """
+import datetime
 import uuid
 
 from shepherd_contracts.auth import CallerContext, Role
+from shepherd_db.models import Accident, Customer, Report, Vehicle
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from tests.conftest import (
     DEFAULT_COMPANY_ID,
@@ -14,6 +17,7 @@ from tests.conftest import (
     admin_headers,
     company_admin_headers,
     company_headers,
+    make_company_in_schema,
     superadmin_headers,
 )
 
@@ -238,3 +242,124 @@ def test_impersonation_audit_requires_operator(client):
         json={"company_id": company_id, "effective_role": "driver", "action": "start"},
     )
     assert r.status_code == 400
+
+
+# --- per-schema correctness: dedicated schema companies must be counted ---
+
+
+def test_overview_per_schema_dedicated_company(client, pg_engine):
+    """A company in a dedicated schema must appear with non-zero tenant counts.
+
+    The current implementation reads all tenant tables on the request session
+    (which resolves to public for a company-less system admin) - this test
+    will FAIL (all counts are 0 or KeyError) until system_overview is rewritten
+    to open a per-schema translated connection for each company.
+    """
+    cid = make_company_in_schema(pg_engine, f"PerSchemaCo {uuid.uuid4().hex[:6]}", "co_ov1")
+
+    shared = "public"
+    veh_id = uuid.uuid4()
+    with pg_engine.connect() as raw_conn:
+        tconn = raw_conn.execution_options(
+            schema_translate_map={"tenant": "co_ov1", None: shared}
+        )
+        with Session(bind=tconn) as s:
+            veh = Vehicle(
+                vehicle_id=veh_id,
+                company_id=uuid.UUID(cid),
+                licensing_plate=f"OV-{uuid.uuid4().hex[:6]}",
+                # maintenance due: current_km >= next_maintenance_km
+                current_km=50000,
+                next_maintenance_km=40000,
+                # docs expiring: insurance valid in 5 days
+                insurance_valid_to=datetime.date.today() + datetime.timedelta(days=5),
+            )
+            s.add(veh)
+            s.flush()
+
+            s.add(Customer(
+                company_id=uuid.UUID(cid),
+                full_name="Test Customer",
+            ))
+
+            s.add(Accident(
+                company_id=uuid.UUID(cid),
+                vehicle_id=veh_id,
+                datetime=datetime.datetime.now(datetime.timezone.utc),
+            ))
+
+            s.add(Report(
+                company_id=uuid.UUID(cid),
+                vehicle_id=veh_id,
+                ticket_type="traffic",
+            ))
+
+            s.commit()
+
+    r = client.get("/sysadmin/overview", headers=superadmin_headers())
+    assert r.status_code == 200
+
+    companies = {c["company_id"]: c for c in r.json()["companies"]}
+    assert cid in companies, f"Company {cid} not found in overview"
+
+    item = companies[cid]
+
+    # New fields must be present
+    assert "schema_name" in item, "schema_name field missing from SystemOverviewItem"
+    assert "is_active" in item, "is_active field missing from SystemOverviewItem"
+    assert "customer_count" in item, "customer_count field missing"
+    assert "accident_count" in item, "accident_count field missing"
+    assert "maintenance_due_count" in item, "maintenance_due_count field missing"
+    assert "docs_expiring_count" in item, "docs_expiring_count field missing"
+    assert "unpaid_report_count" in item, "unpaid_report_count field missing"
+    assert "total_km_7d" in item, "total_km_7d field missing"
+    assert "bot_user_count" in item, "bot_user_count field missing"
+
+    # These will be 0 with the current public-only impl (RED assertions):
+    assert item["customer_count"] >= 1, (
+        "customer_count should be >=1 (inserted into co_ov1.customers); "
+        "0 means the overview read public.customers instead"
+    )
+    assert item["accident_count"] >= 1, (
+        "accident_count should be >=1 (inserted into co_ov1.accidents); "
+        "0 means the overview read public.accidents instead"
+    )
+    assert item["unpaid_report_count"] >= 1, (
+        "unpaid_report_count should be >=1 (inserted into co_ov1.reports); "
+        "0 means the overview read public.reports instead"
+    )
+    assert item["maintenance_due_count"] >= 1, (
+        "maintenance_due_count should be >=1 (vehicle with current_km>=next_maintenance_km "
+        "inserted into co_ov1.vehicles); 0 means the overview read public.vehicles"
+    )
+    assert item["docs_expiring_count"] >= 1, (
+        "docs_expiring_count should be >=1 (insurance valid in 5 days inserted into "
+        "co_ov1.vehicles); 0 means the overview read public.vehicles instead"
+    )
+    assert item["vehicle_count"] >= 1, (
+        "vehicle_count should be >=1; 0 means overview read public.vehicles"
+    )
+    assert item["schema_name"] == "co_ov1"
+    assert item["is_active"] is True
+
+
+def test_overview_default_company_still_counts(client, pg_engine):
+    """The default company (public schema) must still appear with correct counts.
+
+    Guards against the per-schema refactor breaking the shared-schema path.
+    """
+    # Insert a vehicle in the default (public) company.
+    with Session(pg_engine) as s:
+        s.add(Vehicle(
+            company_id=uuid.UUID(DEFAULT_COMPANY_ID),
+            licensing_plate=f"DEF-{uuid.uuid4().hex[:6]}",
+        ))
+        s.commit()
+
+    r = client.get("/sysadmin/overview", headers=superadmin_headers())
+    assert r.status_code == 200
+    companies = {c["company_id"]: c for c in r.json()["companies"]}
+    assert DEFAULT_COMPANY_ID in companies
+    item = companies[DEFAULT_COMPANY_ID]
+    assert item["vehicle_count"] >= 1
+    assert item["schema_name"] == "public"
