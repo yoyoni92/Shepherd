@@ -482,6 +482,45 @@ async def test_update_driver_license_apply_patches_driver(store, bot, fleet, moc
 OPERATOR_ID = "op-1"
 LIVE_CO = "00000000-0000-0000-0000-0000000000c9"
 PLAYGROUND = "00000000-0000-0000-0000-0000000000aa"
+GLOBEX_CO = "00000000-0000-0000-0000-0000000000c0"
+
+ACME_DATA: dict = {
+    "company_id": LIVE_CO,
+    "name": "Acme",
+    "vehicle_count": 3,
+    "driver_count": 5,
+    "open_event_count": 1,
+    "attendance_enabled": True,
+    "gdrive_configured": False,
+    "customer_count": 7,
+    "accident_count": 2,
+    "maintenance_due_count": 1,
+    "docs_expiring_count": 3,
+    "unpaid_report_count": 4,
+    "total_km_7d": 1500,
+    "is_active": True,
+    "schema_name": "co_acme",
+    "bot_user_count": 6,
+}
+
+GLOBEX_DATA: dict = {
+    "company_id": GLOBEX_CO,
+    "name": "Globex",
+    "vehicle_count": 2,
+    "driver_count": 2,
+    "open_event_count": 0,
+    "attendance_enabled": False,
+    "gdrive_configured": True,
+    "customer_count": 1,
+    "accident_count": 0,
+    "maintenance_due_count": 0,
+    "docs_expiring_count": 0,
+    "unpaid_report_count": 0,
+    "total_km_7d": 0,
+    "is_active": True,
+    "schema_name": "public",
+    "bot_user_count": 0,
+}
 
 
 def sysadmin_whoami(playground: str | None = PLAYGROUND) -> httpx.Response:
@@ -524,49 +563,97 @@ async def test_system_admin_menu_shown(store, bot, fleet, mock_api):
 
 
 async def test_overview_uses_system_admin_context(store, bot, fleet, mock_api):
+    """List view: caller-context is company-less admin; bold names; keyboard per company."""
     mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
     route = mock_api.get(f"{FLEET}/sysadmin/overview").mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "companies": [
-                    {
-                        "company_id": LIVE_CO,
-                        "name": "Acme",
-                        "vehicle_count": 3,
-                        "driver_count": 5,
-                        "open_event_count": 1,
-                        "attendance_enabled": True,
-                        "gdrive_configured": False,
-                        "customer_count": 7,
-                        "accident_count": 2,
-                        "maintenance_due_count": 1,
-                        "docs_expiring_count": 3,
-                        "unpaid_report_count": 4,
-                        "total_km_7d": 1500,
-                        "is_active": True,
-                        "schema_name": "co_acme",
-                        "bot_user_count": 6,
-                    }
-                ]
-            },
-        )
+        return_value=httpx.Response(200, json={"companies": [ACME_DATA, GLOBEX_DATA]})
     )
     await dispatch(
         {"chat_id": 61, "sender_id": 61, "is_callback": True, "callback_data": "sa_overview"},
-        bot,
-        fleet,
+        bot, fleet,
     )
-    # The overview reads as the company-less system admin (no company_id, no impersonator).
+    # API is called with company-less system-admin context
     assert caller_ctx(route) == {"role": "admin"}
-    texts_sent = sent_texts(bot)
-    assert any("Acme" in t for t in texts_sent)
-    # New fields must appear in the rendered output.
-    combined = "\n".join(texts_sent)
-    assert "co_acme" in combined, "schema_name 'co_acme' must appear in overview"
-    assert "7" in combined, "customer_count=7 must appear"
-    assert "1500" in combined, "total_km_7d=1500 must appear"
-    assert "4" in combined, "unpaid_report_count=4 must appear"
+
+    combined = "\n".join(sent_texts(bot))
+    # Both company names appear bold in the list view
+    assert "<b>Acme</b>" in combined
+    assert "<b>Globex</b>" in combined
+
+    # Inline keyboard has one sa_ov_<id> button per company
+    cbs = menu_callbacks(bot)
+    assert f"sa_ov_{LIVE_CO}" in cbs
+    assert f"sa_ov_{GLOBEX_CO}" in cbs
+
+
+async def test_overview_detail_card(store, bot, fleet, mock_api):
+    """Detail view: tapping sa_ov_<id> sends sectioned card with all metrics + back btn."""
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    mock_api.get(f"{FLEET}/sysadmin/overview").mock(
+        return_value=httpx.Response(200, json={"companies": [ACME_DATA, GLOBEX_DATA]})
+    )
+    await dispatch(
+        {"chat_id": 62, "sender_id": 62, "is_callback": True,
+         "callback_data": f"sa_ov_{LIVE_CO}"},
+        bot, fleet,
+    )
+    combined = "\n".join(sent_texts(bot))
+
+    # Company name in title
+    assert "Acme" in combined
+
+    # All key metrics present
+    assert "7" in combined    # customer_count
+    assert "1500" in combined  # total_km_7d
+    assert "4" in combined    # unpaid_report_count
+
+    # Section headers
+    assert "צי" in combined
+    assert "סיכונים" in combined
+    assert "תחזוקה" in combined
+    assert "פלטפורמה" in combined
+
+    # Hebrew labels
+    assert "לקוחות" in combined
+    assert "דוחות לא שולמו" in combined
+    assert "טיפולים נדרשים" in combined
+    assert "מסמכים לחידוש" in combined
+
+    # Back button returns to overview list
+    cbs = menu_callbacks(bot)
+    assert "sa_overview" in cbs
+
+
+async def test_overview_detail_dedicated_schema_shown(store, bot, fleet, mock_api):
+    """Detail view: dedicated-tenant schema is shown for Acme (co_acme)."""
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    mock_api.get(f"{FLEET}/sysadmin/overview").mock(
+        return_value=httpx.Response(200, json={"companies": [ACME_DATA]})
+    )
+    await dispatch(
+        {"chat_id": 63, "sender_id": 63, "is_callback": True,
+         "callback_data": f"sa_ov_{LIVE_CO}"},
+        bot, fleet,
+    )
+    combined = "\n".join(sent_texts(bot))
+    assert "מתחם ייעודי" in combined
+    assert "co_acme" in combined
+
+
+async def test_overview_detail_public_schema_hidden(store, bot, fleet, mock_api):
+    """Detail view: 'public' schema company does not show dedicated-schema line."""
+    mock_api.get(f"{FLEET}/whoami").mock(return_value=sysadmin_whoami())
+    mock_api.get(f"{FLEET}/sysadmin/overview").mock(
+        return_value=httpx.Response(200, json={"companies": [GLOBEX_DATA]})
+    )
+    await dispatch(
+        {"chat_id": 64, "sender_id": 64, "is_callback": True,
+         "callback_data": f"sa_ov_{GLOBEX_CO}"},
+        bot, fleet,
+    )
+    combined = "\n".join(sent_texts(bot))
+    assert "מתחם ייעודי" not in combined
+    assert "public" not in combined
 
 
 async def test_enter_debug_binds_playground_persona(store, bot, fleet, mock_api):

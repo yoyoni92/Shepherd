@@ -200,6 +200,12 @@ def route_decision(ctx: Ctx) -> tuple[str, str | None]:
     if ctx.is_callback and ctx.callback_data in CALLBACK_MAP:
         return CALLBACK_MAP[ctx.callback_data]
 
+    # Dynamic prefix: sa_ov_<company_id> -> sysadmin overview_detail.
+    # Note: "sa_overview".startswith("sa_ov_") is False, so the CALLBACK_MAP
+    # entry above handles sa_overview correctly before we reach this branch.
+    if ctx.is_callback and ctx.callback_data and ctx.callback_data.startswith("sa_ov_"):
+        return ("sysadmin", "overview_detail")
+
     return ("menu", None)
 
 

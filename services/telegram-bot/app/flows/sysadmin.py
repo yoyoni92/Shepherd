@@ -10,7 +10,9 @@ operator id (the effective context would be 403 on /sysadmin/*).
 
 from __future__ import annotations
 
-from app import commands, keyboards, sessions, texts
+import html
+
+from app import commands, fmt, keyboards, sessions, texts
 from app.context import Ctx
 from app.tg import send
 
@@ -78,6 +80,8 @@ async def sysadmin(ctx: Ctx, route: str | None) -> None:
 
     if route == "overview":
         await _overview(ctx)
+    elif route == "overview_detail":
+        await _overview_detail(ctx)
     elif route == "debug_menu":
         await send(ctx, texts.SA_DEBUG_PICK, reply_markup=keyboards.sa_debug_pick())
     elif route == "debug_driver":
@@ -102,29 +106,55 @@ async def _overview(ctx: Ctx) -> None:
     if not companies:
         await send(ctx, f"{texts.SA_OVERVIEW_TITLE}\n\n{texts.SA_OVERVIEW_EMPTY}")
         return
-    lines = [texts.SA_OVERVIEW_TITLE, ""]
+    blocks = []
     for c in companies:
-        active_flag = texts.SA_ON if c.get("is_active", True) else texts.SA_OFF
-        lines.append(
-            texts.SA_OVERVIEW_LINE.format(
-                name=c["name"],
-                schema=c.get("schema_name", ""),
-                active=active_flag,
-                vehicles=c["vehicle_count"],
-                drivers=c["driver_count"],
-                events=c["open_event_count"],
-                customers=c.get("customer_count", 0),
-                accidents=c.get("accident_count", 0),
-                unpaid=c.get("unpaid_report_count", 0),
-                maint_due=c.get("maintenance_due_count", 0),
-                docs_exp=c.get("docs_expiring_count", 0),
-                km_7d=c.get("total_km_7d", 0),
-                bot_users=c.get("bot_user_count", 0),
-                attendance=texts.SA_ON if c["attendance_enabled"] else texts.SA_OFF,
-                drive=texts.SA_ON if c["gdrive_configured"] else texts.SA_OFF,
-            )
+        status_chip = fmt.bool_chip(c.get("is_active", True), "פעיל", "לא פעיל")
+        headline = (
+            f"⚠️ {fmt.val(c['open_event_count'])} פתוחים · "
+            f"🚗 {fmt.val(c['vehicle_count'])}"
         )
-    await send(ctx, "\n".join(lines))
+        blocks.append(fmt.card(c["name"], f"{status_chip}\n{headline}"))
+    text = f"{texts.SA_OVERVIEW_TITLE}\n\n" + "\n\n".join(blocks)
+    await send(ctx, text, reply_markup=keyboards.sa_overview_list(companies))
+
+
+async def _overview_detail(ctx: Ctx) -> None:
+    assert ctx.callback_data is not None
+    company_id = ctx.callback_data[len("sa_ov_"):]
+    resp = await ctx.fleet.get("/sysadmin/overview")
+    companies = resp.json().get("companies", []) if resp.status_code == 200 else []
+    company = next((c for c in companies if c["company_id"] == company_id), None)
+    if company is None:
+        await send(ctx, texts.SA_OVERVIEW_NOT_FOUND, reply_markup=keyboards.sa_back())
+        return
+    c = company
+    status_line = "  ·  ".join([
+        fmt.bool_chip(c.get("is_active", True), "פעיל", "לא פעיל"),
+        fmt.bool_chip(c["attendance_enabled"], "נוכחות", "נוכחות כבויה"),
+        fmt.bool_chip(c["gdrive_configured"], "Drive", "ללא Drive"),
+    ])
+    fleet_section = fmt.section("צי", [
+        fmt.kv("🚗 רכבים", c["vehicle_count"]),
+        fmt.kv("👷 נהגים", c["driver_count"]),
+        fmt.kv("👥 לקוחות", c.get("customer_count", 0)),
+    ])
+    risk_section = fmt.section("סיכונים", [
+        fmt.kv("⚠️ אירועים פתוחים", c["open_event_count"]),
+        fmt.kv("💥 תאונות", c.get("accident_count", 0)),
+        fmt.kv("🎫 דוחות לא שולמו", c.get("unpaid_report_count", 0)),
+    ])
+    maint_section = fmt.section("תחזוקה ומסמכים", [
+        fmt.kv("🔧 טיפולים נדרשים", c.get("maintenance_due_count", 0)),
+        fmt.kv("📄 מסמכים לחידוש", c.get("docs_expiring_count", 0)),
+        fmt.kv('📈 ק"מ השבוע', c.get("total_km_7d", 0)),
+    ])
+    platform_lines = [fmt.kv("🤖 משתמשי בוט", c.get("bot_user_count", 0))]
+    schema_name = c.get("schema_name") or ""
+    if schema_name and schema_name != "public":
+        platform_lines.append(fmt.kv("🔒 מתחם ייעודי", html.escape(schema_name)))
+    platform_section = fmt.section("פלטפורמה", platform_lines)
+    body = "\n\n".join([status_line, fleet_section, risk_section, maint_section, platform_section])
+    await send(ctx, fmt.card(f"🏢 {c['name']}", body), reply_markup=keyboards.sa_back())
 
 
 # --- Debug (Playground sandbox; unguarded + unaudited) ---
