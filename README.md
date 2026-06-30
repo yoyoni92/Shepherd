@@ -45,11 +45,18 @@ enforced and is load-bearing when companies share a schema.
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`): path-filtered per-package quality gates
-(lint/typecheck/test via the Makefile, one leg per changed package) on every push and
-pull request; build and push all 5 service images to GHCR (`ghcr.io`) as **private**
-packages on merge to `main`. Auth uses the built-in `GITHUB_TOKEN` (`packages: write`) -
-no registry secrets required.
+GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request:
+
+- **Quality gates for every party, always** (no path-filtering): lint + typecheck +
+  test via the Makefile for all 5 Python packages (`libs`, `libs/shepherd_config`,
+  `db`, `services/fleet-api`, `services/telegram-bot`), plus the WebUI (lint, typecheck,
+  build, vitest).
+- **E2E**: boots the compose stack (Postgres + db-init seed + Fleet API) and runs the
+  cross-service `tests/e2e` suite (the real telegram-bot driven in-process; only
+  Telegram and LLM/S3 mocked).
+- **Build + push** all 5 service images to GHCR (`ghcr.io`) as **private** packages on
+  merge to `main`, gated on the quality + e2e jobs. Auth uses the built-in
+  `GITHUB_TOKEN` (`packages: write`); no registry secrets required.
 
 ## Status
 

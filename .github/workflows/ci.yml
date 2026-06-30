@@ -23,70 +23,20 @@ permissions:
   contents: read
 
 jobs:
-  detect:
-    runs-on: ubuntu-latest
-    outputs:
-      # JSON array of changed Python packages as Makefile SVC paths (webui excluded).
-      packages: ${{ steps.pkgs.outputs.list }}
-      webui: ${{ steps.filter.outputs.webui }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          # Filter keys ARE the Makefile SVC paths, so each leg runs `make ... SVC=<key>`
-          # with no mapping. fleet-api's libs/** covers both contracts and shepherd_config;
-          # the libs key negates shepherd_config so a config-only change does not run the
-          # contracts leg; telegram-bot now depends on shepherd_config so it expands on
-          # libs/shepherd_config/**.
-          filters: |
-            libs:
-              - 'libs/**'
-              - '!libs/shepherd_config/**'
-            'libs/shepherd_config':
-              - 'libs/shepherd_config/**'
-            db:
-              - 'db/**'
-            'services/fleet-api':
-              - 'services/fleet-api/**'
-              - 'libs/**'
-              - 'db/**'
-            'services/telegram-bot':
-              - 'services/telegram-bot/**'
-              - 'libs/shepherd_config/**'
-            webui:
-              - 'services/webui/**'
-      - id: pkgs
-        # Drop webui from the changed set (it runs in its own npm job). jq array-difference
-        # is the smallest available glue; no action does set subtraction. CHANGES is passed
-        # via env (not inlined into the script) to avoid expression-injection warnings.
-        env:
-          CHANGES: ${{ steps.filter.outputs.changes }}
-        run: echo "list=$(jq -cn --argjson c "$CHANGES" '$c - ["webui"]')" >> "$GITHUB_OUTPUT"
-      - name: Summary
-        env:
-          PKGS: ${{ steps.pkgs.outputs.list }}
-          WEBUI: ${{ steps.filter.outputs.webui }}
-        run: |
-          web=$([ "$WEBUI" = true ] && echo "✅ yes" || echo "⏭️ no")
-          {
-            echo "## 🔍 Change detection"
-            echo
-            echo "| Target | Will run |"
-            echo "| --- | --- |"
-            echo "| Python packages | \`$PKGS\` |"
-            echo "| WebUI | $web |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
   python:
-    needs: detect
-    # Empty array => no Python packages changed; skip rather than start an empty matrix.
-    if: needs.detect.outputs.packages != '[]'
+    # No path-filtering: every Python package runs lint + typecheck + test on every
+    # push and PR, so all parties always show a result. The matrix values are the
+    # Makefile SVC paths.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJSON(needs.detect.outputs.packages) }}
+        package:
+          - libs
+          - libs/shepherd_config
+          - db
+          - services/fleet-api
+          - services/telegram-bot
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -122,8 +72,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   webui:
-    needs: detect
-    if: needs.detect.outputs.webui == 'true'
+    # Always runs (no path-filtering) so the WebUI gate is always visible.
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -164,10 +113,59 @@ jobs:
             echo "| test | $(icon "$TEST") ${TEST:-not run} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  e2e:
+    # Cross-service integration: boot the compose stack (Postgres + one-shot db-init
+    # seed + Fleet API) and drive the real telegram-bot in-process against it. Only
+    # Telegram and the LLM/S3 boundaries are mocked; the tests assert real DB rows.
+    # No secrets needed - the stack runs on its compose defaults.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pipx install poetry
+      # secrets/ is git-ignored; without a real file Docker mounts a directory at the
+      # gdrive key path. A placeholder is enough since e2e mocks Drive/LLM.
+      - run: mkdir -p secrets && echo '{}' > secrets/gdrive-sa.json
+      # Build + start only what e2e needs; depends_on pulls in postgres and the
+      # one-shot db-init (schema + seed) before Fleet API.
+      - run: docker compose up -d --build fleet-api
+      - name: Wait for Fleet API health
+        run: |
+          for _ in $(seq 1 30); do
+            curl -fsS http://localhost:8000/health >/dev/null 2>&1 && { echo "fleet-api healthy"; exit 0; }
+            sleep 5
+          done
+          echo "fleet-api did not become healthy" >&2
+          docker compose logs --tail=200
+          exit 1
+      - run: make install SVC=tests/e2e
+      - id: e2e
+        run: make e2e
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose logs --tail=300
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+      - name: Summary
+        if: always()
+        env:
+          E2E: ${{ steps.e2e.outcome }}
+        run: |
+          icon() { case "$1" in success) echo "✅";; failure) echo "❌";; *) echo "⏭️";; esac; }
+          {
+            echo "### 🔗 E2E (live stack)"
+            echo "| Suite | Result |"
+            echo "| --- | --- |"
+            echo "| tests/e2e | $(icon "$E2E") ${E2E:-not run} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-push:
-    needs: [detect, python, webui]
-    # Publish only on push to main. !cancelled() && !failure() lets this run when a quality
-    # leg was skipped (unchanged package) while still blocking on an actual gate failure.
+    needs: [python, webui, e2e]
+    # Publish only on push to main. !cancelled() && !failure() still guards against a
+    # gate failure; with path-filtering gone every gate runs, so none are skipped.
     if: >-
       !cancelled() && !failure()
       && github.event_name == 'push'

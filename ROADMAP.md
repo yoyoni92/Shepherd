@@ -18,11 +18,13 @@ Google-Drive-files RAG is planned to replace the chat/RAG stack.
 - `services/telegram-bot` - phone-enrolled Hebrew Telegram bot (aiogram 3, long-polling), driver + admin flows
 
 ### Phase 4 - Delivery
-- `.github/workflows/ci.yml` - full lifecycle CI pipeline: path-filtered per-package quality gates
-  (lint/typecheck/test reusing the Makefile, one leg per changed package), lint and mypy enforced
-  repo-wide across all 5 packages, and a build/push matrix publishing
-  `ghcr.io/<owner>/shepherd-<svc>:<sha>` + `:latest` as private GHCR packages on merge to main.
-  Auth uses the built-in `GITHUB_TOKEN` (`packages: write`); no registry secrets required.
+- `.github/workflows/ci.yml` - full lifecycle CI pipeline: per-package quality gates
+  (lint/typecheck/test reusing the Makefile) for all 5 Python packages plus the WebUI, run on
+  every push and PR (no path-filtering, so every party always shows a result); a cross-service
+  e2e job that boots the compose stack and runs `tests/e2e`; and a build/push matrix publishing
+  `ghcr.io/<owner>/shepherd-<svc>:<sha>` + `:latest` as private GHCR packages on merge to main,
+  gated on the quality + e2e jobs. Auth uses the built-in `GITHUB_TOKEN` (`packages: write`); no
+  registry secrets required.
 - `deploy/` - production operator runbook: pull-only `docker-compose.prod.yml` (pre-built GHCR
   images, no git clone), `deploy.sh` idempotent deploy script, `config.example.toml` and
   `.env.example` templates.
