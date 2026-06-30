@@ -1,197 +1,234 @@
-# AI Service Consolidation + Accident-Description Sanity Check
+# AI Service: Consolidation, Sanity Check, DB Agent, and Per-Company RAG
 
 Date: 2026-06-30
 Status: Approved (design)
 
 ## Summary
 
-Introduce a dedicated `ai-service` that owns every AI/LLM interaction in Shepherd,
-and add a new accident-description sanity check as its first new capability.
+Introduce a dedicated `ai-service` that owns every AI/LLM interaction in Shepherd, and
+grow it across four capabilities:
 
-Today the Telegram bot makes LLM calls directly from two thin modules:
+1. **Consolidation + sanity check** - move the existing Whisper STT and Gemini
+   doc-vision out of the bot into `ai-service`, and add an accident-description sanity
+   check (the originating request).
+2. **NL->DB agent** - convert a user prompt into a proper search over Shepherd data via
+   Gemini function-calling against Fleet API's existing read endpoints.
+3. **Per-company RAG agent** - answer questions about a company's documents (the planned
+   Google-Drive-files RAG), scoped per company.
 
-- `services/telegram-bot/app/stt.py` - OpenAI Whisper (`whisper-1`) for the accident
-  voice description.
-- `services/telegram-bot/app/vision.py` - Google Gemini (`gemini-2.0-flash`) for the
-  admin document scan.
-
-This spec moves both into a new FastAPI `ai-service`, adds a third capability (the
-accident-description classifier), and has the bot call all three over HTTP - the same
-pattern the bot already uses for Fleet API. After this change the bot holds no LLM
-provider keys.
+All capabilities live in one service; delivery is phased (see Phasing). The bot and the
+WebUI call `ai-service` over HTTP. After Phase 1 the bot holds no LLM provider keys.
 
 ## Motivation
 
 - The user wants a single service that "covers our AI", since more AI capabilities are
-  coming (a Drive-files RAG is on the roadmap, plus document-type classification).
-- The originating request was narrower: after the accident description is resolved
-  (voice transcribed, or typed), sanity-check that it actually reads like an accident
-  description; if not, re-prompt for a proper explanation.
+  coming.
+- The originating request: after the accident description is resolved (voice
+  transcribed, or typed), sanity-check that it reads like an accident description; if
+  not, re-prompt for a proper explanation.
+- Two further agents are explicitly in scope now: a per-company document RAG agent, and
+  an agent that turns a client prompt into a proper DB search.
 
 ### Prior-decision note (on the record)
 
 `ROADMAP.md` "Phase 2 - AI Services (removed)" records that an earlier AI stack
 (`channel-gateway`, `doc-extractor`, `rag`, `langgraph-agent`, `guardrails`,
 `ollama-assistant`) was built and deliberately removed; the project was pruned to three
-services (fleet-api, telegram-bot, webui). This spec re-introduces an AI service tier.
-This was an explicit user decision made with that history in view.
+services. This spec re-introduces an AI service tier and a Drive-files RAG - an explicit
+user decision made with that history in view.
 
 ## Decisions
 
-- **Scope:** consolidate all AI now - move STT and doc-vision into the service and add
-  the new classifier. All LLM keys move to the service.
-- **Name:** `ai-service`.
-- **Sanity-check loop guard:** up to 2 re-prompts, then accept whatever the driver sent
-  (never trap a stressed driver mid-accident-report).
-- **Sanity-check strictness:** lenient - reject only clearly-unrelated input (empty,
-  gibberish, greeting, off-topic); accept any plausible accident account.
-- **Classifier provider/model:** Gemini `gemini-2.5-flash-lite` with native
-  structured output (current cheap model per research).
-- **Migrated code keeps its current model IDs** (`whisper-1`, `gemini-2.0-flash`). This
-  is a relocation, not a behavior change. Upgrading vision to
-  `gemini-2.5-flash-lite` + structured output is a separate, optional follow-up.
+- **Service name:** `ai-service`. **Port:** `8001`. Guarded by `X-Internal-Token`.
+- **Sole holder of LLM keys:** `OPENAI_API_KEY`, `GEMINI_API_KEY` (and
+  `ANTHROPIC_API_KEY` available).
+- **Sanity check:** lenient (reject only clearly-unrelated input); up to 2 re-prompts,
+  then accept; model `gemini-2.5-flash-lite` + native structured output; fails open.
+- **NL->DB agent:** Gemini **function-calling over Fleet API read endpoints** - no raw
+  DB access; Fleet API keeps enforcing the permission matrix + tenant isolation.
+- **RAG vector store:** **pgvector in Postgres, per-tenant** (schema-per-company).
+- **RAG ingestion:** **automatic on Drive upload** (hook Fleet API's file-upload path).
+- **Consumers:** Telegram bot and WebUI.
+- **Agent framework:** hand-rolled with the `google-genai` SDK (function-calling /
+  structured output). No LangGraph (consistent with the prior removal; YAGNI).
+- **Migrated STT/vision keep their current model IDs** (`whisper-1`,
+  `gemini-2.0-flash`) - relocation, not behavior change. A vision-model upgrade is a
+  separate optional follow-up.
+
+### OPEN DECISION (please confirm at review): who owns the pgvector tables?
+
+Your invariant is "Fleet API is the sole Postgres writer." Two options:
+
+- **(Recommended) Fleet API owns the vector tables** and exposes `store-chunks` and
+  `search` as typed read/write tools; `ai-service` stays stateless w.r.t. Postgres and
+  calls Fleet API for both. Pros: preserves the invariant; reuses Fleet API's existing
+  schema-per-tenant resolution (`deps.py:81-95`). Cons: more inter-service plumbing; the
+  index path is Fleet API -> ai-service -> Fleet API (made asynchronous to avoid a
+  synchronous request cycle).
+- **(Alternative) ai-service owns its own vector tables** as a scoped carve-out (AI
+  artifacts are not domain data). Pros: no service cycle, RAG cohesive in one service.
+  Cons: a second Postgres writer; must replicate schema-per-tenant scoping in ai-service.
+
+This design assumes the recommended option. Flag it if you prefer the carve-out.
 
 ## Architecture
 
 ### New service: `services/ai-service/`
 
-Scaffolded from `templates/python-service/` and following `services/fleet-api/`
-conventions:
-
-- FastAPI app, `/health` endpoint.
-- Guarded by `X-Internal-Token` against `INTERNAL_SERVICE_TOKEN` (same shared secret as
-  fleet-api), via a `deps.verify_internal_token` dependency.
-- Config via `pydantic-settings` + `shepherd_config` overlay (mirrors
-  `fleet-api`/bot `config.py`).
-- Sole holder of `OPENAI_API_KEY`, `GEMINI_API_KEY` (and `ANTHROPIC_API_KEY` is
-  available for future use).
-- Port `8001` (fleet-api owns 8000, webui 3000).
+Scaffolded from `templates/python-service/`, following `services/fleet-api/`
+conventions: FastAPI, `/health`, `X-Internal-Token` guard (`deps.verify_internal_token`),
+config via `pydantic-settings` + `shepherd_config` overlay.
 
 ```
-services/ai-service/
-  app/
-    __init__.py
-    main.py            # FastAPI app + /health + routers
-    config.py          # settings (keys) + shepherd_config overlay
-    deps.py            # verify_internal_token
-    stt.py             # Whisper impl, moved verbatim from bot
-    vision.py          # Gemini doc-extract impl, moved verbatim from bot
-    classify.py        # NEW Gemini classifier
-    routers/
-      __init__.py
-      stt.py
-      vision.py
-      classify.py
-  tests/
-    test_health.py
-    test_stt.py
-    test_vision.py
-    test_classify.py
-  Dockerfile
-  pyproject.toml       # fastapi, uvicorn, openai, google-genai, shepherd_config, shepherd_contracts
-  README.md
+services/ai-service/app/
+  main.py                 # FastAPI app + /health + routers
+  config.py deps.py       # settings (keys, fleet_api_url) + verify_internal_token
+  stt.py                  # Whisper impl, moved verbatim from bot
+  vision.py               # Gemini doc-extract impl, moved verbatim from bot
+  classify.py             # NEW Gemini classifier (gemini-2.5-flash-lite)
+  fleet.py                # internal Fleet API client (X-Internal-Token + X-Caller-Context)
+  db_agent.py             # NEW NL->DB function-calling agent + Fleet API tool catalog
+  rag.py                  # NEW per-company RAG: ingest (extract/chunk/embed) + ask
+  routers/{stt,vision,classify,agent,rag}.py
+  tests/...
 ```
+
+Shared request/response Pydantic models go in `libs/shepherd_contracts/ai.py`, imported
+by `ai-service` and the bot client.
 
 ### Endpoints
 
-| Method/Path | Input | Output | Notes |
+| Method/Path | Input | Output | Phase |
 |---|---|---|---|
-| `GET /health` | - | `{status}` | From template. |
-| `POST /stt/transcribe` | multipart: audio file + `language` (default `he`) | `{text}` | Wraps moved `stt.py` (`whisper-1`). |
-| `POST /vision/extract` | multipart: image file + `doc_type`, `mime` | flat field dict | Wraps moved `vision.py` (`gemini-2.0-flash`). |
-| `POST /classify/accident-description` | JSON `{text}` | `{is_accident: bool}` | NEW. Lenient prompt, native structured output, fails open. |
+| `GET /health` | - | `{status}` | 1 |
+| `POST /stt/transcribe` | multipart audio + `language` | `{text}` | 1 |
+| `POST /vision/extract` | multipart image + `doc_type`, `mime` | field dict | 1 |
+| `POST /classify/accident-description` | `{text}` | `{is_accident: bool}` | 1 |
+| `POST /agent/query` | `{question, caller_context}` | `{answer, used_tools[]}` | 2 |
+| `POST /rag/index` | `{company_id, file_id, bytes|drive_link, metadata}` | `{chunks_indexed}` | 3 |
+| `POST /rag/ask` | `{company_id, question, caller_context}` | `{answer, citations[]}` | 3 |
 
-Multipart for binary payloads matches Fleet API's `POST /files`. Request/response
-Pydantic models live in `libs/shepherd_contracts` (new `ai.py`), imported by both the
-service and the bot client so the contract is shared and type-checked.
+## Phase 1 - Consolidation + accident sanity check
 
-### Classifier behavior (`classify.py`)
+### ai-service
 
-- Model `gemini-2.5-flash-lite`, lazy `genai.Client` (same shape as the existing
-  `vision.py`).
-- One lenient prompt: does this text describe a vehicle accident/incident? Reject only
-  if empty, gibberish, a greeting, or clearly off-topic.
-- Native structured output: `responseMimeType="application/json"` + a `{is_accident:
-  bool}` response schema. No markdown-fence stripping.
-- **Fails open:** on any provider/parse error, return `is_accident = true`, so an AI
-  outage can never block an accident report.
+- `stt.py` / `vision.py` moved verbatim (same model IDs).
+- `classify.py`: lenient prompt; native structured output (`responseMimeType
+  "application/json"` + `{is_accident: bool}` schema); **fails open** (returns `true`) on
+  any provider/parse error, so an AI outage never blocks an accident report.
 
-## Bot changes (`services/telegram-bot/`)
+### Bot changes
 
-- Delete `app/stt.py` and `app/vision.py`.
-- Add `app/ai.py` - a thin HTTP client mirroring `app/fleet.py` (httpx, base URL
-  `ai_service_url`, `X-Internal-Token`): `transcribe(audio, ...)`,
-  `extract(doc_type, image, mime)`, `is_accident_description(text) -> bool`. The client
-  fails open for `is_accident_description` (returns `True`) when the service is
-  unreachable, matching the service-side fail-open.
-- Repoint callers:
-  - `app/flows/accident.py:87` - `stt.transcribe` -> `ai.transcribe`.
-  - `app/flows/doc_scan.py:126` - `vision.extract` -> `ai.extract`.
-  - `app/flows/update_driver.py:75` - `vision.extract` -> `ai.extract`.
-- `app/config.py`: remove `openai_api_key` / `gemini_api_key`; add `ai_service_url`
-  (overlaid from `shepherd_config` `[services]`).
-- `pyproject.toml`: drop `openai` and `google-genai` deps (AI is now httpx-only).
+- Delete `app/stt.py`, `app/vision.py`; add `app/ai.py` HTTP client (mirrors
+  `app/fleet.py`): `transcribe()`, `extract()`, `is_accident_description()`. The client
+  fails open for `is_accident_description` (returns `True`) when ai-service is
+  unreachable.
+- Repoint callers: `accident.py:87` (`stt`->`ai`), `doc_scan.py:126` and
+  `update_driver.py:75` (`vision`->`ai`).
+- `config.py`: drop `openai_api_key`/`gemini_api_key`; add `ai_service_url`.
+- `pyproject.toml`: drop `openai` and `google-genai` (AI is now httpx-only).
 
-### Accident-description sanity check (`accident.py`, `accident_description`, lines 83-96)
+### Accident sanity check (`accident.py` `accident_description`, lines 83-96)
 
 1. Resolve `description` (voice -> `ai.transcribe`, else `ctx.text`) - unchanged.
-2. Call `ai.is_accident_description(description)`.
-3. **Pass** -> store `description`, advance to `awaiting_road_clear` (current behavior).
-4. **Fail** -> read `ctx.state["desc_rejects"]` (default 0):
-   - If `< 2`: increment `desc_rejects`, stay in `awaiting_description`, send
-     `texts.ACCIDENT_DESCRIPTION_RETRY`.
-   - If `>= 2`: accept anyway - store `description`, advance.
-   - Net effect: up to 2 re-prompts, then accept.
+2. `ai.is_accident_description(description)`.
+3. **Pass** -> store, advance to `awaiting_road_clear`.
+4. **Fail** -> read `ctx.state["desc_rejects"]` (default 0): if `< 2`, increment, stay in
+   `awaiting_description`, send `texts.ACCIDENT_DESCRIPTION_RETRY`; if `>= 2`, accept and
+   advance. (Up to 2 re-prompts, then accept.)
 
-The router already re-fires `accident_description` on text or voice while in
-`awaiting_description` (`router.py:83-84`); **no router change needed**.
+Router already re-fires the step on text/voice (`router.py:83-84`) - no router change.
+New Hebrew string `texts.ACCIDENT_DESCRIPTION_RETRY` (what a proper description should
+include: what happened, where, other vehicles involved).
 
-New Hebrew string `texts.ACCIDENT_DESCRIPTION_RETRY` explaining what a proper
-description should include (what happened, where, other vehicles involved).
+## Phase 2 - NL->DB agent (function-calling over Fleet API)
+
+- `POST /agent/query {question, caller_context}` -> `{answer, used_tools[]}`.
+- `ai-service/app/fleet.py`: internal Fleet API client that forwards `X-Internal-Token`
+  plus the caller's `X-Caller-Context` on every call, so **Fleet API enforces the
+  caller's permissions and tenant scope** - the agent can never exceed them.
+- `db_agent.py`: a curated tool catalog mapping Gemini function declarations to a subset
+  of Fleet API read endpoints (v1: vehicles list/get, drivers list/get, accidents list,
+  kpi, attendance summary). Loop: model selects a tool -> ai-service calls Fleet API with
+  the caller context -> results returned to the model -> model emits a grounded NL
+  answer. Bounded max tool-call iterations.
+- Caller context originates at the surface (bot/webui) and is passed through; ai-service
+  never elevates it.
+- Consumers: bot (an "ask about my fleet" entry point) and webui (admin console query).
+  Surface UX wiring is light in this spec; the contract is the endpoint.
+
+## Phase 3 - Per-company RAG (Drive-files)
+
+Assumes the recommended ownership option (Fleet API owns vector tables).
+
+- **Schema:** new pgvector-backed model(s) in `shepherd-db` (per-company schema): chunk
+  id, source file reference, chunk text, embedding vector, metadata. pgvector extension
+  enabled in DB init (`db/`); table dimension matches the embedding model. Per the repo
+  rule "no migrations until prod", this is added to models and the DB is rebuilt.
+- **Fleet API gains** typed tools: `POST /rag/chunks` (persist chunks+embeddings for a
+  company) and `POST /rag/search` (pgvector top-k similarity within the company schema).
+- **Ingestion (automatic on upload):** Fleet API's file-upload path, after storing to
+  Drive, triggers `ai-service POST /rag/index` **asynchronously** (background task, to
+  avoid a synchronous service cycle). `ai-service` extracts text from the file (Gemini
+  native PDF/image reading), chunks it, embeds chunks (Gemini embeddings, e.g.
+  `gemini-embedding-001` - verify current ID), and persists them via Fleet API
+  `POST /rag/chunks`.
+- **Ask:** `POST /rag/ask {company_id, question, caller_context}` -> ai-service embeds the
+  question, calls Fleet API `POST /rag/search` for top-k chunks in that company, then
+  Gemini generates a grounded answer with citations. Company scoping is enforced
+  end-to-end; never returns another company's chunks.
+- Consumers: bot ("ask about our docs") and webui.
 
 ## Wiring
 
-- `docker-compose.yml`:
-  - Add `ai-service` (repo-root build context, `services/ai-service/Dockerfile`, port
-    `8001`, env `OPENAI_API_KEY`/`GEMINI_API_KEY`/`INTERNAL_SERVICE_TOKEN`/
-    `SHEPHERD_CONFIG`, `/health` healthcheck).
-  - `telegram-bot`: `depends_on` ai-service (healthy); remove `OPENAI_API_KEY` /
-    `GEMINI_API_KEY`; add `AI_SERVICE_URL: http://ai-service:8001`.
-- `config.toml` + `config.example.toml`: add `ai_service_url = "http://ai-service:8001"`
-  under `[services]`.
+- `docker-compose.yml`: add `ai-service` (repo-root build context, port 8001, env
+  `OPENAI_API_KEY`/`GEMINI_API_KEY`/`INTERNAL_SERVICE_TOKEN`/`FLEET_API_URL`/
+  `SHEPHERD_CONFIG`, `/health` healthcheck). `telegram-bot` `depends_on` it, loses the
+  two LLM keys, gains `AI_SERVICE_URL`. `fleet-api` gains `AI_SERVICE_URL` (Phase 3 index
+  trigger).
+- `config.toml` + `config.example.toml`: add `ai_service_url` under `[services]`.
 - `.env.example`: keys documented as owned by ai-service.
 
 ## Testing
 
-- **ai-service** (`tests/`): provider SDKs stubbed.
-  - `test_health.py` (from template).
-  - `test_stt.py`, `test_vision.py`: endpoint contract with the provider call mocked.
-  - `test_classify.py`: pass/fail cases + fail-open returns `is_accident = true` on
-    provider error.
-- **telegram-bot** (`tests/`): re-stub the new `ai` HTTP client instead of
-  `stt`/`vision` (respx against `ai_service_url`, or monkeypatch `ai.*`).
-  - Update existing accident / doc_scan / update_driver tests.
-  - New accident sanity-check tests: pass -> advance; fail -> stays + retry message +
-    `desc_rejects` increments; third failing submission -> accepted + advances; voice
-    path (bad transcription -> re-prompt); fail-open (classifier errors -> treated as
-    accident, advances).
+- **ai-service** (provider SDKs + Fleet API stubbed):
+  - Phase 1: `test_health`, `test_stt`, `test_vision`, `test_classify` (incl. fail-open).
+  - Phase 2: `test_db_agent` - tool selection, caller-context forwarding, bounded loop,
+    permission errors surfaced not bypassed.
+  - Phase 3: `test_rag` - chunking/embedding (embeddings stubbed), company scoping on
+    ask, citation assembly.
+- **telegram-bot**: re-stub the `ai` HTTP client instead of `stt`/`vision`; update
+  accident/doc_scan/update_driver tests; add sanity-check tests (pass->advance,
+  fail->retry+counter, cap->accept, voice path, fail-open).
+- **fleet-api** (Phase 3): `rag/chunks` + `rag/search` with company scoping under the
+  existing testcontainers-postgres suite (pgvector enabled in the test image).
+
+## Phasing (delivery order)
+
+- **Phase 1** - consolidation + accident sanity check (smallest, ships the original ask).
+- **Phase 2** - NL->DB function-calling agent.
+- **Phase 3** - per-company RAG (pgvector + ingestion + retrieval; depends on the
+  ownership decision and a pgvector-enabled DB image).
+
+Each phase is independently shippable. The implementation plan sequences them.
 
 ## Docs to update (same commit as code, per repo pre-commit rule)
 
-- `ROADMAP.md` - Phase 2: AI service re-introduced (update the "removed" note).
-- root `README.md` - service list; LLM touches now live in ai-service.
-- `services/telegram-bot/README.md` - LLM touches now via ai-service over HTTP.
-- `services/ai-service/README.md` - new.
+- `ROADMAP.md` - Phase 2: AI service re-introduced; Drive-files RAG now in build.
+- root `README.md`, `services/telegram-bot/README.md`, new `services/ai-service/README.md`.
 - `.env.example`, `config.example.toml`.
+- `CONTEXT.md` - if RAG/agent introduce canonical domain terms.
 
 ## Out of scope
 
 - Upgrading the migrated vision model to `gemini-2.5-flash-lite` + structured output.
-- Switching STT off Whisper to a Google model (no evidence it improves Hebrew; needs an
-  empirical A/B test first).
-- The planned Drive-files RAG.
+- Switching STT off Whisper (no evidence it improves Hebrew; needs an empirical A/B
+  test first).
+- A natural-language intent router that auto-picks between the DB agent and the RAG
+  agent (v1 exposes them as distinct endpoints/entry points).
 
 ## Open questions
 
-None blocking. Provider model IDs/pricing move fast; re-verify `gemini-2.5-flash-lite`
-availability on the API key before relying on it.
+- Vector-table ownership (see "OPEN DECISION" above) - confirm before Phase 3.
+- Exact current Gemini embedding model ID/dimension - verify on the API key before
+  Phase 3.
