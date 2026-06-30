@@ -69,6 +69,7 @@ from identities import (  # noqa: E402
     ADMIN_CONTACT,
     ADMIN_PHONE,
     AUTHORIZATION_ID,
+    COMPANY_ID,
     CUSTOMER_ID,
     DRIVER_CHAT,
     DRIVER_CONTACT,
@@ -151,25 +152,26 @@ def seed_fleet():
     cur.execute("DELETE FROM bot_authorizations WHERE id = %s", (AUTHORIZATION_ID,))
 
     cur.execute(
-        "INSERT INTO customers (customer_id, full_name) VALUES (%s, %s)",
-        (CUSTOMER_ID, "E2E Customer"),
+        "INSERT INTO customers (customer_id, company_id, full_name) VALUES (%s, %s, %s)",
+        (CUSTOMER_ID, COMPANY_ID, "E2E Customer"),
     )
     cur.execute(
-        "INSERT INTO drivers (driver_id, full_name, phone_number, status) "
-        "VALUES (%s, %s, %s, 'active')",
-        (DRIVER_ID, "E2E Driver", DRIVER_PHONE),
+        "INSERT INTO drivers (driver_id, company_id, full_name, phone_number, status) "
+        "VALUES (%s, %s, %s, %s, 'active')",
+        (DRIVER_ID, COMPANY_ID, "E2E Driver", DRIVER_PHONE),
     )
     cur.execute(
-        "INSERT INTO maintenance_types (id, name, interval_km, steps) "
-        "VALUES (%s, %s, %s, %s)",
-        (MAINTENANCE_TYPE_ID, MAINTENANCE_TYPE_NAME, 10000, '["A", "B"]'),
+        "INSERT INTO maintenance_types (id, company_id, name, interval_km, steps) "
+        "VALUES (%s, %s, %s, %s, %s)",
+        (MAINTENANCE_TYPE_ID, COMPANY_ID, MAINTENANCE_TYPE_NAME, 10000, '["A", "B"]'),
     )
     cur.execute(
-        "INSERT INTO vehicles (vehicle_id, licensing_plate, driver_id, customer_id, "
+        "INSERT INTO vehicles (vehicle_id, company_id, licensing_plate, driver_id, customer_id, "
         "current_km, next_maintenance_km, vendor, model, vehicle_type) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'car')",
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'car')",
         (
             VEHICLE_ID,
+            COMPANY_ID,
             PLATE,
             DRIVER_ID,
             CUSTOMER_ID,
@@ -180,8 +182,9 @@ def seed_fleet():
         ),
     )
     cur.execute(
-        "INSERT INTO bot_authorizations (id, phone_number, role) VALUES (%s, %s, 'admin')",
-        (AUTHORIZATION_ID, ADMIN_PHONE),
+        "INSERT INTO bot_authorizations (id, company_id, phone_number, role) "
+        "VALUES (%s, %s, %s, 'admin')",
+        (AUTHORIZATION_ID, COMPANY_ID, ADMIN_PHONE),
     )
     conn.close()
 

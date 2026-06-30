@@ -16,6 +16,11 @@ def _sid(name: str) -> uuid.UUID:
     return uuid.uuid5(_NS, name)
 
 
+# The seeded Default Company (db/seed.py DEFAULT_COMPANY_ID), whose schema is co_default.
+# The suite attaches its fleet rows to this tenant and the bot enrolls into the same
+# company, so direct-DB assertions and the bot's writes target the same schema.
+COMPANY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000c0")
+
 # Seeded fleet rows (created once per session, cleaned at the end).
 DRIVER_ID = _sid("driver")
 VEHICLE_ID = _sid("vehicle")
