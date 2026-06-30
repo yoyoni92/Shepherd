@@ -47,6 +47,12 @@ user decision made with that history in view.
 - **NL->DB agent:** Gemini **function-calling over Fleet API read endpoints** - no raw
   DB access; Fleet API keeps enforcing the permission matrix + tenant isolation.
 - **RAG vector store:** **pgvector in Postgres, per-tenant** (schema-per-company).
+- **RAG embedding model:** **`gemini-embedding-001`** (GA, 100+ languages incl. Hebrew,
+  $0.15/1M input tokens, 2048-token max input), output truncated via Matryoshka to
+  **1536 dimensions**. 1536 is a deliberate choice: pgvector's `hnsw`/`ivfflat` indexes
+  cap at 2000 dimensions, so the model's 3072 default could be stored but not indexed
+  with a standard vector index; 1536 stays under the cap and is a Google-recommended MRL
+  size. The pgvector column is `vector(1536)` with an `hnsw` index.
 - **RAG ingestion:** **automatic on Drive upload** (hook Fleet API's file-upload path).
 - **Consumers:** Telegram bot and WebUI.
 - **Agent framework:** hand-rolled with the `google-genai` SDK (function-calling /
@@ -166,17 +172,17 @@ include: what happened, where, other vehicles involved).
 Assumes the recommended ownership option (Fleet API owns vector tables).
 
 - **Schema:** new pgvector-backed model(s) in `shepherd-db` (per-company schema): chunk
-  id, source file reference, chunk text, embedding vector, metadata. pgvector extension
-  enabled in DB init (`db/`); table dimension matches the embedding model. Per the repo
-  rule "no migrations until prod", this is added to models and the DB is rebuilt.
+  id, source file reference, chunk text, `embedding vector(1536)`, metadata, with an
+  `hnsw` index on the embedding. pgvector extension enabled in DB init (`db/`). Per the
+  repo rule "no migrations until prod", this is added to models and the DB is rebuilt.
 - **Fleet API gains** typed tools: `POST /rag/chunks` (persist chunks+embeddings for a
   company) and `POST /rag/search` (pgvector top-k similarity within the company schema).
 - **Ingestion (automatic on upload):** Fleet API's file-upload path, after storing to
   Drive, triggers `ai-service POST /rag/index` **asynchronously** (background task, to
   avoid a synchronous service cycle). `ai-service` extracts text from the file (Gemini
-  native PDF/image reading), chunks it, embeds chunks (Gemini embeddings, e.g.
-  `gemini-embedding-001` - verify current ID), and persists them via Fleet API
-  `POST /rag/chunks`.
+  native PDF/image reading), chunks it (each chunk within the 2048-token embedding
+  input limit), embeds chunks with `gemini-embedding-001` at 1536 dimensions, and
+  persists them via Fleet API `POST /rag/chunks`.
 - **Ask:** `POST /rag/ask {company_id, question, caller_context}` -> ai-service embeds the
   question, calls Fleet API `POST /rag/search` for top-k chunks in that company, then
   Gemini generates a grounded answer with citations. Company scoping is enforced
@@ -264,6 +270,5 @@ Each phase is independently shippable. The implementation plan sequences them.
 
 ## Open questions
 
-- Vector-table ownership (see "OPEN DECISION" above) - confirm before Phase 3.
-- Exact current Gemini embedding model ID/dimension - verify on the API key before
-  Phase 3.
+- Vector-table ownership (see "OPEN DECISION" above) - confirm before Phase 3. This is
+  the one remaining decision; everything else is pinned.
