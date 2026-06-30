@@ -17,7 +17,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Image push authenticates to Docker Hub with repo secrets, not GITHUB_TOKEN, so read is enough.
+# Default is read-only; the build-push job widens its own GITHUB_TOKEN to packages: write
+# so it can push the private images to GHCR (ghcr.io). No registry secrets needed.
 permissions:
   contents: read
 
@@ -172,6 +173,10 @@ jobs:
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Widen GITHUB_TOKEN so the built-in token can push packages to GHCR.
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -186,22 +191,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      # GHCR via the built-in token. Pushed packages default to private and are
+      # linked to this repo; no DOCKERHUB_* secrets needed.
       - uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # GHCR namespaces must be lowercase; the owner login can carry uppercase.
+      - id: ns
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/shepherd-${{ matrix.svc }}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:${{ github.sha }}
-            ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:latest
+            ${{ steps.ns.outputs.image }}:${{ github.sha }}
+            ${{ steps.ns.outputs.image }}:latest
       - name: Summary
         if: success()
         env:
-          IMAGE: ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}
+          IMAGE: ${{ steps.ns.outputs.image }}
           SHA: ${{ github.sha }}
         run: |
           {

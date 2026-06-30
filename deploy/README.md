@@ -5,8 +5,9 @@ The host needs only **Docker** (with the Compose plugin) and **this folder** -
 no git clone, no source tree, no build toolchain.
 
 The images (`shepherd-postgres`, `shepherd-db-init`, `shepherd-fleet-api`,
-`shepherd-telegram-bot`, `shepherd-webui`) are built and pushed to Docker Hub by
-CI (see plan 04) as `${REGISTRY}/shepherd-<svc>:${TAG}`.
+`shepherd-telegram-bot`, `shepherd-webui`) are built by CI and pushed as
+**private** packages to GHCR (`ghcr.io`) as `${REGISTRY}/shepherd-<svc>:${TAG}`,
+where `REGISTRY` is `ghcr.io/<github-owner>`.
 
 ## Contents
 
@@ -26,10 +27,11 @@ CI (see plan 04) as `${REGISTRY}/shepherd-<svc>:${TAG}`.
   docker compose version   # must succeed
   ```
 
-- Login to the registry if the images are private:
+- Log in to GHCR (the images are private) with a GitHub token that has the
+  `read:packages` scope:
 
   ```bash
-  docker login docker.io   # use your Docker Hub user + access token
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
   ```
 
 ## Steps
@@ -52,7 +54,7 @@ CI (see plan 04) as `${REGISTRY}/shepherd-<svc>:${TAG}`.
    ${EDITOR:-vi} .env
    ```
 
-   Set `REGISTRY` and `TAG` to the images CI pushed (e.g. `docker.io/yourorg`
+   Set `REGISTRY` and `TAG` to the images CI pushed (e.g. `ghcr.io/yoyoni92`
    and a git SHA or `latest`). Set `DATABASE_URL` to point at the `postgres`
    service host (`@postgres:5432`).
 
