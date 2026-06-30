@@ -7,7 +7,8 @@ help:  ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'
 
 install:  ## install one package  (make install SVC=services/fleet-api)
-	cd $(SVC) && poetry env use python3.12 >/dev/null 2>&1; cd $(SVC) && poetry install
+	cd $(SVC) && poetry env use python3.12 >/dev/null 2>&1 || true
+	cd $(SVC) && poetry install
 
 test:  ## unit tests (fast, mocked) for one package  (make test SVC=services/fleet-api)
 	cd $(SVC) && poetry run pytest -q

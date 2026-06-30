@@ -62,6 +62,20 @@ jobs:
         env:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: echo "list=$(jq -cn --argjson c "$CHANGES" '$c - ["webui"]')" >> "$GITHUB_OUTPUT"
+      - name: Summary
+        env:
+          PKGS: ${{ steps.pkgs.outputs.list }}
+          WEBUI: ${{ steps.filter.outputs.webui }}
+        run: |
+          web=$([ "$WEBUI" = true ] && echo "✅ yes" || echo "⏭️ no")
+          {
+            echo "## 🔍 Change detection"
+            echo
+            echo "| Target | Will run |"
+            echo "| --- | --- |"
+            echo "| Python packages | \`$PKGS\` |"
+            echo "| WebUI | $web |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   python:
     needs: detect
@@ -81,10 +95,30 @@ jobs:
       # `make lint` runs `uvx ruff check .`; uvx ships with uv, which is not preinstalled.
       - run: pipx install uv
       - run: make install SVC=${{ matrix.package }}
-      - run: make lint
+      - id: lint
+        run: make lint
       # make lint, typecheck, and test all pass for every package.
-      - run: make typecheck SVC=${{ matrix.package }}
-      - run: make test SVC=${{ matrix.package }}
+      - id: typecheck
+        run: make typecheck SVC=${{ matrix.package }}
+      - id: test
+        run: make test SVC=${{ matrix.package }}
+      - name: Summary
+        if: always()
+        env:
+          PKG: ${{ matrix.package }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          icon() { case "$1" in success) echo "✅";; failure) echo "❌";; skipped) echo "⏭️";; *) echo "⚪";; esac; }
+          {
+            echo "### 🐍 \`$PKG\`"
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| lint | $(icon "$LINT") ${LINT:-not run} |"
+            echo "| typecheck | $(icon "$TYPECHECK") ${TYPECHECK:-not run} |"
+            echo "| test | $(icon "$TEST") ${TEST:-not run} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   webui:
     needs: detect
@@ -101,10 +135,33 @@ jobs:
           cache: npm
           cache-dependency-path: services/webui/package-lock.json
       - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm test
+      - id: lint
+        run: npm run lint
+      - id: typecheck
+        run: npm run typecheck
+      - id: build
+        run: npm run build
+      - id: test
+        run: npm test
+      - name: Summary
+        if: always()
+        working-directory: .
+        env:
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          icon() { case "$1" in success) echo "✅";; failure) echo "❌";; skipped) echo "⏭️";; *) echo "⚪";; esac; }
+          {
+            echo "### 🌐 WebUI"
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| lint | $(icon "$LINT") ${LINT:-not run} |"
+            echo "| typecheck | $(icon "$TYPECHECK") ${TYPECHECK:-not run} |"
+            echo "| build | $(icon "$BUILD") ${BUILD:-not run} |"
+            echo "| test | $(icon "$TEST") ${TEST:-not run} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build-push:
     needs: [detect, python, webui]
@@ -141,6 +198,17 @@ jobs:
           tags: |
             ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:${{ github.sha }}
             ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:latest
+      - name: Summary
+        if: success()
+        env:
+          IMAGE: ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}
+          SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "### 📦 Pushed \`$IMAGE\`"
+            echo "- \`$IMAGE:${SHA}\`"
+            echo "- \`$IMAGE:latest\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     # Manual-only (workflow_dispatch). Injects the rotating secrets into the host's
@@ -210,3 +278,16 @@ jobs:
           rm -rf ~/.shepherd-stage
           ./deploy.sh
           REMOTE
+      - name: Summary
+        if: always()
+        env:
+          TAG: ${{ inputs.tag }}
+          RESULT: ${{ job.status }}
+        run: |
+          {
+            echo "## 🚀 Deploy ($RESULT)"
+            echo
+            echo "- Tag: \`${TAG:-(kept host's current TAG)}\`"
+            echo "- Injected secrets: \`TELEGRAM_BOT_TOKEN\`, \`GEMINI_API_KEY\`, Drive SA JSON"
+            echo "- Ran \`deploy.sh\` on the host"
+          } >> "$GITHUB_STEP_SUMMARY"
