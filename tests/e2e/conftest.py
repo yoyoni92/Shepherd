@@ -4,7 +4,7 @@ Drives the *real* telegram-bot code in-process (the real aiogram dispatcher in
 `app.main`, the real `app.sessions` Postgres pool, the real `app.fleet` HTTP client)
 against the **live compose stack** - Fleet API on :8000 and Postgres on :5432. Only the
 genuinely-external boundaries are mocked: Telegram itself (at the aiogram session layer,
-via `tests/sim.Recorder`) and the third-party LLM/S3 calls. Everything the bot does to
+via `tests/sim.Recorder`) and the third-party LLM/Drive calls. Everything the bot does to
 Fleet API and Postgres is real, and the tests assert the real rows that result.
 
 Requires the stack to be up (`make up`); if Fleet API isn't reachable the whole suite is
@@ -58,7 +58,7 @@ sys.path.insert(0, str(BOT_DIR))
 sys.path.insert(0, str(BOT_DIR / "tests"))
 
 from aiogram import Bot  # noqa: E402
-from app import main, s3, sessions, stt, vision  # noqa: E402
+from app import main, sessions, storage, stt, vision  # noqa: E402
 from app.fleet import FleetClient  # noqa: E402
 from identities import (  # noqa: E402
     ADMIN_CHAT,
@@ -235,10 +235,10 @@ async def bot_pool():
 
 @pytest.fixture
 def stub_external(monkeypatch):
-    """Stub only the third-party boundaries: S3 upload, Whisper STT, Gemini vision."""
+    """Stub only the third-party boundaries: Drive upload, Whisper STT, Gemini vision."""
     from unittest.mock import AsyncMock
 
-    monkeypatch.setattr(s3, "upload", AsyncMock(return_value="s3://e2e/object"))
+    monkeypatch.setattr(storage, "upload", AsyncMock(return_value="https://drive.example/e2e/object"))
     monkeypatch.setattr(stt, "transcribe", AsyncMock(return_value="תיאור תאונה קולי"))
 
     async def fake_extract(doc_type, image, mime="image/jpeg"):
