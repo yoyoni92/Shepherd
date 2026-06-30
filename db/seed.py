@@ -526,7 +526,10 @@ def _seed_app_users(conn):
 def _seed_playground(conn, cfg=None):
     """Built-in sandbox company (is_internal) with attendance ON + mock drivers/vehicles.
 
-    Drive stays unconfigured. Idempotent via fixed ids / ON CONFLICT.
+    Tenant rows go to the `internal` company's schema from config (the sandbox schema,
+    mirroring how the Default Company uses its `default` schema). Without that schema the
+    mock rows are skipped, never written to the shared schema, which holds no tenant
+    tables. Drive stays unconfigured. Idempotent via fixed ids / ON CONFLICT.
     """
     conn.execute(
         text("""
@@ -536,19 +539,32 @@ def _seed_playground(conn, cfg=None):
         """),
         {"id": PLAYGROUND_COMPANY_ID},
     )
-    # Attendance ON so the sandbox surfaces every flow; Drive left empty.
-    # schema_name from config (shared schema); falls back to sentinel when no config.
-    shared_schema = cfg.database.shared_schema if cfg is not None else "__pending__"
+    # The sandbox's tenant rows live in the `internal` company's schema from config. None
+    # when there is no config (tests put tenant tables in public) or no `internal` entry.
+    sandbox_schema = None
+    if cfg is not None:
+        sandbox_schema = next(
+            (c.schema_name for c in cfg.companies if c.slug == "internal"), None
+        )
+    # Attendance ON so the sandbox surfaces every flow; Drive left empty. Record the
+    # company against its sandbox schema, or the shared schema when none is configured.
+    settings_schema = sandbox_schema or (
+        cfg.database.shared_schema if cfg is not None else "__pending__"
+    )
     conn.execute(
         text("""
             INSERT INTO company_settings (company_id, schema_name, feature_flags)
             VALUES (:id, :schema, '{"attendance": true}'::jsonb)
             ON CONFLICT (company_id) DO UPDATE SET schema_name = EXCLUDED.schema_name
         """),
-        {"id": PLAYGROUND_COMPANY_ID, "schema": shared_schema},
+        {"id": PLAYGROUND_COMPANY_ID, "schema": settings_schema},
     )
-    if cfg is not None:
-        _use_schema(conn, _schema_for(conn, PLAYGROUND_COMPANY_ID, cfg))
+    # With config but no provisioned sandbox schema, the shared schema holds no tenant
+    # tables - skip the mock rows instead of failing on a missing `drivers` relation.
+    if cfg is not None and sandbox_schema is None:
+        return
+    if sandbox_schema is not None:
+        _use_schema(conn, sandbox_schema)
     for i in range(1, 4):
         conn.execute(
             text("""
@@ -589,7 +605,7 @@ def _seed_playground(conn, cfg=None):
                 "driver_id": stable_uuid("pg_driver", i),
             },
         )
-    if cfg is not None:
+    if sandbox_schema is not None:
         _use_public(conn)
 
 
