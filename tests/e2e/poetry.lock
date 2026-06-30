@@ -224,46 +224,6 @@ files = [
 ]
 
 [[package]]
-name = "boto3"
-version = "1.43.36"
-description = "The AWS SDK for Python"
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = [
-    {file = "boto3-1.43.36-py3-none-any.whl", hash = "sha256:42942dde254673abcbc9e6e60017c88341a4f49d99d24e1f2e290fb38138c26f"},
-    {file = "boto3-1.43.36.tar.gz", hash = "sha256:587d7ee92a12e440ad12b0e7f11f3358f0c4d65b19f64726efc94aaf194aff28"},
-]
-
-[package.dependencies]
-botocore = ">=1.43.36,<1.44.0"
-jmespath = ">=0.7.1,<2.0.0"
-s3transfer = ">=0.19.0,<0.20.0"
-
-[package.extras]
-crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
-
-[[package]]
-name = "botocore"
-version = "1.43.36"
-description = "Low-level, data-driven core of boto 3."
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = [
-    {file = "botocore-1.43.36-py3-none-any.whl", hash = "sha256:3c65fdc39ed01d8dfde1e961b34038aed03c459f8ddf80717a12ac006475e49d"},
-    {file = "botocore-1.43.36.tar.gz", hash = "sha256:4cae47d1b2d426316b85a0087d9e69e048f13bc003b5177d74639fe9dfd28205"},
-]
-
-[package.dependencies]
-jmespath = ">=0.7.1,<2.0.0"
-python-dateutil = ">=2.1,<3.0.0"
-urllib3 = ">=1.25.4,<2.2.0 || >2.2.0,<3"
-
-[package.extras]
-crt = ["awscrt (==0.32.2)"]
-
-[[package]]
 name = "certifi"
 version = "2026.6.17"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -992,18 +952,6 @@ files = [
 ]
 
 [[package]]
-name = "jmespath"
-version = "1.1.0"
-description = "JSON Matching Expressions"
-optional = false
-python-versions = ">=3.9"
-groups = ["main"]
-files = [
-    {file = "jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64"},
-    {file = "jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d"},
-]
-
-[[package]]
 name = "magic-filter"
 version = "1.0.12"
 description = ""
@@ -1725,21 +1673,6 @@ docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
 testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
 
 [[package]]
-name = "python-dateutil"
-version = "2.9.0.post0"
-description = "Extensions to the standard Python datetime module"
-optional = false
-python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main"]
-files = [
-    {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
-    {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
-]
-
-[package.dependencies]
-six = ">=1.5"
-
-[[package]]
 name = "python-dotenv"
 version = "1.2.2"
 description = "Read key-value pairs from a .env file and set them as environment variables"
@@ -1777,34 +1710,21 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<8)"]
 
 [[package]]
-name = "s3transfer"
-version = "0.19.0"
-description = "An Amazon S3 Transfer Manager"
+name = "shepherd-config"
+version = "0.1.0"
+description = "Central config loader (config.toml + ${VAR} env interpolation) for Shepherd services"
 optional = false
-python-versions = ">=3.10"
+python-versions = "^3.12"
 groups = ["main"]
-files = [
-    {file = "s3transfer-0.19.0-py3-none-any.whl", hash = "sha256:777cc2415536f1debadb5c2ef7779275d0fc0fe0e042411cdd6caebeb2685262"},
-    {file = "s3transfer-0.19.0.tar.gz", hash = "sha256:ce436931687addc4c1712d52d40b32f53e88315723f107ffa20ba82b05a0f685"},
-]
+files = []
+develop = true
 
 [package.dependencies]
-botocore = ">=1.37.4,<2.0a0"
+pydantic = "^2.9"
 
-[package.extras]
-crt = ["botocore[crt] (>=1.37.4,<2.0a0)"]
-
-[[package]]
-name = "six"
-version = "1.17.0"
-description = "Python 2 and 3 compatibility utilities"
-optional = false
-python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main"]
-files = [
-    {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
-    {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
-]
+[package.source]
+type = "directory"
+url = "../../libs/shepherd_config"
 
 [[package]]
 name = "sniffio"
@@ -1830,13 +1750,13 @@ develop = true
 
 [package.dependencies]
 aiogram = "^3.13"
-boto3 = "^1.35"
 google-genai = "^1.0"
 httpx = "^0.27"
 openai = "^1.50"
 psycopg = {version = "^3.1", extras = ["binary"]}
 psycopg-pool = "^3.2"
 pydantic-settings = "^2.5"
+shepherd-config = {path = "../../libs/shepherd_config", develop = true}
 
 [package.source]
 type = "directory"
