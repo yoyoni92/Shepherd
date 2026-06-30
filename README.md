@@ -47,9 +47,9 @@ enforced and is load-bearing when companies share a schema.
 
 GitHub Actions (`.github/workflows/ci.yml`): path-filtered per-package quality gates
 (lint/typecheck/test via the Makefile, one leg per changed package) on every push and
-pull request; build and push all 5 service images to Docker Hub on merge to `main`.
-Required GitHub config: secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`, var
-`DOCKERHUB_ORG`.
+pull request; build and push all 5 service images to GHCR (`ghcr.io`) as **private**
+packages on merge to `main`. Auth uses the built-in `GITHUB_TOKEN` (`packages: write`) -
+no registry secrets required.
 
 ## Status
 

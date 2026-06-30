@@ -21,10 +21,10 @@ Google-Drive-files RAG is planned to replace the chat/RAG stack.
 - `.github/workflows/ci.yml` - full lifecycle CI pipeline: path-filtered per-package quality gates
   (lint/typecheck/test reusing the Makefile, one leg per changed package), lint and mypy enforced
   repo-wide across all 5 packages, and a build/push matrix publishing
-  `<org>/shepherd-<svc>:<sha>` + `:latest` to Docker Hub on merge to main. Required GitHub
-  config: secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`, var `DOCKERHUB_ORG`.
-- `deploy/` - production operator runbook: pull-only `docker-compose.prod.yml` (pre-built Docker
-  Hub images, no git clone), `deploy.sh` idempotent deploy script, `config.example.toml` and
+  `ghcr.io/<owner>/shepherd-<svc>:<sha>` + `:latest` as private GHCR packages on merge to main.
+  Auth uses the built-in `GITHUB_TOKEN` (`packages: write`); no registry secrets required.
+- `deploy/` - production operator runbook: pull-only `docker-compose.prod.yml` (pre-built GHCR
+  images, no git clone), `deploy.sh` idempotent deploy script, `config.example.toml` and
   `.env.example` templates.
 - `libs/shepherd_config` - central `config.toml` (path via `SHEPHERD_CONFIG`) holds the DB
   connection string and company-to-schema map; loaded with `${VAR}` env interpolation. Fleet-api
