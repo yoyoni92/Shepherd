@@ -54,6 +54,9 @@ user decision made with that history in view.
 - **Migrated STT/vision keep their current model IDs** (`whisper-1`,
   `gemini-2.0-flash`) - relocation, not behavior change. A vision-model upgrade is a
   separate optional follow-up.
+- **Observability:** **Phoenix (Arize), self-hosted**, instrumented via
+  OpenTelemetry + OpenInference. Backend-agnostic by construction (OTel), so a later
+  switch to Langfuse is possible without re-instrumenting call sites.
 
 ### OPEN DECISION (please confirm at review): who owns the pgvector tables?
 
@@ -83,6 +86,7 @@ config via `pydantic-settings` + `shepherd_config` overlay.
 services/ai-service/app/
   main.py                 # FastAPI app + /health + routers
   config.py deps.py       # settings (keys, fleet_api_url) + verify_internal_token
+  tracing.py              # NEW Phoenix/OTel setup: register + OpenInference instrumentors
   stt.py                  # Whisper impl, moved verbatim from bot
   vision.py               # Gemini doc-extract impl, moved verbatim from bot
   classify.py             # NEW Gemini classifier (gemini-2.5-flash-lite)
@@ -179,13 +183,41 @@ Assumes the recommended ownership option (Fleet API owns vector tables).
   end-to-end; never returns another company's chunks.
 - Consumers: bot ("ask about our docs") and webui.
 
+## Observability (Phoenix, self-hosted)
+
+Because every LLM call funnels through `ai-service`, tracing is instrumented once there
+and covers all capabilities (STT, vision, classifier, DB agent, RAG) automatically.
+
+- **Mechanism:** OpenTelemetry + OpenInference auto-instrumentation of the provider
+  SDKs - `openinference-instrumentation-openai` (Whisper) and
+  `openinference-instrumentation-google-genai` (Gemini). Spans export over OTLP to a
+  self-hosted Phoenix collector. No manual span code at call sites; new capabilities are
+  traced for free as long as they go through the instrumented SDKs.
+- **`app/tracing.py`:** calls `phoenix.otel.register(...)` and the two OpenInference
+  instrumentors at app startup (from `main.py`), reading the collector endpoint from
+  config. A single `tracing_enabled` flag (default off in tests) makes it a no-op when
+  unset, so tests never export.
+- **Usage slicing:** tag spans with `company_id` and `capability`
+  (`stt`/`vision`/`classify`/`agent`/`rag`) so usage and token counts can be sliced per
+  company and per feature in the Phoenix UI. Token usage and latency are captured per
+  span by OpenInference; model pricing can be configured in Phoenix for cost rollups.
+- **Privacy:** spans carry prompt/response payloads (company docs, accident text, driver
+  data). Phoenix is self-hosted and internal-only - this data never leaves the
+  environment. Not exposed publicly.
+- **Deps (ai-service `pyproject.toml`):** `arize-phoenix-otel`,
+  `openinference-instrumentation-openai`, `openinference-instrumentation-google-genai`
+  (OTel SDK/exporter come transitively).
+
 ## Wiring
 
-- `docker-compose.yml`: add `ai-service` (repo-root build context, port 8001, env
+- `docker-compose.yml`: add a `phoenix` service (`arizephoenix/phoenix` image, UI/OTLP
+  port `6006`, SQLite-backed volume for durability; Postgres backing via
+  `PHOENIX_SQL_DATABASE_URL` is an option). Add `ai-service` (repo-root build context,
+  port 8001, env
   `OPENAI_API_KEY`/`GEMINI_API_KEY`/`INTERNAL_SERVICE_TOKEN`/`FLEET_API_URL`/
-  `SHEPHERD_CONFIG`, `/health` healthcheck). `telegram-bot` `depends_on` it, loses the
-  two LLM keys, gains `AI_SERVICE_URL`. `fleet-api` gains `AI_SERVICE_URL` (Phase 3 index
-  trigger).
+  `PHOENIX_COLLECTOR_ENDPOINT`/`SHEPHERD_CONFIG`, `/health` healthcheck). `ai-service`
+  `depends_on` `phoenix`. `telegram-bot` `depends_on` ai-service, loses the two LLM keys,
+  gains `AI_SERVICE_URL`. `fleet-api` gains `AI_SERVICE_URL` (Phase 3 index trigger).
 - `config.toml` + `config.example.toml`: add `ai_service_url` under `[services]`.
 - `.env.example`: keys documented as owned by ai-service.
 
@@ -202,6 +234,8 @@ Assumes the recommended ownership option (Fleet API owns vector tables).
   fail->retry+counter, cap->accept, voice path, fail-open).
 - **fleet-api** (Phase 3): `rag/chunks` + `rag/search` with company scoping under the
   existing testcontainers-postgres suite (pgvector enabled in the test image).
+- **Tracing** is a no-op in all test runs (`tracing_enabled` off / no collector
+  endpoint), so the suite never exports spans or requires a running Phoenix.
 
 ## Phasing (delivery order)
 
@@ -215,7 +249,8 @@ Each phase is independently shippable. The implementation plan sequences them.
 ## Docs to update (same commit as code, per repo pre-commit rule)
 
 - `ROADMAP.md` - Phase 2: AI service re-introduced; Drive-files RAG now in build.
-- root `README.md`, `services/telegram-bot/README.md`, new `services/ai-service/README.md`.
+- root `README.md`, `services/telegram-bot/README.md`, new `services/ai-service/README.md`
+  (document the Phoenix observability setup + how to open the UI).
 - `.env.example`, `config.example.toml`.
 - `CONTEXT.md` - if RAG/agent introduce canonical domain terms.
 
