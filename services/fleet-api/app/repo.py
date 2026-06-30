@@ -725,7 +725,12 @@ def find_enrollment_by_phone(session: Session, phone: str):
     from sqlalchemy import Connection as SAConnection
     assert isinstance(session.bind, SAConnection), "session.bind must be a Connection here"
     engine = session.bind.engine
-    for schema in _registered_schemas(session):
+    # Drivers live only in tenant (company) schemas. _registered_schemas() also appends the
+    # shared schema, which holds no tenant tables, so search the distinct company schema_names
+    # directly - querying <shared>.drivers would raise UndefinedTable.
+    rows = session.execute(select(CompanySettings.schema_name).distinct()).scalars().all()
+    company_schemas = sorted({s for s in rows if s and s != "__pending__"})
+    for schema in company_schemas:
         with engine.connect() as conn:
             tconn = conn.execution_options(
                 schema_translate_map={"tenant": schema, None: shared}
