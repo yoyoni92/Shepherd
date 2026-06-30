@@ -105,6 +105,35 @@ docker compose -f docker-compose.prod.yml --env-file .env down
 ./deploy.sh
 ```
 
+## Deploy from GitHub (manual)
+
+The `deploy` job in `.github/workflows/ci.yml` ships the **rotating** secrets to
+the host and runs `deploy.sh`, without ever baking them into images. Trigger it
+from the Actions tab (`Run workflow`), optionally passing a `tag` to override
+`TAG` in the host `.env`.
+
+It injects only three secrets at runtime: `TELEGRAM_BOT_TOKEN`, `GEMINI_API_KEY`,
+and the Drive service-account JSON. **Everything else** (`REGISTRY`, `TAG`,
+Postgres creds, `INTERNAL_SERVICE_TOKEN`, `AUTH_JWT_SECRET`, `NEXTAUTH_SECRET`,
+`ADMIN_*`), plus `config.toml` and a completed `docker login`, must already be
+present in the host's `deploy/` folder (steps 1-4 above) - the job does not
+create them.
+
+**Required GitHub Actions secrets** (repo Settings -> Secrets and variables ->
+Actions):
+
+| Secret               | Purpose                                                       |
+| -------------------- | ------------------------------------------------------------ |
+| `DEPLOY_SSH_HOST`    | Host to SSH into.                                             |
+| `DEPLOY_SSH_USER`    | SSH user that owns `deploy/` and can run Docker.             |
+| `DEPLOY_SSH_KEY`     | Private SSH key for that user (PEM).                          |
+| `TELEGRAM_BOT_TOKEN` | BotFather token, upserted into `.env`.                        |
+| `GEMINI_API_KEY`     | Gemini key, upserted into `.env`.                             |
+| `GDRIVE_SA_JSON`     | Drive service-account JSON, **base64** (`base64 -w0 sa.json`). |
+
+Optional **variable** `DEPLOY_PATH` sets the `deploy/` location on the host
+(default `deploy`, i.e. `~/deploy`).
+
 ## Notes
 
 - `.env`, `config.toml`, and `secrets/` are git-ignored and must never be

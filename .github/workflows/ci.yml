@@ -4,6 +4,13 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Manual deploy: ships the rotating secrets to the host and runs deploy.sh.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (overrides TAG in the host .env). Blank keeps the current TAG."
+        required: false
+        default: ""
 
 # Cancel superseded runs on the same ref (a new PR push supersedes the previous one).
 concurrency:
@@ -134,3 +141,72 @@ jobs:
           tags: |
             ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:${{ github.sha }}
             ${{ vars.DOCKERHUB_ORG }}/shepherd-${{ matrix.svc }}:latest
+
+  deploy:
+    # Manual-only (workflow_dispatch). Injects the rotating secrets into the host's
+    # deploy/.env (and the Drive service-account JSON) over SSH at runtime, then runs
+    # deploy.sh. Secrets live only in GitHub + the host's git-ignored files, never in
+    # a pushed image. The host must already hold deploy/ with the REST of .env
+    # (REGISTRY, TAG, DB creds, INTERNAL_SERVICE_TOKEN, AUTH/NEXTAUTH secrets, ADMIN_*),
+    # config.toml, and a completed `docker login`. This step ships only the three
+    # rotating secrets: TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, and the Drive SA key.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Stage secret files
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Base64 of the Drive service-account JSON (base64 -w0 sa.json).
+          GDRIVE_SA_JSON_B64: ${{ secrets.GDRIVE_SA_JSON }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          umask 077
+          # Fragment of .env lines to upsert on the host. Only the rotating secrets
+          # (plus TAG when an override was supplied via the dispatch input).
+          : > env.fragment
+          printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN" >> env.fragment
+          printf 'GEMINI_API_KEY=%s\n'     "$GEMINI_API_KEY"     >> env.fragment
+          [ -n "$TAG" ] && printf 'TAG=%s\n' "$TAG" >> env.fragment
+          printf '%s' "$GDRIVE_SA_JSON_B64" | base64 -d > gdrive-sa.json
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Ship secrets and deploy
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          # Path to the deploy/ folder on the host, relative to the SSH user's home
+          # (or absolute). Defaults to ~/deploy.
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || 'deploy' }}
+        run: |
+          SSH=(ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "$SSH_USER@$SSH_HOST")
+          # Stage the secret files in a transient dir, then merge + deploy remotely.
+          "${SSH[@]}" "rm -rf ~/.shepherd-stage && mkdir -m700 -p ~/.shepherd-stage '$DEPLOY_PATH/secrets'"
+          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            env.fragment gdrive-sa.json "$SSH_USER@$SSH_HOST:~/.shepherd-stage/"
+          "${SSH[@]}" "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+          set -euo pipefail
+          umask 077
+          cd "$DEPLOY_PATH"
+          [ -f .env ] || { echo "ERROR: $DEPLOY_PATH/.env missing - seed the host .env first" >&2; exit 1; }
+          # Upsert each fragment line into .env (replace existing key, else append).
+          while IFS='=' read -r k v; do
+            [ -z "$k" ] && continue
+            tmp=$(mktemp)
+            grep -v "^${k}=" .env > "$tmp" || true
+            printf '%s=%s\n' "$k" "$v" >> "$tmp"
+            mv "$tmp" .env
+          done < ~/.shepherd-stage/env.fragment
+          install -m600 ~/.shepherd-stage/gdrive-sa.json secrets/gdrive-sa.json
+          rm -rf ~/.shepherd-stage
+          ./deploy.sh
+          REMOTE
