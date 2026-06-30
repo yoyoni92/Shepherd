@@ -34,7 +34,10 @@ services:
     command: sh entrypoint.sh
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-shepherd}:${POSTGRES_PASSWORD:-shepherd}@postgres:5432/${POSTGRES_DB:-shepherd}
-      # Central config (DB url + per-company schema map). build()/seed read it via get_config().
+      # Central config (DB url + per-company schema map). build()/seed read it via get_config(),
+      # which interpolates EVERY ${VAR} in config.toml (including [services].fleet_api_url),
+      # so FLEET_API_URL must be present even though db-init never calls Fleet API.
+      FLEET_API_URL: http://fleet-api:8000
       SHEPHERD_CONFIG: /etc/shepherd/config.toml
     volumes:
       - ./config.toml:/etc/shepherd/config.toml:ro
@@ -57,6 +60,9 @@ services:
       # Google Drive storage (Fleet API owns uploads).
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gdrive-sa.json
       GDRIVE_FOLDER_ID: ${GDRIVE_FOLDER_ID:-}
+      # get_config() interpolates [services].fleet_api_url, so FLEET_API_URL must resolve
+      # even though Fleet API is itself the target (it does not call out to this URL).
+      FLEET_API_URL: http://fleet-api:8000
       # Central config (DB url + per-company schema map). deps.get_engine reads it via get_config().
       SHEPHERD_CONFIG: /etc/shepherd/config.toml
     volumes:

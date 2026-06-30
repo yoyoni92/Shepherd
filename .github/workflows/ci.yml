@@ -125,9 +125,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pipx install poetry
-      # secrets/ is git-ignored; without a real file Docker mounts a directory at the
-      # gdrive key path. A placeholder is enough since e2e mocks Drive/LLM.
-      - run: mkdir -p secrets && echo '{}' > secrets/gdrive-sa.json
+      # config.toml and secrets/ are git-ignored (local-only); without real files Docker
+      # mounts a directory at each path. The committed example resolves its ${VAR}s from
+      # the compose env; the gdrive placeholder is enough since e2e mocks Drive/LLM.
+      - run: |
+          cp config.example.toml config.toml
+          mkdir -p secrets && echo '{}' > secrets/gdrive-sa.json
       # Build + start only what e2e needs; depends_on pulls in postgres and the
       # one-shot db-init (schema + seed) before Fleet API.
       - run: docker compose up -d --build fleet-api
