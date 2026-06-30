@@ -14,7 +14,11 @@ grow it across four capabilities:
 2. **NL->DB agent** - convert a user prompt into a proper search over Shepherd data via
    Gemini function-calling against Fleet API's existing read endpoints.
 3. **Per-company RAG agent** - answer questions about a company's documents (the planned
-   Google-Drive-files RAG), scoped per company.
+   Google-Drive-files RAG), scoped per company, backed by pgvector tables owned by
+   Fleet API.
+4. **General-queries endpoint** - a single `POST /ask` that unions the DB tools and the
+   RAG docs tool in one function-calling loop, so a surface can ask any question without
+   pre-choosing the source.
 
 All capabilities live in one service; delivery is phased (see Phasing). The bot and the
 WebUI call `ai-service` over HTTP. After Phase 1 the bot holds no LLM provider keys.
@@ -64,21 +68,23 @@ user decision made with that history in view.
   OpenTelemetry + OpenInference. Backend-agnostic by construction (OTel), so a later
   switch to Langfuse is possible without re-instrumenting call sites.
 
-### OPEN DECISION (please confirm at review): who owns the pgvector tables?
+### Vector-table ownership (decided): Fleet API owns the pgvector tables
 
-Your invariant is "Fleet API is the sole Postgres writer." Two options:
+`Fleet API` owns the vector tables and exposes proper RAG endpoints; `ai-service` stays
+stateless w.r.t. Postgres and calls Fleet API to store and search. This preserves the
+"Fleet API is the sole Postgres writer" invariant and reuses Fleet API's existing
+schema-per-tenant resolution (`deps.py:81-95`). The index path is Fleet API ->
+ai-service -> Fleet API, made asynchronous to avoid a synchronous request cycle.
 
-- **(Recommended) Fleet API owns the vector tables** and exposes `store-chunks` and
-  `search` as typed read/write tools; `ai-service` stays stateless w.r.t. Postgres and
-  calls Fleet API for both. Pros: preserves the invariant; reuses Fleet API's existing
-  schema-per-tenant resolution (`deps.py:81-95`). Cons: more inter-service plumbing; the
-  index path is Fleet API -> ai-service -> Fleet API (made asynchronous to avoid a
-  synchronous request cycle).
-- **(Alternative) ai-service owns its own vector tables** as a scoped carve-out (AI
-  artifacts are not domain data). Pros: no service cycle, RAG cohesive in one service.
-  Cons: a second Postgres writer; must replicate schema-per-tenant scoping in ai-service.
+### General-queries endpoint (added): `POST /ask`
 
-This design assumes the recommended option. Flag it if you prefer the carve-out.
+`ai-service` exposes a single general-queries endpoint that the surfaces (bot, webui)
+call for any free-form question. It is one Gemini function-calling loop whose tool
+catalog unions both sources: the Fleet API read endpoints (live data) and a
+`search_company_docs` tool (per-company RAG retrieval). The model routes implicitly by
+choosing tools - a data question pulls from Fleet API, a document question pulls from
+RAG, and a mixed question can use both. The focused endpoints (`/agent/query`,
+`/rag/ask`) remain available for callers that want one source explicitly.
 
 ## Architecture
 
@@ -99,12 +105,18 @@ services/ai-service/app/
   fleet.py                # internal Fleet API client (X-Internal-Token + X-Caller-Context)
   db_agent.py             # NEW NL->DB function-calling agent + Fleet API tool catalog
   rag.py                  # NEW per-company RAG: ingest (extract/chunk/embed) + ask
-  routers/{stt,vision,classify,agent,rag}.py
+  ask.py                  # NEW general-queries orchestrator (DB tools + docs tool)
+  routers/{stt,vision,classify,agent,rag,ask}.py
   tests/...
 ```
 
 Shared request/response Pydantic models go in `libs/shepherd_contracts/ai.py`, imported
 by `ai-service` and the bot client.
+
+`Fleet API` gains a `rag` router (Phase 3): `POST /rag/chunks` (upsert chunks +
+embeddings for a company/source), `POST /rag/search` (pgvector top-k within the company
+schema), and `DELETE /rag/chunks?source=...` (drop a source's chunks for re-index). All
+under the existing `X-Internal-Token` + `X-Caller-Context` guards and tenant scoping.
 
 ### Endpoints
 
@@ -117,6 +129,7 @@ by `ai-service` and the bot client.
 | `POST /agent/query` | `{question, caller_context}` | `{answer, used_tools[]}` | 2 |
 | `POST /rag/index` | `{company_id, file_id, bytes|drive_link, metadata}` | `{chunks_indexed}` | 3 |
 | `POST /rag/ask` | `{company_id, question, caller_context}` | `{answer, citations[]}` | 3 |
+| `POST /ask` (general) | `{question, caller_context}` | `{answer, citations[], used_tools[]}` | 4 |
 
 ## Phase 1 - Consolidation + accident sanity check
 
@@ -189,6 +202,23 @@ Assumes the recommended ownership option (Fleet API owns vector tables).
   end-to-end; never returns another company's chunks.
 - Consumers: bot ("ask about our docs") and webui.
 
+## Phase 4 - General-queries endpoint (`POST /ask`)
+
+The unified, primary consumer-facing endpoint. `ask.py` runs one Gemini
+function-calling loop whose tool catalog is the union of:
+
+- the Phase 2 Fleet API read tools (live fleet data), and
+- a `search_company_docs` tool that performs Phase 3 RAG retrieval (embed the query ->
+  Fleet API `POST /rag/search` -> top-k chunks).
+
+The model routes implicitly: data questions hit Fleet API, document questions hit RAG,
+mixed questions use both. Returns `{answer, citations[], used_tools[]}`. The caller's
+`caller_context` is forwarded on every Fleet API call, so permissions and tenant scope
+hold across both sources. Depends on Phases 2 and 3. The focused `/agent/query` and
+`/rag/ask` endpoints remain for callers wanting a single source.
+
+Consumers: bot (a general "ask" entry point) and webui (console assistant).
+
 ## Observability (Phoenix, self-hosted)
 
 Because every LLM call funnels through `ai-service`, tracing is instrumented once there
@@ -204,7 +234,7 @@ and covers all capabilities (STT, vision, classifier, DB agent, RAG) automatical
   config. A single `tracing_enabled` flag (default off in tests) makes it a no-op when
   unset, so tests never export.
 - **Usage slicing:** tag spans with `company_id` and `capability`
-  (`stt`/`vision`/`classify`/`agent`/`rag`) so usage and token counts can be sliced per
+  (`stt`/`vision`/`classify`/`agent`/`rag`/`ask`) so usage and token counts can be sliced per
   company and per feature in the Phoenix UI. Token usage and latency are captured per
   span by OpenInference; model pricing can be configured in Phoenix for cost rollups.
 - **Privacy:** spans carry prompt/response payloads (company docs, accident text, driver
@@ -235,6 +265,8 @@ and covers all capabilities (STT, vision, classifier, DB agent, RAG) automatical
     permission errors surfaced not bypassed.
   - Phase 3: `test_rag` - chunking/embedding (embeddings stubbed), company scoping on
     ask, citation assembly.
+  - Phase 4: `test_ask` - the orchestrator selects the docs tool vs Fleet API data tools
+    appropriately, forwards caller context, and merges citations + answer.
 - **telegram-bot**: re-stub the `ai` HTTP client instead of `stt`/`vision`; update
   accident/doc_scan/update_driver tests; add sanity-check tests (pass->advance,
   fail->retry+counter, cap->accept, voice path, fail-open).
@@ -247,8 +279,10 @@ and covers all capabilities (STT, vision, classifier, DB agent, RAG) automatical
 
 - **Phase 1** - consolidation + accident sanity check (smallest, ships the original ask).
 - **Phase 2** - NL->DB function-calling agent.
-- **Phase 3** - per-company RAG (pgvector + ingestion + retrieval; depends on the
-  ownership decision and a pgvector-enabled DB image).
+- **Phase 3** - per-company RAG (Fleet API `rag` endpoints + pgvector, ingestion,
+  retrieval; needs a pgvector-enabled DB image).
+- **Phase 4** - general-queries `POST /ask` orchestrator (unions Phase 2 + Phase 3
+  tools). Depends on Phases 2 and 3.
 
 Each phase is independently shippable. The implementation plan sequences them.
 
@@ -265,10 +299,8 @@ Each phase is independently shippable. The implementation plan sequences them.
 - Upgrading the migrated vision model to `gemini-2.5-flash-lite` + structured output.
 - Switching STT off Whisper (no evidence it improves Hebrew; needs an empirical A/B
   test first).
-- A natural-language intent router that auto-picks between the DB agent and the RAG
-  agent (v1 exposes them as distinct endpoints/entry points).
 
 ## Open questions
 
-- Vector-table ownership (see "OPEN DECISION" above) - confirm before Phase 3. This is
-  the one remaining decision; everything else is pinned.
+None - all decisions are resolved. (Re-verify `gemini-embedding-001` availability on the
+API key at Phase 3 build time, since model IDs change.)
