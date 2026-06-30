@@ -45,6 +45,10 @@ PG_PASSWORD = _ENV.get("POSTGRES_PASSWORD", "shepherd")
 PG_DB = _ENV.get("POSTGRES_DB", "shepherd")
 INTERNAL_TOKEN = _ENV.get("INTERNAL_SERVICE_TOKEN", "change-me")
 PG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:5432/{PG_DB}"
+# The seeded Default Company's schema (config.example.toml maps default -> co_default).
+# The harness's direct tenant-table queries route here; control-plane tables (bot_sessions,
+# users, bot_authorizations) fall back to public.
+DEFAULT_SCHEMA = "co_default"
 
 # Point the bot's settings at the live stack BEFORE importing any app.* module
 # (pydantic reads the environment at import time).
@@ -110,7 +114,10 @@ def require_stack():
 
 
 def _connect() -> psycopg.Connection:
-    return psycopg.connect(PG_DSN, autocommit=True)
+    conn = psycopg.connect(PG_DSN, autocommit=True)
+    # Schema-per-tenant: tenant tables live in DEFAULT_SCHEMA, public holds control-plane.
+    conn.execute(f'SET search_path TO "{DEFAULT_SCHEMA}", public')
+    return conn
 
 
 def _delete_derived(cur) -> None:
