@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shepherd — מחשבון תמחור ו‑ROI</title>
+<style>
+  :root{ --bg:#0b1220; --panel:#111a2e; --panel2:#0f1830; --line:#22304d; --muted:#9fb4cf; --ink:#e8eef7; --accent:#60a5fa; --good:#34d399; --bad:#f87171; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:"Heebo","Assistant","Arial Hebrew","Segoe UI",sans-serif; background:radial-gradient(120% 120% at 85% -10%,#16315e,var(--bg) 55%); color:var(--ink); min-height:100vh; padding:26px 18px; }
+  .wrap{ max-width:960px; margin:0 auto; }
+  h1{ font-size:26px; font-weight:800; margin:0 0 2px; }
+  .sub{ color:var(--muted); font-size:14px; margin-bottom:18px; }
+  .grid{ display:grid; grid-template-columns:1.05fr .95fr; gap:18px; }
+  @media(max-width:760px){ .grid{ grid-template-columns:1fr; } }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px; }
+  .card h2{ font-size:15px; font-weight:800; margin:0 0 12px; color:#fff; }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; }
+  .row label{ font-size:13.5px; color:var(--muted); flex:1; }
+  input[type=number]{ width:120px; background:var(--panel2); border:1px solid var(--line); color:var(--ink); border-radius:9px; padding:8px 10px; font-size:14px; text-align:left; direction:ltr; font-family:inherit; }
+  select{ background:var(--panel2); border:1px solid var(--line); color:var(--ink); border-radius:9px; padding:8px 10px; font-size:14px; font-family:inherit; }
+  .res{ background:linear-gradient(135deg,#16315e,#0f1830); }
+  .big{ text-align:center; padding:8px 0 4px; }
+  .big .roi{ font-size:54px; font-weight:800; color:var(--good); line-height:1; }
+  .big .roilbl{ color:var(--muted); font-size:13px; margin-top:4px; }
+  .stat{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .s{ background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:11px 12px; }
+  .s .n{ font-size:21px; font-weight:800; color:#fff; }
+  .s .n.bad{ color:var(--bad); } .s .n.good{ color:var(--good); }
+  .s .l{ color:var(--muted); font-size:11.5px; margin-top:2px; }
+  .pay{ text-align:center; margin-top:12px; color:var(--muted); font-size:13.5px; }
+  .pay b{ color:var(--accent); font-size:16px; }
+  .breakdown{ margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
+  .breakdown .li{ display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin:5px 0; }
+  .breakdown .li b{ color:var(--ink); }
+  .note{ color:#6b84a6; font-size:11px; margin-top:14px; line-height:1.5; }
+  .ltr{ direction:ltr; unicode-bidi:embed; }
+  .tierline{ color:var(--accent); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Shepherd — מחשבון תמחור ו‑<span class="ltr">ROI</span></h1>
+  <div class="sub">הזן/י את נתוני הצי שלך — החישוב מתעדכן בזמן אמת. כל ההנחות ניתנות לעריכה.</div>
+
+  <div class="grid">
+    <!-- INPUTS -->
+    <div class="card">
+      <h2>נתוני הצי וההנחות</h2>
+      <div class="row"><label>מספר רכבים</label><input id="vehicles" type="number" min="1" value="25"></div>
+      <div class="row"><label>חבילה</label>
+        <select id="tier">
+          <option value="12">בסיסי · ₪12/רכב</option>
+          <option value="24" selected>מקצועי · ₪24/רכב</option>
+          <option value="40">ארגוני · ₪40/רכב</option>
+        </select>
+      </div>
+      <div class="row"><label>מינימום חודשי (₪) — חבילת בסיסי</label><input id="minMonthly" type="number" min="0" value="199"></div>
+      <hr style="border:none;border-top:1px dashed var(--line);margin:14px 0">
+      <div class="row"><label>שעות אדמיניסטרציה שנחסכות בשבוע</label><input id="hours" type="number" min="0" value="6"></div>
+      <div class="row"><label>עלות שעת עבודה (₪)</label><input id="rate" type="number" min="0" value="60"></div>
+      <div class="row"><label>קנסות/דוחות שנמנעים בשנה (₪)</label><input id="fines" type="number" min="0" value="3000"></div>
+      <div class="row"><label>חיסכון תחזוקה לרכב בשנה (₪)</label><input id="maint" type="number" min="0" value="220"></div>
+      <div class="note">
+        הנחת בסיס: חיסכון תחזוקה נובע מתפיסת טיפולים בזמן (לפי ק״מ) לפני תקלה. קנסות נמנעים = טסט/ביטוח פגי‑תוקף והסבת דוחות בזמן.
+        חיוב שנתי. המספרים הם נקודת פתיחה — כדאי לכייל מול לקוח אמיתי.
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="card res">
+      <h2>התוצאה</h2>
+      <div class="big"><div class="roi" id="roi">—</div><div class="roilbl">החזר השקעה (<span class="ltr">ROI</span>) שנתי</div></div>
+      <div class="stat">
+        <div class="s"><div class="n bad" id="cost">—</div><div class="l">עלות Shepherd לשנה</div></div>
+        <div class="s"><div class="n good" id="save">—</div><div class="l">חיסכון משוער לשנה</div></div>
+        <div class="s"><div class="n good" id="net">—</div><div class="l">חיסכון נטו לשנה</div></div>
+        <div class="s"><div class="n" id="perv">—</div><div class="l">עלות לרכב/חודש (אפקטיבי)</div></div>
+      </div>
+      <div class="pay">החזר ההשקעה תוך <b id="payback">—</b></div>
+      <div class="breakdown" id="bd"></div>
+    </div>
+  </div>
+
+  <div class="note" style="text-align:center;margin-top:16px">
+    Shepherd · מחשבון להמחשה · יוני 2026 · המרה ~<span class="ltr">$1 ≈ ₪3.7</span>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const ils = n => "₪" + Math.round(n).toLocaleString("he-IL");
+  function calc(){
+    const v = Math.max(1, +$("vehicles").value||0);
+    const tier = +$("tier").value;
+    const minM = +$("minMonthly").value||0;
+    const hours = +$("hours").value||0;
+    const rate = +$("rate").value||0;
+    const fines = +$("fines").value||0;
+    const maintPer = +$("maint").value||0;
+
+    // Cost: per-vehicle, with a monthly minimum only on the basic tier (12).
+    let monthly = v * tier;
+    if (tier === 12) monthly = Math.max(monthly, minM);
+    const cost = monthly * 12;
+    const perVeff = monthly / v;
+
+    // Savings.
+    const adminSave = hours * rate * 52;
+    const maintSave = maintPer * v;
+    const save = adminSave + fines + maintSave;
+    const net = save - cost;
+    const roi = cost > 0 ? (net / cost) * 100 : 0;
+
+    $("cost").textContent = ils(cost);
+    $("save").textContent = ils(save);
+    $("net").textContent = (net>=0?"+":"") + ils(net);
+    $("net").className = "n " + (net>=0?"good":"bad");
+    $("perv").textContent = ils(perVeff);
+    $("roi").textContent = (roi>=0?"+":"") + Math.round(roi) + "%";
+    $("roi").style.color = roi>=0 ? "var(--good)" : "var(--bad)";
+
+    // Payback (months) based on monthly net.
+    const monthlyNet = save/12 - monthly;
+    if (monthlyNet > 0){
+      const months = cost / (save/12);
+      $("payback").textContent = (months < 1 ? "פחות מחודש" : Math.ceil(months) + " חודשים");
+    } else {
+      $("payback").textContent = "לא מוחזר בהנחות הנוכחיות";
+    }
+
+    $("bd").innerHTML =
+      row("חיסכון בשעות אדמיניסטרציה", adminSave) +
+      row("קנסות/דוחות שנמנעו", fines) +
+      row("חיסכון תחזוקה", maintSave) +
+      row("סה״כ חיסכון", save, true) +
+      row("פחות עלות Shepherd", -cost, true);
+  }
+  function row(label, val, bold){
+    const b = bold ? "b" : "span";
+    return `<div class="li"><${b}>${label}</${b}><${b}>${(val<0?"−":"")+"₪"+Math.round(Math.abs(val)).toLocaleString("he-IL")}</${b}></div>`;
+  }
+  document.querySelectorAll("input,select").forEach(el => el.addEventListener("input", calc));
+  calc();
+</script>
+</body>
+</html>
