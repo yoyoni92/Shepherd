@@ -129,6 +129,11 @@ def update_vehicle(
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
     assert_company(existing, caller)
+
+    if body.last_maintenance_type is not None:
+        mtype_id = body.maintenance_type_id or existing.maintenance_type_id
+        _validate_cycle_position(session, body.last_maintenance_type, mtype_id)
+
     vehicle = repo.update_vehicle(session, vehicle_id, body.model_dump(exclude_unset=True))
     return _to_read(vehicle)
 

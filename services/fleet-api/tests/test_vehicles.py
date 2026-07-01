@@ -189,3 +189,40 @@ def test_create_vehicle_position_not_in_cycle_400(client):
         headers=admin_headers(),
     )
     assert r.status_code == 400
+
+
+def test_update_vehicle_sets_cycle_position(client):
+    mt = _make_cycle(client, ["small", "big", "huge"])
+    plate = _plate(uuid.uuid4().hex[:6])
+    create_r = client.post(
+        "/vehicles",
+        json={"licensing_plate": plate, "maintenance_type_id": mt},
+        headers=admin_headers(),
+    )
+    vehicle_id = create_r.json()["vehicle_id"]
+    r = client.patch(
+        f"/vehicles/{vehicle_id}",
+        json={"last_maintenance_type": "small", "last_maintenance_km": 10000},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["next_maintenance_type"] == "big"        # step after "small"
+    assert data["next_maintenance_km"] == 20000
+
+
+def test_update_vehicle_position_not_in_cycle_400(client):
+    mt = _make_cycle(client, ["small", "big"])
+    plate = _plate(uuid.uuid4().hex[:6])
+    create_r = client.post(
+        "/vehicles",
+        json={"licensing_plate": plate, "maintenance_type_id": mt},
+        headers=admin_headers(),
+    )
+    vehicle_id = create_r.json()["vehicle_id"]
+    r = client.patch(
+        f"/vehicles/{vehicle_id}",
+        json={"last_maintenance_type": "nope"},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400

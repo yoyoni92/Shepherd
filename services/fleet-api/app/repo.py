@@ -103,6 +103,9 @@ def update_vehicle(session: Session, vehicle_id: UUID, data: dict) -> Vehicle | 
         return None
     for key, value in data.items():
         setattr(vehicle, key, value)
+    session.flush()
+    if "last_maintenance_type" in data and vehicle.last_maintenance_type is not None:
+        apply_cycle_position(vehicle)
     session.commit()
     session.refresh(vehicle)
     return vehicle

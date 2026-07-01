@@ -50,6 +50,9 @@ class VehicleUpdate(BaseModel):
     maintenance_type_id: UUID | None = None
     insurance_valid_to: date | None = None
     license_valid_to: date | None = None
+    last_maintenance_type: str | None = None
+    last_maintenance_km: int | None = None
+    last_maintenance_date: date | None = None
 
 
 class VehicleRead(BaseModel):
