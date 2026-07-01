@@ -168,6 +168,51 @@ def test_create_vehicle_without_position_leaves_next_unset(client):
     assert r.json()["next_maintenance_type"] is None     # unchanged behavior
 
 
+def test_create_three_vehicles_each_at_a_different_cycle_position(client):
+    # One 3-care cycle; three cars added, each set to a different last-done care.
+    # Each must derive the correct next-due care, including the wrap from the
+    # last step back to the first.
+    mt = _make_cycle(client, ["small", "big", "huge"])
+    cases = [
+        ("small", 10000, "big", 20000),
+        ("big", 20000, "huge", 30000),
+        ("huge", 30000, "small", 40000),  # wraps to the first step
+    ]
+    for last_step, last_km, want_next, want_next_km in cases:
+        r = client.post(
+            "/vehicles",
+            json={
+                "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+                "maintenance_type_id": mt,
+                "last_maintenance_type": last_step,
+                "last_maintenance_km": last_km,
+            },
+            headers=admin_headers(),
+        )
+        assert r.status_code == 201, (last_step, r.text)
+        data = r.json()
+        assert data["next_maintenance_type"] == want_next, last_step
+        assert data["next_maintenance_km"] == want_next_km, last_step
+
+
+def test_create_vehicle_position_without_km_derives_from_zero(client):
+    # Position given but no km: next_km is computed off a 0 baseline (0 + interval).
+    mt = _make_cycle(client, ["small", "big"], interval_km=15000)
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "maintenance_type_id": mt,
+            "last_maintenance_type": "small",
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["next_maintenance_type"] == "big"
+    assert data["next_maintenance_km"] == 15000
+
+
 def test_create_vehicle_position_without_maintenance_type_400(client):
     r = client.post(
         "/vehicles",
