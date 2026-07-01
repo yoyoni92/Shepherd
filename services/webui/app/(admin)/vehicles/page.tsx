@@ -15,6 +15,7 @@ import { SortChips, nextDir, type SortState } from '@/components/SortChips'
 import { VehicleCard } from '@/components/VehicleCard'
 import { EntityFormModal, type FieldDef, type FormValues } from '@/components/EntityFormModal'
 import { MaintenanceTypesPanel } from '@/components/MaintenanceTypesPanel'
+import { stepOptions } from './stepOptions'
 
 type VKey = 'plate' | 'title' | 'insurance' | 'license' | 'km' | 'customer'
 
@@ -35,9 +36,6 @@ const accessor = (v: UiVehicle, key: VKey, customerById: Record<string, string>)
   if (key === 'customer') return v.customerId ? (customerById[v.customerId] ?? '') : ''
   return v.plate
 }
-
-export const stepOptions = (types: UiMaintenanceType[], maintenanceTypeId: string) =>
-  (types.find((t) => t.id === maintenanceTypeId)?.steps ?? []).map((s) => ({ value: s, label: s }))
 
 const formFields = (
   driverOpts: { value: string; label: string }[],

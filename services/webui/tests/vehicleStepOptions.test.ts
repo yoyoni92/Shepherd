@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { stepOptions } from '@/app/(admin)/vehicles/page'
+import { stepOptions } from '@/app/(admin)/vehicles/stepOptions'
 import type { UiMaintenanceType } from '@/lib/api/schemas'
 
 const types: UiMaintenanceType[] = [
