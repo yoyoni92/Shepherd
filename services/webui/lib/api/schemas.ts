@@ -36,6 +36,9 @@ export const VehicleCreateSchema = z.object({
   driver_id: z.string().nullish(),
   customer_id: z.string().nullish(),
   maintenance_type_id: z.string().nullish(),
+  last_maintenance_type: z.string().nullish(),
+  last_maintenance_km: z.number().nullish(),
+  last_maintenance_date: z.string().nullish(),
   insurance_valid_to: z.string().nullish(),
   license_valid_to: z.string().nullish(),
 })
@@ -265,6 +268,8 @@ export interface UiVehicle {
   lastService: string | null // last_maintenance_date
   nextMaintenanceKm: number | null
   nextMaintenanceType: string | null
+  lastMaintenanceType: string | null
+  lastMaintenanceKm: number | null
   maintenanceTypeId: string | null // FK into the maintenance_types catalog
   maintenanceTypeName: string | null // resolved name for display
 }

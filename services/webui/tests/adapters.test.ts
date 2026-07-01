@@ -15,6 +15,7 @@ describe('toUiVehicle', () => {
       id: 'v1', plate: '12-345-67', vehicleType: 'truck', make: 'Toyota', model: 'Corolla',
       driverId: 'd9', customerId: 'c2', currentKm: 84000, insurance: '2026-09-02', licenseValidTo: '2026-07-01',
       lastService: '2026-04-12', nextMaintenanceKm: 90000, nextMaintenanceType: 'גדול',
+      lastMaintenanceType: null, lastMaintenanceKm: null,
       maintenanceTypeId: 'mt1', maintenanceTypeName: 'קטן ואז גדול',
     })
   })
@@ -62,7 +63,7 @@ describe('toUiMaintenanceType', () => {
 
 describe('toUiAccident', () => {
   const vehicleById: Record<string, UiVehicle> = {
-    v1: { id: 'v1', plate: '12-345-67', vehicleType: 'car', make: 'Toyota', model: 'Corolla', driverId: 'd1', customerId: null, currentKm: null, insurance: null, licenseValidTo: null, lastService: null, nextMaintenanceKm: null, nextMaintenanceType: null, maintenanceTypeId: null, maintenanceTypeName: null },
+    v1: { id: 'v1', plate: '12-345-67', vehicleType: 'car', make: 'Toyota', model: 'Corolla', driverId: 'd1', customerId: null, currentKm: null, insurance: null, licenseValidTo: null, lastService: null, nextMaintenanceKm: null, nextMaintenanceType: null, lastMaintenanceType: null, lastMaintenanceKm: null, maintenanceTypeId: null, maintenanceTypeName: null },
   }
   const driverById: Record<string, UiDriver> = {
     d1: { id: 'd1', name: 'דנה לוי', phone: '050', license: 'IL-1', licExpiry: null, status: 'on' },

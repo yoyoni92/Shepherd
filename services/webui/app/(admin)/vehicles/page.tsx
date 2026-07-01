@@ -8,7 +8,7 @@ import { useMaintenanceTypes } from '@/hooks/useMaintenanceTypes'
 import { sortItems } from '@/lib/domain'
 import { plate as plateGuard, nonNegInt } from '@/lib/validation'
 import { VEHICLE_TYPES, VEHICLE_TYPE_LABEL } from '@/lib/vehicleTypes'
-import type { UiVehicle, VehicleCreate } from '@/lib/api/schemas'
+import type { UiVehicle, UiMaintenanceType, VehicleCreate } from '@/lib/api/schemas'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { SortChips, nextDir, type SortState } from '@/components/SortChips'
@@ -36,10 +36,14 @@ const accessor = (v: UiVehicle, key: VKey, customerById: Record<string, string>)
   return v.plate
 }
 
+export const stepOptions = (types: UiMaintenanceType[], maintenanceTypeId: string) =>
+  (types.find((t) => t.id === maintenanceTypeId)?.steps ?? []).map((s) => ({ value: s, label: s }))
+
 const formFields = (
   driverOpts: { value: string; label: string }[],
   customerOpts: { value: string; label: string }[],
   maintenanceOpts: { value: string; label: string }[],
+  maintenanceTypes: UiMaintenanceType[],
 ): FieldDef[] => [
   { key: 'licensing_plate', label: 'מספר רישוי', type: 'text', required: true, ltr: true, placeholder: '12-345-67', validate: plateGuard },
   { key: 'vehicle_type', label: 'סוג רכב', type: 'select', required: true, options: VEHICLE_TYPES.map((t) => ({ value: t, label: VEHICLE_TYPE_LABEL[t] })) },
@@ -47,6 +51,9 @@ const formFields = (
   { key: 'model', label: 'דגם', type: 'text' },
   { key: 'current_km', label: 'ק״מ נוכחי', type: 'number', validate: nonNegInt },
   { key: 'maintenance_type_id', label: 'סוג טיפול', type: 'select', options: maintenanceOpts },
+  { key: 'last_maintenance_type', label: 'טיפול אחרון שבוצע', type: 'select', options: (v) => stepOptions(maintenanceTypes, v.maintenance_type_id) },
+  { key: 'last_maintenance_km', label: 'ק״מ בטיפול האחרון', type: 'number', validate: nonNegInt },
+  { key: 'last_maintenance_date', label: 'תאריך טיפול אחרון', type: 'date' },
   { key: 'driver_id', label: 'נהג משויך', type: 'select', options: driverOpts },
   { key: 'customer_id', label: 'לקוח', type: 'select', options: customerOpts },
   { key: 'insurance_valid_to', label: 'תוקף ביטוח', type: 'date' },
@@ -60,6 +67,9 @@ const editInitial = (v: UiVehicle): FormValues => ({
   model: v.model,
   current_km: v.currentKm != null ? String(v.currentKm) : '',
   maintenance_type_id: v.maintenanceTypeId ?? '',
+  last_maintenance_type: v.lastMaintenanceType ?? '',
+  last_maintenance_km: v.lastMaintenanceKm != null ? String(v.lastMaintenanceKm) : '',
+  last_maintenance_date: v.lastService ?? '',
   driver_id: v.driverId ?? '',
   customer_id: v.customerId ?? '',
   insurance_valid_to: v.insurance ?? '',
@@ -76,6 +86,9 @@ function toPayload(values: FormValues): Partial<VehicleCreate> {
   put('model', values.model)
   if (values.current_km.trim()) out.current_km = Number(values.current_km)
   put('maintenance_type_id', values.maintenance_type_id)
+  put('last_maintenance_type', values.last_maintenance_type)
+  if (values.last_maintenance_km.trim()) out.last_maintenance_km = Number(values.last_maintenance_km)
+  put('last_maintenance_date', values.last_maintenance_date)
   put('driver_id', values.driver_id)
   put('customer_id', values.customer_id)
   put('insurance_valid_to', values.insurance_valid_to)
@@ -98,6 +111,7 @@ export default function VehiclesPage() {
     drivers.map((d) => ({ value: d.id, label: d.name })),
     customers.map((c) => ({ value: c.id, label: c.name })),
     maintenanceTypes.map((m) => ({ value: m.id, label: m.name })),
+    maintenanceTypes,
   )
 
   const onSubmit = (values: FormValues) => {
