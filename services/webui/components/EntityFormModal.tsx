@@ -11,7 +11,7 @@ export interface FieldDef {
   label: string
   type: FieldType
   required?: boolean
-  options?: { value: string; label: string }[]
+  options?: { value: string; label: string }[] | ((values: FormValues) => { value: string; label: string }[])
   placeholder?: string
   ltr?: boolean
   /** Format check, run only on a non-empty value. Returns a Hebrew error or null. */
@@ -93,7 +93,7 @@ export function EntityFormModal({
                     style={{ padding: '9px 10px' }}
                   >
                     <option value="">— בחר/י —</option>
-                    {f.options?.map((o) => (
+                    {(typeof f.options === 'function' ? f.options(values) : f.options)?.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
