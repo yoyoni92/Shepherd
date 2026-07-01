@@ -46,3 +46,15 @@ Supporting terms:
 - **Effective persona** vs **operator** - the persona being acted as vs the
   System Admin behind it. The audit ties every Customer-Live action back to the
   operator.
+
+## Fleet
+
+- **Vehicle** - a car in a company's fleet. May be assigned to one Driver
+  (`driver_id`) and may reference one maintenance type.
+- **Maintenance type (cycle)** - an ordered list of service **care** steps plus
+  a km and/or month interval. A vehicle's next-due care is derived from the last
+  care done, wrapping around the cycle after the final step.
+- **Care** - one service step in a maintenance cycle. A vehicle's **current
+  cycle position** is the last-done care (plus optional km/date); setting it on
+  add/edit recomputes the next-due care, km, and date without logging a service
+  record.
