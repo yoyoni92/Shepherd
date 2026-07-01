@@ -45,7 +45,8 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
     # access immediately (defence-in-depth ahead of the pg_cron sweep).
     if user.expires_at is not None and user.expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
-    if user.driver is not None and user.driver.status.value != "active":
+    driver = repo.get_driver_for_bot_user(session, user.company_id, user.driver_id)
+    if driver is not None and driver[0] != "active":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown")
     attendance_enabled = (
         repo.company_feature_enabled(session, user.company_id, "attendance")
@@ -55,7 +56,7 @@ def whoami(chat_id: int, session: Db) -> BotWhoamiResponse:
     return BotWhoamiResponse(
         role=user.role.value,
         driver_id=user.driver_id,
-        driver_name=user.driver.full_name if user.driver else None,
+        driver_name=driver[1] if driver else None,
         user_id=user.id,
         company_id=user.company_id,
         attendance_enabled=attendance_enabled,
@@ -80,6 +81,7 @@ def enroll(body: BotEnrollRequest, session: Db) -> BotEnrollResponse:
     user = repo.enroll_bot_user(session, body.telegram_chat_id, body.phone_number)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_authorized")
+    driver = repo.get_driver_for_bot_user(session, user.company_id, user.driver_id)
     attendance_enabled = (
         repo.company_feature_enabled(session, user.company_id, "attendance")
         if user.company_id
@@ -88,7 +90,7 @@ def enroll(body: BotEnrollRequest, session: Db) -> BotEnrollResponse:
     return BotEnrollResponse(
         role=user.role.value,
         driver_id=user.driver_id,
-        driver_name=user.driver.full_name if user.driver else None,
+        driver_name=driver[1] if driver else None,
         user_id=user.id,
         expires_at=user.expires_at,
         attendance_enabled=attendance_enabled,

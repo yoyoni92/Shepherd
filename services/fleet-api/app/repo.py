@@ -775,6 +775,38 @@ def enroll_bot_user(session: Session, telegram_chat_id: int, phone_number: str) 
     return user
 
 
+def get_driver_for_bot_user(
+    session: Session, company_id: UUID | None, driver_id: UUID | None
+) -> tuple[str, str] | None:
+    """A bot user's driver as ``(status, full_name)``, read from the company's schema.
+
+    BotUser lives in the shared schema and its ``driver`` relationship cannot lazy-load
+    across schemas, so resolve the tenant ``Driver`` on a connection translated to the
+    company's schema. Returns None when there is no driver/company or the row is missing.
+    """
+    from shepherd_config import get_config
+
+    if company_id is None or driver_id is None:
+        return None
+    settings = get_company_settings(session, company_id)
+    if settings is None or not settings.schema_name or settings.schema_name == "__pending__":
+        return None
+    from sqlalchemy import Connection as SAConnection
+
+    assert isinstance(session.bind, SAConnection), "session.bind must be a Connection here"
+    shared = get_config().database.shared_schema
+    with session.bind.engine.connect() as conn:
+        tconn = conn.execution_options(
+            schema_translate_map={"tenant": settings.schema_name, None: shared}
+        )
+        with Session(bind=tconn) as s:
+            d = s.get(Driver, driver_id)
+            if d is None:
+                return None
+            status = d.status.value if hasattr(d.status, "value") else d.status
+            return (status, d.full_name)
+
+
 def get_bot_user(session: Session, user_id: UUID) -> BotUser | None:
     return session.get(BotUser, user_id)
 
