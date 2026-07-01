@@ -127,3 +127,65 @@ def test_list_vehicles_driver_sees_own_only(client):
     plates = [v["licensing_plate"] for v in r.json()]
     assert p_own in plates
     assert p_other not in plates
+
+
+def _make_cycle(client, steps, interval_km=10000):
+    r = client.post(
+        "/maintenance-types",
+        json={"name": f"cyc-{uuid.uuid4().hex[:6]}", "interval_km": interval_km, "steps": steps},
+        headers=admin_headers(),
+    )
+    return r.json()["id"]
+
+
+def test_create_vehicle_with_cycle_position_derives_next(client):
+    mt = _make_cycle(client, ["small", "big", "huge"])
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "maintenance_type_id": mt,
+            "last_maintenance_type": "big",
+            "last_maintenance_km": 50000,
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["last_maintenance_type"] == "big"
+    assert data["next_maintenance_type"] == "huge"      # step after "big"
+    assert data["next_maintenance_km"] == 60000          # 50000 + 10000 interval
+
+
+def test_create_vehicle_without_position_leaves_next_unset(client):
+    mt = _make_cycle(client, ["small", "big"])
+    r = client.post(
+        "/vehicles",
+        json={"licensing_plate": _plate(uuid.uuid4().hex[:6]), "maintenance_type_id": mt},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+    assert r.json()["next_maintenance_type"] is None     # unchanged behavior
+
+
+def test_create_vehicle_position_without_maintenance_type_400(client):
+    r = client.post(
+        "/vehicles",
+        json={"licensing_plate": _plate(uuid.uuid4().hex[:6]), "last_maintenance_type": "big"},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_create_vehicle_position_not_in_cycle_400(client):
+    mt = _make_cycle(client, ["small", "big"])
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "maintenance_type_id": mt,
+            "last_maintenance_type": "nope",
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400

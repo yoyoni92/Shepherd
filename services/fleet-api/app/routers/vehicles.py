@@ -11,6 +11,18 @@ from app.schemas import VehicleCreate, VehicleRead, VehicleUpdate
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
+def _validate_cycle_position(session, last_step, maintenance_type_id):
+    if last_step is None:
+        return
+    if maintenance_type_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="last_maintenance_type requires a maintenance_type_id")
+    mtype = repo.get_maintenance_type(session, maintenance_type_id)
+    if mtype is None or last_step not in mtype.steps:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="last_maintenance_type is not a step of the maintenance cycle")
+
+
 def _to_read(v) -> VehicleRead:
     return VehicleRead(
         vehicle_id=v.vehicle_id,
@@ -94,6 +106,8 @@ def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleR
     company_id = UUID(caller.company_id) if caller.company_id else None
     if repo.get_vehicle_by_plate(session, body.licensing_plate, company_id=company_id):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plate already exists")
+
+    _validate_cycle_position(session, body.last_maintenance_type, body.maintenance_type_id)
 
     data = body.model_dump()
     data["company_id"] = caller.company_id

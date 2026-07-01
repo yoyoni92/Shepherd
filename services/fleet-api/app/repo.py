@@ -62,9 +62,36 @@ def list_vehicles(
     return list(session.execute(stmt).scalars())
 
 
+def apply_cycle_position(vehicle: Vehicle) -> dict:
+    """Recompute next_* service fields from the vehicle's last_maintenance_* and its cycle.
+
+    Pointer-set only: writes next_maintenance_type/_km/_date on the vehicle and returns the
+    next_maintenance() result. Does not create care rows or touch events.
+    """
+    mtype = vehicle.maintenance_type
+    steps = mtype.steps if mtype else [vehicle.last_maintenance_type]
+    interval_km = mtype.interval_km if mtype else 10_000
+    interval_months = mtype.interval_months if mtype else None
+    nm = next_maintenance(
+        vehicle.last_maintenance_type,
+        steps,
+        last_km=vehicle.last_maintenance_km or 0,
+        interval_km=interval_km,
+        last_date=vehicle.last_maintenance_date,
+        interval_months=interval_months,
+    )
+    vehicle.next_maintenance_km = nm["next_km"]
+    vehicle.next_maintenance_date = nm["next_date"]
+    vehicle.next_maintenance_type = nm["next_type"]
+    return nm
+
+
 def create_vehicle(session: Session, data: dict) -> Vehicle:
     vehicle = Vehicle(**data)
     session.add(vehicle)
+    session.flush()
+    if vehicle.last_maintenance_type is not None:
+        apply_cycle_position(vehicle)
     session.commit()
     session.refresh(vehicle)
     return vehicle
@@ -310,26 +337,10 @@ def create_care(session: Session, data: dict) -> VehicleCare:
     session.add(care)
     session.flush()
 
-    # Cycle is data-driven: read the assigned maintenance type's km + month intervals.
-    mtype = vehicle.maintenance_type
-    steps = mtype.steps if mtype else [care.maintenance_type]
-    interval_km = mtype.interval_km if mtype else 10_000
-    interval_months = mtype.interval_months if mtype else None
-    nm = next_maintenance(
-        care.maintenance_type,
-        steps,
-        last_km=care.km_at_service,
-        interval_km=interval_km,
-        last_date=care.service_date,
-        interval_months=interval_months,
-    )
-
     vehicle.last_maintenance_date = care.service_date
     vehicle.last_maintenance_type = care.maintenance_type
     vehicle.last_maintenance_km = care.km_at_service
-    vehicle.next_maintenance_km = nm["next_km"]
-    vehicle.next_maintenance_date = nm["next_date"]
-    vehicle.next_maintenance_type = nm["next_type"]
+    nm = apply_cycle_position(vehicle)
 
     # Cycle reset: resolve any open maintenance_due event so the next due (km or
     # time, whichever first) can emit a fresh one.
