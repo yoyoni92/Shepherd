@@ -7,10 +7,15 @@ callback starts a feature; otherwise show the role menu.
 
 from __future__ import annotations
 
-from app import sessions
+import logging
+
+from app import sessions, texts
 from app.context import Ctx
 from app.fleet import FleetClient
 from app.flows import FEATURES
+from app.tg import send
+
+log = logging.getLogger(__name__)
 
 # Menu/entry callbacks -> (feature, route). Mirrors the n8n callback lookup.
 CALLBACK_MAP: dict[str, tuple[str, str]] = {
@@ -264,4 +269,11 @@ async def dispatch(raw: dict, bot, fleet: FleetClient) -> None:
     if required and ctx.role != required:
         feature, route = "access_denied", None
 
-    await FEATURES[feature](ctx, route)
+    # Safety net: any provider failure (Fleet/Whisper/Gemini/Drive) surfaces a Hebrew
+    # message instead of a silent dead chat. State is left intact so a multi-step flow
+    # can be retried from its current step.
+    try:
+        await FEATURES[feature](ctx, route)
+    except Exception:
+        log.exception("flow failed: feature=%s route=%s chat_id=%s", feature, route, chat_id)
+        await send(ctx, texts.GENERIC_ERROR)

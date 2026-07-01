@@ -84,7 +84,12 @@ async def accident(ctx: Ctx, route: str | None) -> None:
         description: str | None
         if ctx.voice_id:
             audio = await download(ctx, ctx.voice_id)
-            description = await stt.transcribe(audio)
+            try:
+                description = await stt.transcribe(audio)
+            except Exception:
+                # Keep the step so the driver can re-send the voice note or type it.
+                await send(ctx, texts.ACCIDENT_STT_FAILED)
+                return
         else:
             description = ctx.text
         ctx.state["description"] = description

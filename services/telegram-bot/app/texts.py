@@ -190,3 +190,8 @@ DOC_SCAN_APPLIED = "✅ המסמך עובד והרשומה עודכנה."
 DOC_SCAN_REVIEW = "⚠️ לא נמצאה התאמה - נדרשת בדיקה ידנית."
 DOC_SCAN_CANCELLED = "❌ הסריקה בוטלה."
 DOC_SCAN_FAILED = "⚠️ לא הצלחתי לחלץ פרטים מהמסמך. נסה/י שוב."
+
+# Resilience: any provider failure (Fleet / Gemini / Drive) surfaces GENERIC_ERROR via
+# the dispatch safety net; the accident voice step gets a specific retry-or-type message.
+GENERIC_ERROR = "⚠️ אירעה תקלה זמנית. נסה/י שוב מאוחר יותר."
+ACCIDENT_STT_FAILED = "⚠️ לא הצלחתי לעבד את ההודעה הקולית. שלח/י שוב או כתוב/י את התיאור."
