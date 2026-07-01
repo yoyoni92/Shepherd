@@ -1,5 +1,6 @@
 """T4 - Vehicles CRUD with ownership enforcement (T3 integration)."""
 import uuid
+from datetime import date, timedelta
 
 from tests.conftest import admin_headers, customer_headers, driver_headers
 
@@ -343,3 +344,103 @@ def test_update_repositioning_same_vehicle_recomputes_including_wrap(client):
     data = r2.json()
     assert data["next_maintenance_type"] == "small"      # wraps
     assert data["next_maintenance_km"] == 40000
+
+
+# --- last-care km/date bounds: last_maintenance_km <= current_km, date not in the future ---
+
+def test_create_vehicle_last_km_above_current_400(client):
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "current_km": 20000,
+            "last_maintenance_km": 30000,
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_create_vehicle_last_km_equal_current_ok(client):
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "current_km": 20000,
+            "last_maintenance_km": 20000,  # equal is allowed
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+
+
+def test_create_vehicle_future_last_date_400(client):
+    tomorrow = date.today() + timedelta(days=1)
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "last_maintenance_date": tomorrow.isoformat(),
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_create_vehicle_today_last_date_ok(client):
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": _plate(uuid.uuid4().hex[:6]),
+            "last_maintenance_date": date.today().isoformat(),  # today is allowed
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+
+
+def test_update_last_km_above_current_400(client):
+    plate = _plate(uuid.uuid4().hex[:6])
+    vid = client.post(
+        "/vehicles",
+        json={"licensing_plate": plate, "current_km": 20000},
+        headers=admin_headers(),
+    ).json()["vehicle_id"]
+    r = client.patch(
+        f"/vehicles/{vid}",
+        json={"last_maintenance_km": 30000},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_update_current_km_below_existing_last_400(client):
+    # Lowering current_km below the already-recorded last-care km must be rejected.
+    plate = _plate(uuid.uuid4().hex[:6])
+    vid = client.post(
+        "/vehicles",
+        json={"licensing_plate": plate, "current_km": 20000, "last_maintenance_km": 10000},
+        headers=admin_headers(),
+    ).json()["vehicle_id"]
+    r = client.patch(
+        f"/vehicles/{vid}",
+        json={"current_km": 5000},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_update_future_last_date_400(client):
+    plate = _plate(uuid.uuid4().hex[:6])
+    vid = client.post(
+        "/vehicles",
+        json={"licensing_plate": plate},
+        headers=admin_headers(),
+    ).json()["vehicle_id"]
+    tomorrow = date.today() + timedelta(days=1)
+    r = client.patch(
+        f"/vehicles/{vid}",
+        json={"last_maintenance_date": tomorrow.isoformat()},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400

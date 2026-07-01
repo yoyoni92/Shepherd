@@ -57,4 +57,5 @@ Supporting terms:
 - **Care** - one service step in a maintenance cycle. A vehicle's **current
   cycle position** is the last-done care (plus optional km/date); setting it on
   add/edit recomputes the next-due care, km, and date without logging a service
-  record.
+  record. The last-done km may not exceed the vehicle's `current_km` (equal is
+  allowed), and the last-done date may not be in the future.

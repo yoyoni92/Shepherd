@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
@@ -21,6 +22,17 @@ def _validate_cycle_position(session, last_step, maintenance_type_id):
     if mtype is None or last_step not in mtype.steps:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="last_maintenance_type is not a step of the maintenance cycle")
+
+
+def _validate_maintenance_bounds(last_km, current_km, last_date):
+    # A service can't have happened at a higher odometer than the car now reads,
+    # nor in the future. Only compare when both values are known.
+    if last_km is not None and current_km is not None and last_km > current_km:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="last_maintenance_km cannot exceed current_km")
+    if last_date is not None and last_date > date.today():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="last_maintenance_date cannot be in the future")
 
 
 def _to_read(v) -> VehicleRead:
@@ -108,6 +120,9 @@ def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleR
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plate already exists")
 
     _validate_cycle_position(session, body.last_maintenance_type, body.maintenance_type_id)
+    _validate_maintenance_bounds(
+        body.last_maintenance_km, body.current_km, body.last_maintenance_date
+    )
 
     data = body.model_dump()
     data["company_id"] = caller.company_id
@@ -134,7 +149,17 @@ def update_vehicle(
         mtype_id = body.maintenance_type_id or existing.maintenance_type_id
         _validate_cycle_position(session, body.last_maintenance_type, mtype_id)
 
-    vehicle = repo.update_vehicle(session, vehicle_id, body.model_dump(exclude_unset=True))
+    data = body.model_dump(exclude_unset=True)
+    if "last_maintenance_km" in data or "current_km" in data:
+        _validate_maintenance_bounds(
+            data.get("last_maintenance_km", existing.last_maintenance_km),
+            data.get("current_km", existing.current_km),
+            None,
+        )
+    if "last_maintenance_date" in data:
+        _validate_maintenance_bounds(None, None, data["last_maintenance_date"])
+
+    vehicle = repo.update_vehicle(session, vehicle_id, data)
     return _to_read(vehicle)
 
 
