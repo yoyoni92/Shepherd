@@ -1,3 +1,4 @@
+import { test, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { EntityFormModal, type FieldDef } from '@/components/EntityFormModal'
 
