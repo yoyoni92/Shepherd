@@ -118,3 +118,76 @@ def test_log_care_driver_forbidden(client):
         headers=driver_headers(str(uuid.uuid4())),
     )
     assert r.status_code == 403
+
+
+# --- care km/date bounds: km_at_service <= current_km, service_date not in the future ---
+
+from datetime import date, timedelta  # noqa: E402
+
+
+def _make_vehicle_with_km(client, current_km) -> str:
+    mt = client.post(
+        "/maintenance-types",
+        json={
+            "name": f"cycle-{uuid.uuid4().hex[:6]}",
+            "interval_km": 10000,
+            "steps": ["small", "big"],
+        },
+        headers=admin_headers(),
+    ).json()
+    r = client.post(
+        "/vehicles",
+        json={
+            "licensing_plate": f"CARE-{uuid.uuid4().hex[:6]}",
+            "maintenance_type_id": mt["id"],
+            "current_km": current_km,
+        },
+        headers=admin_headers(),
+    )
+    return r.json()["vehicle_id"]
+
+
+def test_log_care_km_above_current_400(client):
+    vehicle_id = _make_vehicle_with_km(client, 20000)
+    r = client.post(
+        "/vehicle_care",
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2025-06-01",
+            "maintenance_type": "small",
+            "km_at_service": 30000,  # exceeds current_km
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400
+
+
+def test_log_care_km_equal_current_ok(client):
+    vehicle_id = _make_vehicle_with_km(client, 20000)
+    r = client.post(
+        "/vehicle_care",
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2025-06-01",
+            "maintenance_type": "small",
+            "km_at_service": 20000,  # equal is allowed
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+
+
+def test_log_care_future_date_400(client):
+    vehicle_id = _make_vehicle_with_km(client, 20000)
+    tomorrow = date.today() + timedelta(days=1)
+    r = client.post(
+        "/vehicle_care",
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": tomorrow.isoformat(),
+            "maintenance_type": "small",
+            "km_at_service": 10000,
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 400

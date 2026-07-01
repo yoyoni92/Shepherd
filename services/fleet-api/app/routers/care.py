@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from app import repo
 from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
+from app.routers.vehicles import validate_maintenance_bounds
 from app.schemas import VehicleCareCreate, VehicleCareRead
 
 router = APIRouter(prefix="/vehicle_care", tags=["care"])
@@ -25,6 +26,7 @@ def log_care(body: VehicleCareCreate, session: Db, caller: Caller) -> VehicleCar
     if vehicle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
     assert_company(vehicle, caller)
+    validate_maintenance_bounds(body.km_at_service, vehicle.current_km, body.service_date)
 
     care = repo.create_care(session, body.model_dump())
     return VehicleCareRead(

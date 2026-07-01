@@ -24,7 +24,7 @@ def _validate_cycle_position(session, last_step, maintenance_type_id):
                             detail="last_maintenance_type is not a step of the maintenance cycle")
 
 
-def _validate_maintenance_bounds(last_km, current_km, last_date):
+def validate_maintenance_bounds(last_km, current_km, last_date):
     # A service can't have happened at a higher odometer than the car now reads,
     # nor in the future. Only compare when both values are known.
     if last_km is not None and current_km is not None and last_km > current_km:
@@ -120,7 +120,7 @@ def create_vehicle(body: VehicleCreate, session: Db, caller: Caller) -> VehicleR
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Plate already exists")
 
     _validate_cycle_position(session, body.last_maintenance_type, body.maintenance_type_id)
-    _validate_maintenance_bounds(
+    validate_maintenance_bounds(
         body.last_maintenance_km, body.current_km, body.last_maintenance_date
     )
 
@@ -151,13 +151,13 @@ def update_vehicle(
 
     data = body.model_dump(exclude_unset=True)
     if "last_maintenance_km" in data or "current_km" in data:
-        _validate_maintenance_bounds(
+        validate_maintenance_bounds(
             data.get("last_maintenance_km", existing.last_maintenance_km),
             data.get("current_km", existing.current_km),
             None,
         )
     if "last_maintenance_date" in data:
-        _validate_maintenance_bounds(None, None, data["last_maintenance_date"])
+        validate_maintenance_bounds(None, None, data["last_maintenance_date"])
 
     vehicle = repo.update_vehicle(session, vehicle_id, data)
     return _to_read(vehicle)
