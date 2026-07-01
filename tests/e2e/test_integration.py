@@ -104,6 +104,7 @@ async def test_vehicle_issue_writes_event_row(sim, rec, db, driver_user):
 async def test_accident_persists_accident_and_attachments(sim, rec, db, driver_user, admin_user):
     await sim.tap(DRIVER_CHAT, "accident_start")
     await sim.tap(DRIVER_CHAT, "accident_safe")
+    await sim.share_location(DRIVER_CHAT, 32.08, 34.78)  # flow waits for location before description
     await sim.text(DRIVER_CHAT, "פגעתי בעמוד")
     await sim.tap(DRIVER_CHAT, "accident_road_clear")
     await sim.photo(DRIVER_CHAT)  # other driver's insurance
