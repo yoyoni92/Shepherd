@@ -186,6 +186,13 @@ def seed_fleet():
         "VALUES (%s, %s, %s, 'admin')",
         (AUTHORIZATION_ID, COMPANY_ID, ADMIN_PHONE),
     )
+    # The suite exercises the attendance flows, so turn the feature on for its company
+    # (the seeded Default Company ships with it off). company_settings is a public table.
+    cur.execute(
+        "UPDATE company_settings SET feature_flags = feature_flags || '{\"attendance\": true}'::jsonb "
+        "WHERE company_id = %s",
+        (COMPANY_ID,),
+    )
     conn.close()
 
     yield
