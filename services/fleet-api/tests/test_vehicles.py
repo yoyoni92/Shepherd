@@ -271,3 +271,75 @@ def test_update_vehicle_position_not_in_cycle_400(client):
         headers=admin_headers(),
     )
     assert r.status_code == 400
+
+
+def _make_vehicle_on_cycle(client, mt) -> str:
+    r = client.post(
+        "/vehicles",
+        json={"licensing_plate": _plate(uuid.uuid4().hex[:6]), "maintenance_type_id": mt},
+        headers=admin_headers(),
+    )
+    return r.json()["vehicle_id"]
+
+
+def test_update_three_vehicles_each_at_a_different_cycle_position(client):
+    # One 3-care cycle; three cars edited, each set to a different last-done care.
+    # Each must derive the correct next-due care, including the wrap from the
+    # last step back to the first.
+    mt = _make_cycle(client, ["small", "big", "huge"])
+    cases = [
+        ("small", 10000, "big", 20000),
+        ("big", 20000, "huge", 30000),
+        ("huge", 30000, "small", 40000),  # wraps to the first step
+    ]
+    for last_step, last_km, want_next, want_next_km in cases:
+        vehicle_id = _make_vehicle_on_cycle(client, mt)
+        r = client.patch(
+            f"/vehicles/{vehicle_id}",
+            json={"last_maintenance_type": last_step, "last_maintenance_km": last_km},
+            headers=admin_headers(),
+        )
+        assert r.status_code == 200, (last_step, r.text)
+        data = r.json()
+        assert data["next_maintenance_type"] == want_next, last_step
+        assert data["next_maintenance_km"] == want_next_km, last_step
+
+
+def test_update_vehicle_position_without_km_derives_from_zero(client):
+    # Position given but no km: next_km is computed off a 0 baseline (0 + interval).
+    mt = _make_cycle(client, ["small", "big"], interval_km=15000)
+    vehicle_id = _make_vehicle_on_cycle(client, mt)
+    r = client.patch(
+        f"/vehicles/{vehicle_id}",
+        json={"last_maintenance_type": "small"},
+        headers=admin_headers(),
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["next_maintenance_type"] == "big"
+    assert data["next_maintenance_km"] == 15000
+
+
+def test_update_repositioning_same_vehicle_recomputes_including_wrap(client):
+    # Editing the same vehicle again re-derives next-due each time; the second
+    # edit sets the last step, so the next wraps back to the first.
+    mt = _make_cycle(client, ["small", "big", "huge"])
+    vehicle_id = _make_vehicle_on_cycle(client, mt)
+
+    r1 = client.patch(
+        f"/vehicles/{vehicle_id}",
+        json={"last_maintenance_type": "small", "last_maintenance_km": 10000},
+        headers=admin_headers(),
+    )
+    assert r1.status_code == 200
+    assert r1.json()["next_maintenance_type"] == "big"
+
+    r2 = client.patch(
+        f"/vehicles/{vehicle_id}",
+        json={"last_maintenance_type": "huge", "last_maintenance_km": 30000},
+        headers=admin_headers(),
+    )
+    assert r2.status_code == 200
+    data = r2.json()
+    assert data["next_maintenance_type"] == "small"      # wraps
+    assert data["next_maintenance_km"] == 40000
