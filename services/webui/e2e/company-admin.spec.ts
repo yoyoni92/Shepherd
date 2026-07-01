@@ -2,8 +2,10 @@ import { test, expect } from '@playwright/test'
 import { COMPANY_ADMIN, login } from './helpers'
 
 // A company_admin (bound to the Default Company) sees a reduced shell: the system-only
-// sections are hidden in the sidebar (lib/nav allowedRoles) and hard-blocked by the
-// middleware route gate (lib/routeAccess). Their own company-scoped data still loads.
+// sections (company/user management + ops) are hidden in the sidebar (lib/nav
+// allowedRoles) and hard-blocked by the middleware route gate (lib/routeAccess). The
+// company-scoped sections still load - including /config, which is per-company settings
+// a company admin manages for their own company (see lib/nav + routeAccess unit tests).
 test.describe('company admin', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, COMPANY_ADMIN)
@@ -11,14 +13,14 @@ test.describe('company admin', () => {
 
   test('sidebar hides the system-only sections', async ({ page }) => {
     const aside = page.locator('aside')
-    for (const href of ['/companies', '/access', '/health', '/config']) {
+    for (const href of ['/companies', '/access', '/health']) {
       await expect(aside.locator(`a[href="${href}"]`)).toHaveCount(0)
     }
   })
 
   test('sidebar still shows the company-scoped sections', async ({ page }) => {
     const aside = page.locator('aside')
-    for (const href of ['/vehicles', '/drivers', '/bot']) {
+    for (const href of ['/vehicles', '/drivers', '/bot', '/config']) {
       await expect(aside.locator(`a[href="${href}"]`)).toHaveCount(1)
     }
   })

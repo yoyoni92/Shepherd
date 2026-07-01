@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { ADMIN, COMPANY_ADMIN, login, logout, openCompanySettings } from './helpers'
+import { ADMIN, COMPANY_ADMIN, login, logout } from './helpers'
 
 // Feature 5 (per-tenant settings): the Attendance nav item is gated behind the
 // company's `attendance` feature flag for a company_admin. The flag rides in the
@@ -13,30 +13,34 @@ const ATTENDANCE_LABEL = 'נוכחות'
 // so the suite is re-runnable regardless of the flag's current persisted value.
 test.describe.configure({ mode: 'serial' })
 
-// Drive the REAL settings dialog (Companies tab -> "הגדרות" -> toggle -> "שמירה")
-// as the system admin to put the Default Company's attendance flag into a known
-// state, then drop the admin session.
+// Drive the REAL per-row attendance switch (Companies tab -> Default Company row ->
+// "נוכחות" toggle) as the system admin to put the Default Company's attendance flag
+// into a known state, then drop the admin session. The switch lazily loads the
+// company's settings and saves immediately on click via PATCH /settings.
 async function setAttendanceFlag(page: Page, on: boolean): Promise<void> {
   await login(page, ADMIN)
   await page.goto('/companies')
   await expect(page.locator('body')).not.toContainText('Application error')
 
-  const { dialog } = await openCompanySettings(page, 'Default Company')
+  const row = page.locator('tr', { hasText: 'Default Company' })
+  const toggle = row.getByRole('switch', { name: 'נוכחות' })
+  // The switch is disabled until the company's settings have loaded.
+  await expect(toggle).toBeEnabled()
 
-  const toggle = dialog.locator('input[type="checkbox"]')
-  if (on) await toggle.check()
-  else await toggle.uncheck()
+  const isOn = (await toggle.getAttribute('aria-checked')) === 'true'
+  if (isOn === on) {
+    await logout(page)
+    return
+  }
 
-  // Assert the save committed via the PATCH response (200). We deliberately do NOT
-  // assert on the "ההגדרות נשמרו ✓" toast: on success the mutation updates the React
-  // Query cache, which re-fires the dialog's hydration effect and immediately runs
-  // setOk(false), so the confirmation is cleared before it can be observed. The 200
-  // is the authoritative signal that the merged flag was persisted.
+  // Assert the save committed via the PATCH response (200), the authoritative signal
+  // that the merged flag was persisted, then confirm the switch reflects the new state.
   const patchResp = page.waitForResponse(
     (r) => /\/companies\/[^/]+\/settings(\?|$)/.test(r.url()) && r.request().method() === 'PATCH',
   )
-  await dialog.getByRole('button', { name: 'שמירה' }).click()
+  await toggle.click()
   expect((await patchResp).status()).toBe(200)
+  await expect(toggle).toHaveAttribute('aria-checked', String(on))
   await logout(page)
 }
 

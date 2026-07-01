@@ -24,29 +24,35 @@ export async function logout(page: Page): Promise<void> {
   await page.context().clearCookies()
 }
 
-// Open a company's per-tenant settings dialog from the Companies tab and wait until
-// the async GET /settings has hydrated the form. The dialog's effect resets the
-// credentials textarea to "" and the attendance checkbox to the persisted value
-// when settings arrive, so interacting before hydration races the effect and gets
-// silently overwritten. We block on the GET response, then on the checkbox
-// reflecting the persisted flag, which proves the hydration effect has run.
+// Open a company's Drive settings dialog from the Companies tab and wait until the
+// async GET /settings has hydrated the form. The dialog's effect resets the
+// credentials textarea to "" when settings arrive, so interacting before hydration
+// races the effect and gets silently overwritten. We block on the GET response, then
+// on the "configured" status badge, which renders only once settings have loaded -
+// proving the hydration effect has run. (Attendance is no longer in this dialog; it
+// is a per-row switch on the Companies table - see setAttendanceFlag.)
 export async function openCompanySettings(
   page: Page,
   companyName: string,
-): Promise<{ dialog: Locator; attendanceEnabled: boolean }> {
+): Promise<{ dialog: Locator }> {
   const respPromise = page.waitForResponse(
     (r) => /\/companies\/[^/]+\/settings(\?|$)/.test(r.url()) && r.request().method() === 'GET',
   )
   await page.locator('tr', { hasText: companyName }).getByRole('button', { name: 'הגדרות' }).click()
 
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByText(`הגדרות · ${companyName}`)).toBeVisible()
+  await expect(dialog.getByText(`הגדרות חברה · ${companyName}`)).toBeVisible()
 
-  const body = await (await respPromise).json()
-  const attendanceEnabled = body?.feature_flags?.attendance === true
+  await respPromise
+  // The Drive-credentials status badge (מוגדר ✓ / לא מוגדר) is rendered only once the
+  // GET has resolved, so its presence proves the hydration effect has run.
+  await expect(dialog.getByText('מוגדר').first()).toBeVisible()
 
-  // Wait for the hydration effect to apply the persisted state to the form.
-  await expect(dialog.locator('input[type="checkbox"]')).toBeChecked({ checked: attendanceEnabled })
+  // The Companies page fires a settings GET per row (each AttendanceToggle) that shares
+  // this dialog's query key; under load one can resolve late and re-run the dialog's
+  // hydration effect, wiping any value a caller just typed. Wait for the network to
+  // settle so the form is stable before the caller interacts with it.
+  await page.waitForLoadState('networkidle')
 
-  return { dialog, attendanceEnabled }
+  return { dialog }
 }
