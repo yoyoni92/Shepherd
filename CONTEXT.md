@@ -54,8 +54,14 @@ Supporting terms:
 - **Maintenance type (cycle)** - an ordered list of service **care** steps plus
   a km and/or month interval. A vehicle's next-due care is derived from the last
   care done, wrapping around the cycle after the final step.
-- **Care** - one service step in a maintenance cycle. A vehicle's **current
-  cycle position** is the last-done care (plus optional km/date); setting it on
-  add/edit recomputes the next-due care, km, and date without logging a service
-  record. The last-done km may not exceed the vehicle's `current_km` (equal is
-  allowed), and the last-done date may not be in the future.
+- **Care** - one service step in a maintenance cycle.
+  - **Back-filling the cycle position** on vehicle add/edit records a *past*
+    service (`last_maintenance_km`/date): its km may not exceed the vehicle's
+    `current_km` (equal allowed) and its date may not be in the future. It
+    recomputes the next-due care/km/date without writing a service record.
+  - **Logging a live care** (`POST /vehicle_care`) records a service happening
+    now: `km_at_service` is a fresh odometer reading, so it may not be *below*
+    `current_km` (no downgrade) and it advances `current_km` to that value; the
+    service date may not be in the future.
+  - The odometer (`current_km`) only ever increases - the same rule the KM
+    update flow enforces.

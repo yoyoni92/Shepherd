@@ -1,9 +1,10 @@
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, status
 
 from app import repo
 from app.auth import Action, assert_company, assert_permitted
 from app.deps import Caller, Db
-from app.routers.vehicles import validate_maintenance_bounds
 from app.schemas import VehicleCareCreate, VehicleCareRead
 
 router = APIRouter(prefix="/vehicle_care", tags=["care"])
@@ -26,7 +27,19 @@ def log_care(body: VehicleCareCreate, session: Db, caller: Caller) -> VehicleCar
     if vehicle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
     assert_company(vehicle, caller)
-    validate_maintenance_bounds(body.km_at_service, vehicle.current_km, body.service_date)
+
+    # A service reading is a live odometer reading: it may not be below current_km
+    # (that would downgrade the odometer) and may not be in the future. create_care
+    # advances current_km to it.
+    if vehicle.current_km is not None and body.km_at_service < vehicle.current_km:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="km_below_current"
+        )
+    if body.service_date > date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="service_date cannot be in the future",
+        )
 
     care = repo.create_care(session, body.model_dump())
     return VehicleCareRead(

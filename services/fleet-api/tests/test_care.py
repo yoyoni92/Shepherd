@@ -1,5 +1,6 @@
 """T7 - vehicle_care advances the maintenance cycle."""
 import uuid
+from datetime import date, timedelta
 
 from tests.conftest import admin_headers, driver_headers
 
@@ -120,12 +121,10 @@ def test_log_care_driver_forbidden(client):
     assert r.status_code == 403
 
 
-# --- care km/date bounds: km_at_service <= current_km, service_date not in the future ---
+# --- care km/date bounds: km_at_service is a live reading, so it may not be below
+# --- current_km (no odometer downgrade) and advances it; service_date not in the future.
 
-from datetime import date, timedelta  # noqa: E402
-
-
-def _make_vehicle_with_km(client, current_km) -> str:
+def _make_vehicle_with_km(client, current_km):
     mt = client.post(
         "/maintenance-types",
         json={
@@ -135,35 +134,36 @@ def _make_vehicle_with_km(client, current_km) -> str:
         },
         headers=admin_headers(),
     ).json()
+    plate = f"CARE-{uuid.uuid4().hex[:6]}"
     r = client.post(
         "/vehicles",
         json={
-            "licensing_plate": f"CARE-{uuid.uuid4().hex[:6]}",
+            "licensing_plate": plate,
             "maintenance_type_id": mt["id"],
             "current_km": current_km,
         },
         headers=admin_headers(),
     )
-    return r.json()["vehicle_id"]
+    return r.json()["vehicle_id"], plate
 
 
-def test_log_care_km_above_current_400(client):
-    vehicle_id = _make_vehicle_with_km(client, 20000)
+def test_log_care_km_below_current_422(client):
+    vehicle_id, _plate = _make_vehicle_with_km(client, 20000)
     r = client.post(
         "/vehicle_care",
         json={
             "vehicle_id": vehicle_id,
             "service_date": "2025-06-01",
             "maintenance_type": "small",
-            "km_at_service": 30000,  # exceeds current_km
+            "km_at_service": 10000,  # below current_km -> odometer downgrade
         },
         headers=admin_headers(),
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_log_care_km_equal_current_ok(client):
-    vehicle_id = _make_vehicle_with_km(client, 20000)
+    vehicle_id, _plate = _make_vehicle_with_km(client, 20000)
     r = client.post(
         "/vehicle_care",
         json={
@@ -177,8 +177,26 @@ def test_log_care_km_equal_current_ok(client):
     assert r.status_code == 201
 
 
+def test_log_care_above_current_advances_odometer(client):
+    vehicle_id, plate = _make_vehicle_with_km(client, 20000)
+    r = client.post(
+        "/vehicle_care",
+        json={
+            "vehicle_id": vehicle_id,
+            "service_date": "2025-06-01",
+            "maintenance_type": "small",
+            "km_at_service": 30000,  # the car drove to 30000, then was serviced
+        },
+        headers=admin_headers(),
+    )
+    assert r.status_code == 201
+    # The service reading advances the odometer.
+    v = client.get(f"/vehicles/{plate}", headers=admin_headers()).json()
+    assert v["current_km"] == 30000
+
+
 def test_log_care_future_date_400(client):
-    vehicle_id = _make_vehicle_with_km(client, 20000)
+    vehicle_id, _plate = _make_vehicle_with_km(client, 20000)
     tomorrow = date.today() + timedelta(days=1)
     r = client.post(
         "/vehicle_care",
@@ -186,7 +204,7 @@ def test_log_care_future_date_400(client):
             "vehicle_id": vehicle_id,
             "service_date": tomorrow.isoformat(),
             "maintenance_type": "small",
-            "km_at_service": 10000,
+            "km_at_service": 20000,
         },
         headers=admin_headers(),
     )

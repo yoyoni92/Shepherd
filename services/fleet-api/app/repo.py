@@ -343,6 +343,8 @@ def create_care(session: Session, data: dict) -> VehicleCare:
     vehicle.last_maintenance_date = care.service_date
     vehicle.last_maintenance_type = care.maintenance_type
     vehicle.last_maintenance_km = care.km_at_service
+    # A service reading advances the odometer (never lowers it).
+    vehicle.current_km = max(care.km_at_service, vehicle.current_km or 0)
     nm = apply_cycle_position(vehicle)
 
     # Cycle reset: resolve any open maintenance_due event so the next due (km or
