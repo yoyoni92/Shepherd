@@ -37,3 +37,6 @@ data/raw/
 .DS_Store
 .idea/
 .vscode/
+
+# Claude Code local agent config + worktrees (machine-local, never committed)
+.claude/
