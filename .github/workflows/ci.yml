@@ -165,8 +165,65 @@ jobs:
             echo "| tests/e2e | $(icon "$E2E") ${E2E:-not run} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  webui-e2e:
+    # Browser e2e (Playwright): boot the full stack - webui + fleet-api + the seeded db -
+    # and drive the real UI at :3000. depends_on pulls in postgres and the one-shot
+    # db-init (which seeds the app_users the specs log in as). No secrets needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/webui/package-lock.json
+      # config.toml + gdrive placeholder (same reason as the pytest e2e job): both are
+      # git-ignored, so without real files Docker mounts a directory at each path.
+      - run: |
+          cp config.example.toml config.toml
+          mkdir -p secrets && echo '{}' > secrets/gdrive-sa.json
+      # Bring up webui and fleet-api (the webui proxy calls fleet-api server-side);
+      # depends_on pulls in postgres and the db-init seed.
+      - run: docker compose up -d --build webui fleet-api
+      - name: Wait for the stack to be healthy
+        run: |
+          for _ in $(seq 1 40); do
+            curl -fsS http://localhost:8000/health >/dev/null 2>&1 \
+              && curl -fsS http://localhost:3000/api/auth/session >/dev/null 2>&1 \
+              && { echo "webui + fleet-api healthy"; exit 0; }
+            sleep 5
+          done
+          echo "stack did not become healthy" >&2
+          docker compose logs --tail=200
+          exit 1
+      - working-directory: services/webui
+        run: npm ci
+      - working-directory: services/webui
+        run: npx playwright install --with-deps chromium
+      - id: e2e
+        working-directory: services/webui
+        run: npm run e2e
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose logs --tail=300
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+      - name: Summary
+        if: always()
+        env:
+          E2E: ${{ steps.e2e.outcome }}
+        run: |
+          icon() { case "$1" in success) echo "✅";; failure) echo "❌";; *) echo "⏭️";; esac; }
+          {
+            echo "### 🖥️ WebUI E2E (Playwright)"
+            echo "| Suite | Result |"
+            echo "| --- | --- |"
+            echo "| services/webui/e2e | $(icon "$E2E") ${E2E:-not run} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-push:
-    needs: [python, webui, e2e]
+    needs: [python, webui, e2e, webui-e2e]
     # Publish only on push to main. !cancelled() && !failure() still guards against a
     # gate failure; with path-filtering gone every gate runs, so none are skipped.
     if: >-
@@ -253,7 +310,9 @@ jobs:
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          # Host/user are not secret: plain Variables so the deploy target can be
+          # re-pointed in Settings -> Variables without editing this workflow.
+          SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
         run: |
           umask 077
           mkdir -p ~/.ssh
@@ -262,8 +321,8 @@ jobs:
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
       - name: Ship secrets and deploy
         env:
-          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
-          SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ vars.DEPLOY_SSH_USER }}
           # Path to the deploy/ folder on the host, relative to the SSH user's home
           # (or absolute). Defaults to ~/deploy.
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || 'deploy' }}

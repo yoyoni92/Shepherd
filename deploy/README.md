@@ -122,19 +122,24 @@ present in the host's `deploy/` folder (steps 1-4 above) - the job does not
 create them.
 
 **Required GitHub Actions secrets** (repo Settings -> Secrets and variables ->
-Actions):
+Actions -> Secrets):
 
 | Secret               | Purpose                                                       |
 | -------------------- | ------------------------------------------------------------ |
-| `DEPLOY_SSH_HOST`    | Host to SSH into.                                             |
-| `DEPLOY_SSH_USER`    | SSH user that owns `deploy/` and can run Docker.             |
-| `DEPLOY_SSH_KEY`     | Private SSH key for that user (PEM).                          |
+| `DEPLOY_SSH_KEY`     | Private SSH key for the deploy user (PEM).                    |
 | `TELEGRAM_BOT_TOKEN` | BotFather token, upserted into `.env`.                        |
 | `GEMINI_API_KEY`     | Gemini key, upserted into `.env`.                             |
 | `GDRIVE_SA_JSON`     | Drive service-account JSON, **base64** (`base64 -w0 sa.json`). |
 
-Optional **variable** `DEPLOY_PATH` sets the `deploy/` location on the host
-(default `deploy`, i.e. `~/deploy`).
+**Required GitHub Actions variables** (same page -> Variables). These are the
+non-secret deploy target, kept as plain Variables so the host can be re-pointed
+without editing the workflow:
+
+| Variable          | Purpose                                          | Default   |
+| ----------------- | ------------------------------------------------ | --------- |
+| `DEPLOY_SSH_HOST` | Host to SSH into (hostname preferred over IP).   | (unset)   |
+| `DEPLOY_SSH_USER` | SSH user that owns `deploy/` and can run Docker. | (unset)   |
+| `DEPLOY_PATH`     | `deploy/` location on the host.                  | `deploy`  |
 
 ## Notes
 

@@ -51,11 +51,13 @@ GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request:
   test via the Makefile for all 5 Python packages (`libs`, `libs/shepherd_config`,
   `db`, `services/fleet-api`, `services/telegram-bot`), plus the WebUI (lint, typecheck,
   build, vitest).
-- **E2E**: boots the compose stack (Postgres + db-init seed + Fleet API) and runs the
-  cross-service `tests/e2e` suite (the real telegram-bot driven in-process; only
-  Telegram and LLM/S3 mocked).
+- **E2E (cross-service)**: boots the compose stack (Postgres + db-init seed + Fleet API)
+  and runs the `tests/e2e` suite (the real telegram-bot driven in-process; only Telegram
+  and LLM/S3 mocked).
+- **WebUI E2E (browser)**: boots webui + Fleet API + the seeded db and runs the Playwright
+  suite (`services/webui/e2e`) against the live UI at `:3000`.
 - **Build + push** all 5 service images to GHCR (`ghcr.io`) as **private** packages on
-  merge to `main`, gated on the quality + e2e jobs. Auth uses the built-in
+  merge to `main`, gated on the quality + both e2e jobs. Auth uses the built-in
   `GITHUB_TOKEN` (`packages: write`); no registry secrets required.
 
 ## Status
