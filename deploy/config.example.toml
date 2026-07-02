@@ -18,6 +18,13 @@ fleet_api_url = "${FLEET_API_URL}"
 slug = "default"
 schema = "co_default"
 
+# Playground / sandbox tenant. The seed ALWAYS creates this company; without this
+# entry its schema falls back to `public` (the shared schema), which holds no tenant
+# tables, and db-init's KPI backfill fails on the missing `public.vehicles`.
+[[company]]
+slug = "internal"
+schema = "co_internal"
+
 # Example of a second tenant (uncomment and edit to add one):
 # [[company]]
 # slug = "acme"

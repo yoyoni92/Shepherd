@@ -32,6 +32,12 @@ services:
     command: sh entrypoint.sh
     env_file:
       - .env
+    environment:
+      # get_config() reads config.toml via SHEPHERD_CONFIG (defaults to a relative
+      # config.toml that isn't in the image). Mount + point at it, like the app services.
+      SHEPHERD_CONFIG: /etc/shepherd/config.toml
+    volumes:
+      - ./config.toml:/etc/shepherd/config.toml:ro
     depends_on:
       postgres:
         condition: service_healthy
